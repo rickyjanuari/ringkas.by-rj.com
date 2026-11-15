@@ -38,6 +38,9 @@ export interface Env {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  WHATSAPP_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+  WHATSAPP_TEMPLATE_NAME?: string;
 }
 
 // Aplikasi dibuat sekali per isolate Worker, lalu dipakai ulang.
@@ -58,7 +61,10 @@ function initEnv(env: Env): void {
     turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? "",
     vapidPublicKey: env.VAPID_PUBLIC_KEY ?? "",
     vapidPrivateKey: env.VAPID_PRIVATE_KEY ?? "",
-    vapidSubject: env.VAPID_SUBJECT ?? ""
+    vapidSubject: env.VAPID_SUBJECT ?? "",
+    whatsappToken: env.WHATSAPP_TOKEN ?? "",
+    whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID ?? "",
+    whatsappTemplateName: env.WHATSAPP_TEMPLATE_NAME ?? "laporan_mingguan"
   });
   envReady = true;
 }

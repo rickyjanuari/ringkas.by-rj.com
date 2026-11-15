@@ -20,6 +20,7 @@ import {
   sendWeeklyReportEmail,
   type WeeklyReportVariables
 } from "./email.js";
+import { sendWeeklyWhatsApp } from "./whatsapp.js";
 
 export interface CronRunResult {
   job: string;
@@ -163,7 +164,7 @@ export async function runDailyJob(db: DB, now: Date = new Date()): Promise<CronR
   return result;
 }
 
-async function buildWeeklyReport(
+export async function buildWeeklyReport(
   db: DB,
   childId: string,
   dailyTarget: number,
@@ -268,6 +269,11 @@ export async function runWeeklyJob(db: DB, now: Date = new Date()): Promise<Cron
         period: `weekly:${child.id}:${weekKey}`
       });
       if (r.sent) result.sent += 1;
+      else result.skipped += 1;
+      // Laporan WhatsApp: isi yang sama, setelah email — email tetap
+      // jalan walau WhatsApp belum dikonfigurasi / gagal.
+      const w = await sendWeeklyWhatsApp(db, { parent, child, report, weekKey });
+      if (w.sent) result.sent += 1;
       else result.skipped += 1;
     } catch (err) {
       result.errors.push(`${child.id}: ${err instanceof Error ? err.message : "gagal"}`);

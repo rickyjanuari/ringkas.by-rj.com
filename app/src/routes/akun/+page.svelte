@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import Avatar from "$lib/Avatar.svelte";
 	import BottomSheet from "$lib/BottomSheet.svelte";
 	import BlogContent from "$lib/info/BlogContent.svelte";
 	import FaqContent from "$lib/info/FaqContent.svelte";
@@ -385,6 +386,9 @@
 			await loadPrediction();
 			await loadHardBank();
 			await loadReferral();
+			await loadXp();
+			await loadJournal();
+			await loadExamDates();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
@@ -412,6 +416,164 @@
 			prediction = await api<PredictionData>("/api/prediction");
 		} catch (e) {
 			predictionError = e instanceof Error ? e.message : "Gagal memuat prediksi nilai SAS.";
+		}
+	}
+
+	// ---- Level & XP ----
+	type XpEvent = { action: string; ref_id: string | null; xp: number; created_at: string };
+	type XpData = {
+		totalXp: number;
+		level: number;
+		xpIntoLevel: number;
+		xpForNextLevel: number;
+		nextLevelAt: number;
+		stage: number;
+		stageName: string;
+		events: XpEvent[];
+	};
+	let xp = $state<XpData | null>(null);
+	let xpError = $state("");
+
+	function xpLabel(action: string): string {
+		switch (action) {
+			case "chapter":
+				return "Bab selesai";
+			case "quiz":
+				return "Kuis bab";
+			case "simulation":
+				return "Simulasi";
+			case "story":
+				return "Soal cerita";
+			case "daily":
+				return "Latihan harian";
+			case "cerita":
+				return "Cerita edukasi";
+			case "streak":
+				return "Streak harian";
+			default:
+				return action;
+		}
+	}
+
+	async function loadXp() {
+		try {
+			xp = await api<XpData>("/api/xp");
+		} catch (e) {
+			xpError = e instanceof Error ? e.message : "Gagal memuat XP.";
+		}
+	}
+
+	// ---- Jurnal Harian ----
+	type JournalEntry = { date: string; text: string; updated_at: string };
+	let journalEntries = $state<JournalEntry[]>([]);
+	let journalText = $state("");
+	let journalError = $state("");
+	let journalSaving = $state(false);
+	let journalMsg = $state("");
+	let journalOk = $state(false);
+
+	/** Tanggal ISO (YYYY-MM-DD) ke format Indonesia, tanpa geser zona waktu. */
+	function formatTanggalId(iso: string): string {
+		const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+		if (Number.isNaN(d.getTime())) return iso;
+		return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+	}
+
+	async function loadJournal() {
+		try {
+			const data = await api<{ today: JournalEntry | null; entries: JournalEntry[] }>(
+				"/api/journal"
+			);
+			journalEntries = data.entries ?? [];
+			journalText = data.today?.text ?? "";
+		} catch (e) {
+			journalError = e instanceof Error ? e.message : "Gagal memuat jurnal.";
+		}
+	}
+
+	async function simpanJurnal() {
+		journalSaving = true;
+		journalMsg = "";
+		journalOk = false;
+		try {
+			const data = await api<{ ok: boolean; date?: string; deleted?: boolean }>("/api/journal", {
+				method: "POST",
+				body: JSON.stringify({ text: journalText.trim() })
+			});
+			journalMsg = data.deleted ? "Jurnal hari ini dihapus." : "Jurnal tersimpan.";
+			journalOk = true;
+			await loadJournal();
+		} catch (e) {
+			journalMsg = e instanceof Error ? e.message : "Gagal menyimpan jurnal.";
+			journalOk = false;
+		} finally {
+			journalSaving = false;
+		}
+	}
+
+	// ---- Hitung Mundur SAS ----
+	type ExamDate = { grade: number; date: string | null; label: string; daysLeft: number | null };
+	type ExamTryout = { id: string; grade: number; title: string; starts_at: string; daysLeft: number };
+	let examDates = $state<ExamDate[] | null>(null);
+	let examTryouts = $state<ExamTryout[]>([]);
+	let examError = $state("");
+
+	function examLabel(d: ExamDate): string {
+		if (d.date === null || d.daysLeft === null) return `Kelas ${d.grade} — Tanggal SAS belum diatur`;
+		if (d.daysLeft < 0) return `Kelas ${d.grade} — Sudah lewat (${formatTanggalId(d.date)})`;
+		if (d.daysLeft === 0) return `Kelas ${d.grade} — Hari ini (${formatTanggalId(d.date)})`;
+		if (d.daysLeft === 1) return `Kelas ${d.grade} — Besok (${formatTanggalId(d.date)})`;
+		return `Kelas ${d.grade} — ${d.daysLeft} hari lagi (${formatTanggalId(d.date)})`;
+	}
+
+	async function loadExamDates() {
+		try {
+			const data = await api<{ dates: ExamDate[]; tryouts: ExamTryout[] }>("/api/exam-dates");
+			examDates = data.dates ?? [];
+			examTryouts = data.tryouts ?? [];
+		} catch (e) {
+			examError = e instanceof Error ? e.message : "Gagal memuat tanggal SAS.";
+		}
+	}
+
+	// ---- Jurnal Anak (Mode Orang Tua) ----
+	let childJournal = $state<
+		Record<string, { entries: JournalEntry[]; loading: boolean; error: string; open: boolean }>
+	>({});
+
+	function childJ(id: string) {
+		return childJournal[id] ?? { entries: [], loading: false, error: "", open: false };
+	}
+
+	async function toggleChildJournal(childId: string) {
+		const cur = childJournal[childId];
+		if (cur?.open) {
+			childJournal = { ...childJournal, [childId]: { ...cur, open: false } };
+			return;
+		}
+		childJournal = {
+			...childJournal,
+			[childId]: { entries: cur?.entries ?? [], loading: true, error: "", open: true }
+		};
+		try {
+			const data = await api<{
+				child: { id: string; name: string };
+				entries: JournalEntry[];
+			}>(`/api/parent/children/${encodeURIComponent(childId)}/journal`);
+			childJournal = {
+				...childJournal,
+				[childId]: { entries: data.entries ?? [], loading: false, error: "", open: true }
+			};
+		} catch (e) {
+			childJournal = {
+				...childJournal,
+				[childId]: {
+					entries: [],
+					loading: false,
+					error: e instanceof Error ? e.message : "Gagal memuat jurnal anak.",
+					open: true
+				}
+			};
 		}
 	}
 
@@ -913,6 +1075,137 @@
 	{#if trackerError}
 		<p class="err mt-3">{trackerError}</p>
 	{/if}
+
+	<!-- Level & XP -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<Avatar stage={xp ? xp.stage : 1} size={56} />
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Level &amp; XP</p>
+				{#if xp}
+					<p class="text-sm font-extrabold text-[#177245]">Level {xp.level} • {xp.stageName}</p>
+					<p class="text-xs text-[#5f6b62]">Total XP: {xp.totalXp}</p>
+				{:else}
+					<p class="text-xs text-[#5f6b62]">Tanamanmu tumbuh seiring XP yang kamu kumpulkan.</p>
+				{/if}
+			</div>
+		</div>
+		{#if xpError}
+			<p class="err mt-3">{xpError}</p>
+		{:else if xp}
+			<div class="mt-3 h-2.5 overflow-hidden rounded-full bg-[#e7e2d2]">
+				<div
+					class="h-full bg-[#177245] transition-all"
+					style="width: {xp.xpForNextLevel > 0
+						? Math.min(100, Math.round((xp.xpIntoLevel / xp.xpForNextLevel) * 100))
+						: 100}%"
+				></div>
+			</div>
+			<p class="mt-1 text-xs font-bold text-[#5f6b62]">
+				{xp.xpIntoLevel} / {xp.xpForNextLevel} XP menuju Level {xp.level + 1}
+			</p>
+			{#if xp.events.length > 0}
+				<p class="mt-3 text-sm font-bold">Aktivitas XP terakhir</p>
+				<ul class="mt-1.5 space-y-1.5">
+					{#each xp.events.slice(0, 5) as ev (`${ev.created_at}-${ev.action}-${ev.ref_id ?? ""}`)}
+						<li class="flex items-center justify-between gap-2 text-sm">
+							<span>{xpLabel(ev.action)}</span>
+							<span class="shrink-0 font-extrabold text-[#177245]">+{ev.xp} XP</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{:else}
+			<p class="mt-3 text-sm text-[#5f6b62]">Memuat XP...</p>
+		{/if}
+	</div>
+
+	<!-- Jurnal Harian -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="pen" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Jurnal — Apa yang kupelajari hari ini?</p>
+				<p class="text-xs text-[#5f6b62]">Tulis satu hal yang kamu pelajari hari ini.</p>
+			</div>
+		</div>
+		{#if journalError}
+			<p class="err mt-3">{journalError}</p>
+		{:else}
+			<label class="lbl mt-3" for="jurnal-text">Jurnal hari ini</label>
+			<textarea
+				id="jurnal-text"
+				class="input"
+				rows="3"
+				maxlength="500"
+				bind:value={journalText}
+				placeholder="Contoh: Hari ini aku belajar membilang sampai 20..."
+			></textarea>
+			<p class="mt-1 text-right text-xs text-[#5f6b62]">{journalText.length}/500 karakter</p>
+			<button type="button" class="btn btn-primary" disabled={journalSaving} onclick={simpanJurnal}>
+				{#if journalSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Jurnal{/if}
+			</button>
+			{#if journalMsg}
+				<p class="mt-2 text-sm {journalOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{journalMsg}</p>
+			{/if}
+			{#if journalEntries.length > 0}
+				<p class="mt-4 text-sm font-bold">Jurnal terakhir</p>
+				<div class="mt-2 space-y-2">
+					{#each journalEntries.slice(0, 7) as e (e.date)}
+						<div class="card !rounded-lg p-3">
+							<p class="text-xs font-bold text-[#177245]">{formatTanggalId(e.date)}</p>
+							<p class="mt-0.5 text-sm leading-relaxed">{e.text}</p>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="mt-3 text-sm text-[#5f6b62]">Belum ada jurnal. Tulis jurnal pertamamu hari ini yuk!</p>
+			{/if}
+		{/if}
+	</div>
+
+	<!-- Hitung Mundur SAS -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="calendar" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Hitung Mundur SAS</p>
+				<p class="text-xs text-[#5f6b62]">Tanggal SAS per kelas, diatur oleh admin.</p>
+			</div>
+		</div>
+		{#if examError}
+			<p class="err mt-3">{examError}</p>
+		{:else if !examDates}
+			<p class="mt-3 text-sm text-[#5f6b62]">Memuat tanggal SAS...</p>
+		{:else}
+			<div class="mt-3 space-y-2">
+				{#each examDates as d (d.grade)}
+					<div class="card !rounded-lg flex items-center gap-3 p-3">
+						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] font-extrabold text-[#177245]">{d.grade}</span>
+						<div class="min-w-0 flex-1">
+							<p class="text-sm font-extrabold">{examLabel(d)}</p>
+							{#if d.label}
+								<p class="text-xs text-[#5f6b62]">{d.label}</p>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+			{#if examTryouts.length > 0}
+				<p class="mt-4 text-sm font-bold">Tryout mendatang</p>
+				<div class="mt-2 space-y-2">
+					{#each examTryouts as t (t.id)}
+						<div class="card !rounded-lg p-3 text-sm">
+							<p class="font-bold">{t.title}</p>
+							<p class="text-xs text-[#5f6b62]">
+								Kelas {t.grade} • {t.daysLeft} hari lagi • {formatTanggalId(t.starts_at)}
+							</p>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		{/if}
+	</div>
 
 	<!-- Edit WA -->
 	<div class="card mt-3 p-4">
@@ -1469,6 +1762,34 @@
 													onchange={(e) => setTarget(c.id, Number(e.currentTarget.value))}
 												/>
 											</label>
+										</div>
+										<div class="mt-3 border-t border-[#e7e2d2] pt-3">
+											<button
+												type="button"
+												class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+												onclick={() => toggleChildJournal(c.id)}
+											>
+												<Icon name="book-open" size={14} /> Jurnal {c.name}
+												<Icon name={childJ(c.id).open ? "chevron-down" : "chevron-right"} size={14} />
+											</button>
+											{#if childJ(c.id).open}
+												{#if childJ(c.id).loading}
+													<p class="mt-2 text-sm text-[#5f6b62]">Memuat jurnal...</p>
+												{:else if childJ(c.id).error}
+													<p class="err mt-2">{childJ(c.id).error}</p>
+												{:else if childJ(c.id).entries.length === 0}
+													<p class="mt-2 text-sm text-[#5f6b62]">Belum ada jurnal.</p>
+												{:else}
+													<div class="mt-2 space-y-2">
+														{#each childJ(c.id).entries as e (e.date)}
+															<div class="card !rounded-lg p-3">
+																<p class="text-xs font-bold text-[#177245]">{formatTanggalId(e.date)}</p>
+																<p class="mt-0.5 text-sm leading-relaxed">{e.text}</p>
+															</div>
+														{/each}
+													</div>
+												{/if}
+											{/if}
 										</div>
 									</div>
 								{/each}

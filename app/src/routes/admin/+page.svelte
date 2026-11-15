@@ -15,7 +15,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit" | "tryout" | "tanya-jawab";
+	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit" | "tryout" | "tanya-jawab" | "tanggal-sas";
 	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -32,6 +32,7 @@
 		{ id: "pengguna", label: "Pengguna", icon: "users" },
 		{ id: "video", label: "Video per Bab", icon: "video" },
 		{ id: "tryout", label: "Tryout", icon: "trophy" },
+		{ id: "tanggal-sas", label: "Tanggal SAS", icon: "calendar" },
 		{ id: "tanya-jawab", label: "Tanya Jawab", icon: "message" },
 		{ id: "cron", label: "Email & Cron", icon: "clock" },
 		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" },
@@ -46,6 +47,7 @@
 		pengguna: "Pengguna & Role",
 		video: "Video per Bab",
 		tryout: "Tryout Terjadwal",
+		"tanggal-sas": "Tanggal SAS",
 		"tanya-jawab": "Tanya Jawab per Bab",
 		cron: "Email & Cron",
 		pengumuman: "Pengumuman",
@@ -945,6 +947,88 @@
 		}
 	}
 
+	// ---- Tanggal SAS ----
+	type ExamDateAdmin = { grade: number; date: string | null; label: string; daysLeft: number | null };
+	let examDates = $state<ExamDateAdmin[]>([]);
+	let examDatesLoaded = $state(false);
+	let examDatesLoading = $state(false);
+	let examDraft = $state<Record<number, { date: string; label: string }>>({});
+	let examSavingGrade = $state<number | null>(null);
+
+	async function loadExamDates() {
+		examDatesLoading = true;
+		try {
+			const data = await api<{ dates: ExamDateAdmin[] }>("/api/exam-dates");
+			examDates = data.dates ?? [];
+			examDatesLoaded = true;
+			const draft: Record<number, { date: string; label: string }> = {};
+			for (const d of examDates) draft[d.grade] = { date: d.date ?? "", label: d.label ?? "" };
+			for (let g = 1; g <= 6; g++) if (!draft[g]) draft[g] = { date: "", label: "" };
+			examDraft = draft;
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal memuat tanggal SAS.";
+		} finally {
+			examDatesLoading = false;
+		}
+	}
+
+	function examDraftFor(g: number) {
+		return examDraft[g] ?? { date: "", label: "" };
+	}
+
+	function setExamDraft(g: number, patch: Partial<{ date: string; label: string }>) {
+		examDraft = { ...examDraft, [g]: { ...examDraftFor(g), ...patch } };
+	}
+
+	function formatTanggalSas(iso: string | null): string {
+		if (!iso) return "-";
+		const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+		if (Number.isNaN(d.getTime())) return iso;
+		return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+	}
+
+	function sasCountdown(g: number): string {
+		const d = examDates.find((x) => x.grade === g);
+		if (!d || d.date === null || d.daysLeft === null) return "Tanggal SAS belum diatur";
+		if (d.daysLeft < 0) return `Sudah lewat • ${formatTanggalSas(d.date)}`;
+		if (d.daysLeft === 0) return `Hari ini • ${formatTanggalSas(d.date)}`;
+		if (d.daysLeft === 1) return `Besok • ${formatTanggalSas(d.date)}`;
+		return `${d.daysLeft} hari lagi • ${formatTanggalSas(d.date)}`;
+	}
+
+	async function simpanTanggalSas(g: number) {
+		examSavingGrade = g;
+		try {
+			const d = examDraftFor(g);
+			await api("/api/admin/exam-dates", {
+				method: "POST",
+				body: JSON.stringify({ grade: g, date: d.date || null, label: d.label.trim() })
+			});
+			notice = `Tanggal SAS Kelas ${g} tersimpan.`;
+			await loadExamDates();
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal menyimpan tanggal SAS.";
+		} finally {
+			examSavingGrade = null;
+		}
+	}
+
+	async function hapusTanggalSas(g: number) {
+		examSavingGrade = g;
+		try {
+			await api("/api/admin/exam-dates", {
+				method: "POST",
+				body: JSON.stringify({ grade: g, date: null, label: examDraftFor(g).label.trim() })
+			});
+			notice = `Tanggal SAS Kelas ${g} dihapus.`;
+			await loadExamDates();
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal menghapus tanggal SAS.";
+		} finally {
+			examSavingGrade = null;
+		}
+	}
+
 	function switchTab(t: Tab) {
 		tab = t;
 		notice = "";
@@ -956,6 +1040,7 @@
 		if (t === "pengumuman" && !settingsLoaded) loadSettings();
 		if (t === "audit" && !auditLoaded) loadAudit(1);
 		if (t === "tryout" && adminTryouts.length === 0) loadTryouts();
+		if (t === "tanggal-sas" && !examDatesLoaded) loadExamDates();
 		if (t === "tanya-jawab" && adminQa.length === 0) loadQa();
 	}
 
@@ -2878,6 +2963,76 @@
 								</div>
 							{/each}
 						</div>
+					{/if}
+				</div>
+			{:else if tab === "tanggal-sas"}
+				<div class="card mt-4 space-y-3 p-4">
+					<p class="text-sm font-bold"><Icon name="calendar" size={16} /> Tanggal SAS per Kelas</p>
+					<p class="text-xs text-[#5f6b62]">
+						Tanggal SAS tampil sebagai hitung mundur di Beranda dan Akun. Kosongkan tanggal lalu
+						Simpan, atau pakai Hapus Tanggal, bila tanggal belum ditentukan — siswa melihat
+						"Tanggal SAS belum diatur".
+					</p>
+					{#if examDatesLoading && !examDatesLoaded}
+						<p class="text-sm text-[#5f6b62]">Memuat...</p>
+					{:else}
+						<div class="space-y-3">
+							{#each [1, 2, 3, 4, 5, 6] as g (g)}
+								<div class="card !rounded-lg p-3">
+									<p class="text-sm font-extrabold">Kelas {g}</p>
+									<div class="mt-2 grid grid-cols-2 gap-2">
+										<div>
+											<label class="lbl" for={`sas-tanggal-${g}`}>Tanggal SAS</label>
+											<input
+												id={`sas-tanggal-${g}`}
+												class="input"
+												type="date"
+												value={examDraftFor(g).date}
+												oninput={(e) => setExamDraft(g, { date: e.currentTarget.value })}
+											/>
+										</div>
+										<div>
+											<label class="lbl" for={`sas-label-${g}`}>Label (opsional)</label>
+											<input
+												id={`sas-label-${g}`}
+												class="input"
+												maxlength="120"
+												value={examDraftFor(g).label}
+												oninput={(e) => setExamDraft(g, { label: e.currentTarget.value })}
+												placeholder="Contoh: SAS Semester 1"
+											/>
+										</div>
+									</div>
+									<p class="mt-1.5 text-xs font-bold text-[#177245]">{sasCountdown(g)}</p>
+									<div class="mt-2 flex flex-wrap gap-2">
+										<button
+											type="button"
+											class="btn btn-primary text-xs"
+											disabled={examSavingGrade === g}
+											onclick={() => simpanTanggalSas(g)}
+										>
+											{#if examSavingGrade === g}Menyimpan...{:else}<Icon name="save" size={14} /> Simpan{/if}
+										</button>
+										<button
+											type="button"
+											class="btn btn-ghost text-xs !text-[#b91c1c]"
+											disabled={examSavingGrade === g}
+											onclick={() => hapusTanggalSas(g)}
+										>
+											<Icon name="trash" size={14} /> Hapus Tanggal
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+						<button
+							type="button"
+							class="btn btn-ghost text-xs"
+							disabled={examDatesLoading}
+							onclick={loadExamDates}
+						>
+							<Icon name="refresh" size={14} /> Muat ulang
+						</button>
 					{/if}
 				</div>
 			{/if}

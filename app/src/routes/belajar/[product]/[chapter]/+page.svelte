@@ -1,5 +1,8 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import NumberLine from "$lib/tools/NumberLine.svelte";
+	import MultiplicationTable from "$lib/tools/MultiplicationTable.svelte";
+	import FractionCalculator from "$lib/tools/FractionCalculator.svelte";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -48,6 +51,17 @@
 
 	let currentQ = $derived(chapter ? chapter.quiz[qIndex] : undefined);
 	let totalQ = $derived(chapter ? chapter.quiz.length : 0);
+
+	// Alat interaktif Matematika: garis bilangan (Kelas 1–2), tabel perkalian
+	// (Kelas 3–4), kalkulator pecahan (Kelas 5–6). Mapel lain tidak menampilkan.
+	let alatKind = $derived.by(() => {
+		if (!chapter) return null;
+		if (!chapter.subject.toLowerCase().includes("matematika")) return null;
+		if (chapter.grade <= 2) return "garis" as const;
+		if (chapter.grade <= 4) return "perkalian" as const;
+		if (chapter.grade <= 6) return "pecahan" as const;
+		return null;
+	});
 
 	// Tanya Jawab per bab (migrasi 0011).
 	interface QaItem {
@@ -487,6 +501,30 @@
 	</div>
 		</div>
 	</div>
+
+	<!-- Alat Interaktif (hanya bab Matematika Kelas 1–6) -->
+	{#if alatKind}
+		<div class="mt-4">
+			<h2 class="flex items-center gap-1.5 text-base font-extrabold">
+				<Icon name="zap" size={18} /> Alat Interaktif
+			</h2>
+			<p class="mt-1 text-sm text-[#5f6b62]">
+				Main sebentar dengan alat ini sebelum lanjut ke kuis — semua berjalan langsung di perangkatmu.
+			</p>
+			<div class="mt-3">
+				{#if alatKind === "garis"}
+					<NumberLine />
+				{:else if alatKind === "perkalian"}
+					<MultiplicationTable />
+				{:else}
+					<FractionCalculator />
+				{/if}
+			</div>
+			<p class="mt-2 text-sm">
+				<a class="font-bold text-[#177245] underline" href="/alat">Lihat semua alat interaktif</a>
+			</p>
+		</div>
+	{/if}
 
 	<!-- Tanya Jawab per Bab -->
 	<div class="card mt-4 p-4">

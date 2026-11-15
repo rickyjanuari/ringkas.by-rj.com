@@ -17,6 +17,10 @@ import { registerVoiceRoutes } from "./voice.js";
 import { registerPushRoutes } from "./push.js";
 import { registerFlashcardRoutes } from "./flashcards.js";
 import { registerTeacherQuizRoutes } from "./teacher-quiz.js";
+import { registerXpRoutes } from "./xp.js";
+import { registerJournalRoutes } from "./journal.js";
+import { registerExamRoutes } from "./exam.js";
+import { registerStoriesRoutes } from "./stories.js";
 import type { Database } from "./database.js";
 import type { ImageStorage } from "./storage.js";
 
@@ -50,6 +54,10 @@ export function createApp(db: Database, opts: AppOptions): Hono {
   registerPushRoutes(app, db);
   registerFlashcardRoutes(app, db);
   registerTeacherQuizRoutes(app, db);
+  registerXpRoutes(app, db);
+  registerJournalRoutes(app, db);
+  registerExamRoutes(app, db);
+  registerStoriesRoutes(app, db);
 
   return app;
 }

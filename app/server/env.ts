@@ -30,6 +30,12 @@ export interface AppEnv {
   vapidPrivateKey: string;
   /** Subjek VAPID, mis. "mailto:halo@ringkas.by-rj.com". */
   vapidSubject: string;
+  /** Token akses WhatsApp Cloud API (RAHASIA — hanya via wrangler secret). */
+  whatsappToken: string;
+  /** Phone number ID WhatsApp Business (dari Meta for Developers). */
+  whatsappPhoneNumberId: string;
+  /** Nama template WhatsApp laporan mingguan (bawaan 'laporan_mingguan'). */
+  whatsappTemplateName: string;
 }
 
 function fromProcessEnv(): AppEnv {
@@ -48,7 +54,10 @@ function fromProcessEnv(): AppEnv {
     turnstileSiteKey: p.TURNSTILE_SITE_KEY ?? "",
     vapidPublicKey: p.VAPID_PUBLIC_KEY ?? "",
     vapidPrivateKey: p.VAPID_PRIVATE_KEY ?? "",
-    vapidSubject: p.VAPID_SUBJECT ?? ""
+    vapidSubject: p.VAPID_SUBJECT ?? "",
+    whatsappToken: p.WHATSAPP_TOKEN ?? "",
+    whatsappPhoneNumberId: p.WHATSAPP_PHONE_NUMBER_ID ?? "",
+    whatsappTemplateName: p.WHATSAPP_TEMPLATE_NAME ?? "laporan_mingguan"
   };
 }
 

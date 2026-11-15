@@ -42,6 +42,7 @@ import {
   sendWelcomeEmail
 } from "./email.js";
 import { jobDate, runDailyJob, runWeeklyJob } from "./cron.js";
+import { awardXp } from "./xp.js";
 // Modul seed dibuat agen lain (server/seed/study.ts belum ada saat berkas ini
 // ditulis) — abaikan error resolusi modul sampai modul itu tersedia.
 // @ts-ignore
@@ -864,8 +865,19 @@ function computeBadges(
   return badges;
 }
 
-async function markStudyDay(db: Database, userId: string): Promise<void> {
-  await db.run("INSERT OR IGNORE INTO study_days (user_id, date) VALUES (?, ?)", userId, todayIso());
+/**
+ * Tandai hari belajar hari ini. Mengembalikan true bila hari ini
+ * benar-benar baru disisipkan (dipakai hook XP streak — 5 XP per hari
+ * belajar baru); false bila hari ini sudah tercatat. Pemanggil lama
+ * yang mengabaikan return value tetap kompilasi.
+ */
+async function markStudyDay(db: Database, userId: string): Promise<boolean> {
+  const r = await db.run(
+    "INSERT OR IGNORE INTO study_days (user_id, date) VALUES (?, ?)",
+    userId,
+    todayIso()
+  );
+  return r.changes > 0;
 }
 
 function parseJsonArray(raw: string): string[] {
@@ -3279,7 +3291,17 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       );
       sticker = true;
     }
-    await markStudyDay(db, user.id);
+    // Hook XP (fitur keterlibatan): bab pertama selesai +20 XP, dan
+    // hari belajar baru +5 XP streak. awardXp tidak pernah melempar,
+    // tapi tetap dibungkus supaya respons utama tidak pernah gagal.
+    try {
+      if (sticker) await awardXp(db, user.id, "chapter", chapterId, 20);
+      if (await markStudyDay(db, user.id)) {
+        await awardXp(db, user.id, "streak", todayIso(), 5);
+      }
+    } catch {
+      // abaikan — XP gagal dicatat tidak boleh menggagalkan respons
+    }
     return c.json({ ok: true, sticker });
   });
 
@@ -3595,7 +3617,30 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       focusSwitches,
       nowIso()
     );
-    await markStudyDay(db, user.id);
+    // Hook XP (fitur keterlibatan): percobaan pertama vs ulangan, plus
+    // 5 XP bila ini hari belajar baru. awardXp tidak pernah melempar,
+    // tapi tetap dibungkus supaya respons utama tidak pernah gagal.
+    try {
+      const countRow = await db.get<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM quiz_attempts WHERE user_id = ? AND kind = ? AND ref_id = ?",
+        user.id,
+        kind,
+        refId
+      );
+      const first = (countRow?.n ?? 0) <= 1;
+      const passedQuiz = maxScore > 0 && score / maxScore >= 0.7;
+      let quizXp = 0;
+      if (kind === "quiz") quizXp = first ? (passedQuiz ? 10 : 5) : 2;
+      else if (kind === "simulation") quizXp = first ? (passedQuiz ? 25 : 10) : 5;
+      else if (kind === "story") quizXp = first ? 5 : 1;
+      else if (kind === "daily") quizXp = first ? 5 : 1;
+      if (quizXp > 0) await awardXp(db, user.id, kind, refId, quizXp);
+      if (await markStudyDay(db, user.id)) {
+        await awardXp(db, user.id, "streak", todayIso(), 5);
+      }
+    } catch {
+      // abaikan — XP gagal dicatat tidak boleh menggagalkan respons
+    }
     // Sertifikat: lulus simulasi SAS bila skor >= 70%.
     const passed = kind === "simulation" && maxScore > 0 && score / maxScore >= 0.7;
     return c.json({

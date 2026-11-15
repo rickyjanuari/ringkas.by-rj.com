@@ -11,7 +11,7 @@
 	let { children }: { children?: Snippet } = $props();
 
 	// Halaman layar penuh tanpa tab bar.
-	const NO_TAB_PREFIXES = ["/produk/", "/checkout", "/belajar", "/admin", "/peta-belajar", "/soal-sulitku", "/soal-cerita", "/anbk", "/latihan-adaptif", "/rekam-suara", "/jadwal-belajar", "/kuis-guru"];
+	const NO_TAB_PREFIXES = ["/produk/", "/checkout", "/belajar", "/admin", "/peta-belajar", "/soal-sulitku", "/soal-cerita", "/cerita", "/anbk", "/latihan-adaptif", "/rekam-suara", "/jadwal-belajar", "/kuis-guru"];
 	let hideTabs = $derived(
 		NO_TAB_PREFIXES.some((p) => $page.url.pathname.startsWith(p))
 	);

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { api, formatRupiah, type ProductPublic } from "$lib/api";
-	import { cart } from "$lib/store";
+	import { api, formatRupiah, getToken, type ProductPublic } from "$lib/api";
+	import { auth, cart } from "$lib/store";
+	import Avatar from "$lib/Avatar.svelte";
 	import Icon from "$lib/Icon.svelte";
 
 	let products = $state<ProductPublic[]>([]);
@@ -47,6 +48,40 @@
 			.map((g) => tryouts.filter((t) => t.grade === g && t.phase !== "ended").sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at))[0])
 			.filter((t): t is TryoutRingkas => !!t)
 	);
+
+	// ---- Level & XP + Hitung Mundur SAS (gagal diam-diam) ----
+	type XpMini = {
+		totalXp: number;
+		level: number;
+		xpIntoLevel: number;
+		xpForNextLevel: number;
+		stage: number;
+		stageName: string;
+	};
+	type ExamDateHome = { grade: number; date: string | null; label: string; daysLeft: number | null };
+	let homeXp = $state<XpMini | null>(null);
+	let homeExam = $state<ExamDateHome[] | null>(null);
+	let homeExamFailed = $state(false);
+
+	/** Tanggal ISO (YYYY-MM-DD) ke format Indonesia, tanpa geser zona waktu. */
+	function formatTanggalId(iso: string): string {
+		const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+		if (Number.isNaN(d.getTime())) return iso;
+		return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+	}
+
+	/** Tanggal SAS terdekat yang sudah diatur (paling sedikit hari lagi, belum lewat). */
+	let homeExamNext = $derived(
+		(homeExam ?? [])
+			.filter((d) => d.date !== null && d.daysLeft !== null && (d.daysLeft as number) >= 0)
+			.sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number))[0] ?? null
+	);
+
+	function homeExamLabel(d: ExamDateHome): string {
+		if (d.daysLeft === 0) return `SAS Kelas ${d.grade} — Hari ini (${formatTanggalId(d.date as string)})`;
+		if (d.daysLeft === 1) return `SAS Kelas ${d.grade} — Besok (${formatTanggalId(d.date as string)})`;
+		return `SAS Kelas ${d.grade} — ${d.daysLeft} hari lagi (${formatTanggalId(d.date as string)})`;
+	}
 
 	// ---- Pengumuman & promo (dari /api/announcement, gagal diam-diam) ----
 	let announcementText = $state("");
@@ -132,6 +167,23 @@
 	);
 
 	onMount(async () => {
+		// XP mini + tanggal SAS: gagal diam-diam, tidak boleh memperlambat katalog.
+		if (getToken()) {
+			api<XpMini>("/api/xp")
+				.then((d) => {
+					homeXp = d;
+				})
+				.catch(() => {
+					/* kartu XP diam-diam tidak tampil */
+				});
+		}
+		api<{ dates: ExamDateHome[] }>("/api/exam-dates")
+			.then((d) => {
+				homeExam = d.dates ?? [];
+			})
+			.catch(() => {
+				homeExamFailed = true;
+			});
 		// Tryout mendatang: gagal diam-diam, tidak boleh memperlambat katalog.
 		api<{ tryouts: TryoutRingkas[] }>("/api/tryouts")
 			.then((d) => {
@@ -317,6 +369,68 @@
 			<p class="text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
 		</div>
 		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+	</div>
+</section>
+
+<!-- Level & XP mini (hanya bila login) -->
+{#if $auth.user}
+	<section class="card mt-4 p-4 lg:p-5" aria-label="Level dan XP">
+		<div class="flex items-center gap-3">
+			{#if homeXp}
+				<Avatar stage={homeXp.stage} size={48} />
+			{:else}
+				<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="sprout" size={24} /></span>
+			{/if}
+			<div class="min-w-0 flex-1">
+				<h2 class="text-base font-extrabold">Level &amp; XP</h2>
+				{#if homeXp}
+					<p class="text-sm text-[#5f6b62]">Level {homeXp.level} • {homeXp.totalXp} XP • {homeXp.stageName}</p>
+					<div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
+						<div
+							class="h-full bg-[#177245] transition-all"
+							style="width: {homeXp.xpForNextLevel > 0
+								? Math.min(100, Math.round((homeXp.xpIntoLevel / homeXp.xpForNextLevel) * 100))
+								: 100}%"
+						></div>
+					</div>
+				{:else}
+					<p class="text-sm text-[#5f6b62]">Kumpulkan XP dari bab, kuis, dan cerita.</p>
+				{/if}
+			</div>
+			<a href="/akun" class="btn btn-leaf shrink-0">Lihat Akun</a>
+		</div>
+	</section>
+{/if}
+
+<!-- Hitung Mundur SAS -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Hitung Mundur SAS">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="calendar" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Hitung Mundur SAS</h2>
+			{#if homeExamFailed}
+				<p class="text-sm text-[#5f6b62]">Tanggal SAS belum bisa dimuat.</p>
+			{:else if homeExam === null}
+				<p class="text-sm text-[#5f6b62]">Memuat tanggal SAS...</p>
+			{:else if homeExamNext}
+				<p class="text-sm text-[#5f6b62]">{homeExamLabel(homeExamNext)}</p>
+			{:else}
+				<p class="text-sm text-[#5f6b62]">Tanggal SAS belum diatur.</p>
+			{/if}
+		</div>
+		<a href="/akun" class="btn btn-leaf shrink-0">Detail</a>
+	</div>
+</section>
+
+<!-- Cerita Edukasi -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Cerita Edukasi">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="book-open" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Cerita Edukasi</h2>
+			<p class="text-sm text-[#5f6b62]">Baca cerita pendek, lalu jawab kuis pemahamannya dan kumpulkan XP.</p>
+		</div>
+		<a href="/cerita" class="btn btn-leaf shrink-0">Baca Cerita</a>
 	</div>
 </section>
 

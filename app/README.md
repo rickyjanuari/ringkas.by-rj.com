@@ -379,6 +379,82 @@ menampilkan judul halaman + nama admin yang login.
   mengerjakan sekali (server-side), guru melihat rekap per siswa.
   Rute `/kuis-guru` + `/kuis-guru/[id]`.
 
+## Fitur keterlibatan (2026-11-15, migrasi `0013_keterlibatan.sql`)
+
+- **XP, Level & Tahap Avatar** — total XP = `SUM(xp_events)` per
+  pengguna (bukan kolom saldo). `GET /api/xp` (Bearer) →
+  `{totalXp, level, xpIntoLevel, xpForNextLevel, nextLevelAt,
+  stage (1-4), stageName ("Benih"|"Tunas"|"Bunga"|"Pohon"),
+  events: [{action, ref_id, xp, created_at}]}` (10 event terbaru).
+  Ambang level: 0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200
+  (level 1–10); tahap: level 1–2 Benih, 3–4 Tunas, 5–7 Bunga, 8–10
+  Pohon. Aturan XP (lulus = skor ≥ 70%):
+  | Aksi | Percobaan pertama | Ulangan |
+  |---|---|---|
+  | Bab pertama selesai | 20 | — |
+  | Kuis bab | lulus 10 / gagal 5 | 2 |
+  | Simulasi SAS | lulus 25 / gagal 10 | 5 |
+  | Soal cerita sehari-hari | 5 | 1 |
+  | Latihan harian | 5 | 1 |
+  | Cerita edukasi | lulus 10 / gagal 5 | 2 |
+  | Hari belajar baru (streak) | 5 | — |
+  Anti-farm: XP besar hanya untuk percobaan pertama
+  (`COUNT(*) quiz_attempts` untuk user+kind+ref_id == 1); ulangan
+  hanya memberi XP kecil; XP streak hanya bila `study_days` hari itu
+  benar-benar baru. `awardXp()` di `server/xp.ts` tidak pernah
+  melempar — gagal catat XP tidak menggagalkan respons utama.
+- **Jurnal Refleksi Harian** — `GET /api/journal` (Bearer) →
+  `{today: {date, text} | null, entries: [{date, text, updated_at}]}` (30
+  terbaru); `POST /api/journal {text}` (maks. 500 karakter, lebih →
+  400; teks kosong = hapus entri hari ini → `{ok: true, deleted: true}`).
+  Satu entri per anak per tanggal (UTC, sama seperti `study_days`).
+  `GET /api/parent/children/:childId/journal` — hanya orang tua yang
+  terhubung (`parent_links redeemed = 1`), selain itu 403.
+- **Hitung Mundur SAS** — `GET /api/exam-dates` (publik) →
+  `{dates: [{grade, date|null, label, daysLeft|null}], tryouts: [{id,
+  grade, title, starts_at, daysLeft}]}` (tryout mendatang:
+  `status = 'scheduled'`, `starts_at` > sekarang, maks. 10).
+  `daysLeft` dihitung dari tanggal kalender WIB: hari ujian = 0,
+  besok = 1, kemarin = -1 (angka negatif tetap ditampilkan).
+  `POST /api/admin/exam-dates {grade 1-6, date 'YYYY-MM-DD'|null,
+  label}` (admin; label maks. 200 karakter; `date: null` = hapus
+  tanggalnya, label tetap tersimpan).
+- **Cerita Edukasi** — 6 cerita orisinal di `server/seed/stories.ts`,
+  satu per kelas 1–6 (`cerita-k1`..`cerita-k6`): judul, moral 1 kalimat,
+  3 paragraf pendek, 3–5 soal PG (3–4 opsi, 1 poin per soal). Gaya
+  teman-belajar: kalimat pendek, satu ide per kalimat, TANPA nama
+  tokoh (peran seperti "kakak", "adik", "seorang anak") dan TANPA
+  sapaan bergender; bukan salinan dongeng berhak cipta. `GET
+  /api/stories` (daftar, tanpa isi/jawaban), `GET /api/stories/:id`
+  (isi + soal, TANPA jawaban), `POST /api/stories/:id/submit {answers:
+  {index: string}}` → `{score, max_score, correct, review, attempt_id,
+  xpEarned}` (dinilai server-side; attempt = `quiz_attempts`
+  kind=`'cerita'`, ref_id=`cerita-<id>`). Gratis untuk semua akun login.
+- **Laporan WhatsApp Mingguan** — cron mingguan mengirim laporan yang
+  SAMA seperti email ke nomor WhatsApp orang tua (kolom
+  `users.whatsapp`, format `62...` tanpa `+`/spasi) lewat template
+  WhatsApp Cloud API. Idempotensi: satu kirim per anak per minggu ISO
+  (`wa_sent_log`; klaim dulu, gagal kirim → klaim dihapus). Tanpa
+  konfigurasi / nomor tidak valid → dilewati + log (email tetap jalan).
+  Langkah pemilik (template TIDAK dibuat di repo):
+  1. Meta for Developers → buat aplikasi → tambah produk WhatsApp.
+  2. Catat phone number ID + buat token akses (sementara/permanen).
+  3. Buat template **`laporan_mingguan`**, bahasa `id`, 6 parameter
+     body berurutan: nama anak, periode minggu, bab selesai, streak
+     hari, rata-rata simulasi, bab yang perlu diulang — lalu tunggu
+     persetujuan Meta.
+  4. Pasang secret (nilai TIDAK ada di repo):
+     ```
+     wrangler secret put WHATSAPP_TOKEN
+     wrangler secret put WHATSAPP_PHONE_NUMBER_ID
+     wrangler secret put WHATSAPP_TEMPLATE_NAME   # opsional, bawaan: laporan_mingguan
+     ```
+  Batasan jujur: WhatsApp Business API butuh akun bisnis + nomor yang
+  terverifikasi; template yang belum disetujui Meta tidak bisa dipakai;
+  nomor orang tua harus diawali `62` (bukan `08`) dan tersimpan di
+  profil orang tua — nomor yang salah format membuat kirim dilewati
+  (`skipped: 'no-number'`, tercatat di log cron, bukan error).
+
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
 **Peta Belajar (2026-11-15):** satu peta visual per produk kelas (`k1`–`k6`)
