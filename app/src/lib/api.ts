@@ -49,6 +49,41 @@ export interface ChapterMeta {
 	sort_order: number;
 	video_url: string | null;
 	video_duration: string | null;
+	/** Video pendek vertikal (9:16) — URL http(s) atau path relatif situs. */
+	short_url: string | null;
+	short_duration: string | null;
+}
+
+/** Satu soal di Bank Soal Sulitku. */
+export interface HardBankItem {
+	question_id: number;
+	type: string;
+	question: string;
+	options: string[] | { left: string[]; right: string[] } | null;
+	subject: string;
+	grade: number;
+	origin_kind: "quiz" | "simulation";
+	origin_title: string;
+	product_id: string | null;
+	last_wrong_at: string;
+}
+
+export interface HardBankData {
+	total: number;
+	items: HardBankItem[];
+}
+
+export interface HardBankPracticeResult extends QuizResult {
+	mastered: number[];
+	remaining: number;
+}
+
+/** Satu set latihan Soal Cerita (10 soal). */
+export interface StoryPack {
+	grade: number;
+	subject: string;
+	ref_id: string;
+	questions: PublicQuestion[];
 }
 
 export interface PublicQuestion {

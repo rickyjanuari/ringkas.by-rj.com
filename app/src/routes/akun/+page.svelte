@@ -55,6 +55,9 @@
 	let prediction = $state<PredictionData | null>(null);
 	let predictionError = $state("");
 
+	// ---- Bank Soal Sulitku ----
+	let hardTotal = $state<number | null>(null);
+
 	// ---- Sertifikat simulasi ----
 	let certDownloading = $state<number | null>(null);
 	let certError = $state("");
@@ -156,10 +159,20 @@
 			waEdit = user.whatsapp ?? "";
 			await loadTracker();
 			await loadPrediction();
+			await loadHardBank();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
 	});
+
+	async function loadHardBank() {
+		try {
+			const data = await api<{ total: number }>("/api/hard-bank");
+			hardTotal = data.total ?? 0;
+		} catch {
+			hardTotal = null;
+		}
+	}
 
 	async function loadTracker() {
 		try {
@@ -676,6 +689,26 @@
 				{#each [1, 2, 3, 4, 5, 6] as g (g)}
 					<a href="/peta-belajar/k{g}" class="chip">Kelas {g}</a>
 				{/each}
+			</div>
+		</div>
+
+		<!-- Soal Sulitku -->
+		<div class="card p-4">
+			<div class="flex items-center gap-3">
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={22} /></span>
+				<div class="min-w-0 flex-1">
+					<p class="font-extrabold">Soal Sulitku</p>
+					<p class="text-xs text-[#5f6b62]">
+						{hardTotal === null
+							? "Soal yang pernah dijawab salah — ulangi sampai benar."
+							: hardTotal === 0
+								? "Belum ada soal sulit. Terus kerjakan kuis dan simulasi!"
+								: `${hardTotal} soal menunggu diulang sampai benar.`}
+					</p>
+				</div>
+				<a href="/soal-sulitku" class="btn btn-leaf shrink-0 !px-3 !py-2 text-xs">
+					<Icon name="target" size={14} /> Buka Bank
+				</a>
 			</div>
 		</div>
 

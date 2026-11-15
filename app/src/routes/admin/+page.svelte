@@ -153,6 +153,8 @@
 	let videoChapterId = $state("");
 	let videoUrl = $state("");
 	let videoDuration = $state("");
+	let shortUrl = $state("");
+	let shortDuration = $state("");
 	let videoLoading = $state(false);
 	let videoSaving = $state(false);
 
@@ -495,6 +497,8 @@
 		videoChapterId = "";
 		videoUrl = "";
 		videoDuration = "";
+		shortUrl = "";
+		shortDuration = "";
 		if (!videoProductId) {
 			videoChapters = [];
 			return;
@@ -514,6 +518,8 @@
 		const ch = videoChapters.find((c) => c.id === videoChapterId);
 		videoUrl = ch?.video_url ?? "";
 		videoDuration = ch?.video_duration ?? "";
+		shortUrl = ch?.short_url ?? "";
+		shortDuration = ch?.short_duration ?? "";
 	}
 
 	async function simpanVideo() {
@@ -524,11 +530,16 @@
 				`/api/admin/chapters/${videoChapterId}/video`,
 				{
 					method: "POST",
-					body: JSON.stringify({ video_url: videoUrl.trim(), video_duration: videoDuration.trim() })
+					body: JSON.stringify({
+						video_url: videoUrl.trim(),
+						video_duration: videoDuration.trim(),
+						short_url: shortUrl.trim(),
+						short_duration: shortDuration.trim()
+					})
 				}
 			);
 			videoChapters = videoChapters.map((c) => (c.id === videoChapterId ? data.chapter : c));
-			notice = videoUrl.trim()
+			notice = videoUrl.trim() || shortUrl.trim()
 				? "Video bab tersimpan."
 				: "Video bab dihapus.";
 		} catch (e) {
@@ -1086,8 +1097,9 @@
 				<div class="card mt-4 space-y-3 p-4">
 					<p class="text-sm font-bold"><Icon name="video" size={16} /> Video per Bab</p>
 					<p class="text-xs text-[#5f6b62]">
-						Video tampil di Ruang Belajar sebagai kartu "Tonton Video Pembelajaran". Kosongkan URL untuk
-						menghapus video.
+						Video tampil di Ruang Belajar sebagai kartu "Tonton Video Pembelajaran". Video pendek
+						(vertikal 9:16, ±60 detik) tampil sebagai kartu "Tonton Video Pendek". Kosongkan URL
+						untuk menghapus video.
 					</p>
 					<div>
 						<label class="lbl" for="v-produk">Pilih produk</label>
@@ -1107,7 +1119,7 @@
 								<option value="">— Pilih bab —</option>
 								{#each videoChapters as c (c.id)}
 									<option value={c.id}>
-										{c.title}{c.video_url ? " (ada video)" : ""}
+										{c.title}{c.video_url ? " (ada video)" : ""}{c.short_url ? " (ada video pendek)" : ""}
 									</option>
 								{/each}
 							</select>
@@ -1127,6 +1139,24 @@
 						<div>
 							<label class="lbl" for="v-dur">Durasi (contoh: 1 menit 17 detik)</label>
 							<input id="v-dur" class="input" bind:value={videoDuration} placeholder="1 menit 17 detik" />
+						</div>
+						<div>
+							<label class="lbl" for="v-short">URL video pendek (vertikal 9:16) — http/https atau path situs</label>
+							<input
+								id="v-short"
+								class="input"
+								type="text"
+								bind:value={shortUrl}
+								placeholder="/shorts/membilang-10.html"
+							/>
+							<p class="mt-1 text-xs text-[#5f6b62]">
+								Video pendek bawaan: /shorts/membilang-10.html (Membilang) dan
+								/shorts/penjumlahan-10.html (Penjumlahan).
+							</p>
+						</div>
+						<div>
+							<label class="lbl" for="v-short-dur">Durasi video pendek (contoh: 1 menit)</label>
+							<input id="v-short-dur" class="input" bind:value={shortDuration} placeholder="1 menit" />
 						</div>
 						<button
 							type="button"

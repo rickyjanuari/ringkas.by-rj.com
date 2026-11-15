@@ -25,6 +25,7 @@
 	let notice = $state("");
 	let markingId = $state<string | null>(null);
 	let playingVideo = $state<string | null>(null);
+	let playingShort = $state<string | null>(null);
 	let openFlash = $state<string | null>(null);
 	let flipped = $state<Record<string, boolean>>({});
 	let simNotice = $state("");
@@ -171,6 +172,20 @@
 		} finally {
 			loading = false;
 		}
+	});
+
+	// Video pendek: tombol "Lanjut ke Kuis" di dalam iframe mengirim
+	// postMessage ringkas:lanjut-kuis — arahkan ke kuis bab itu.
+	onMount(() => {
+		function onMsg(e: MessageEvent) {
+			if (e.data?.type !== "ringkas:lanjut-kuis") return;
+			if (!playingShort) return;
+			const chapterId = playingShort;
+			playingShort = null;
+			goto(`/belajar/${productId}/${chapterId}`);
+		}
+		window.addEventListener("message", onMsg);
+		return () => window.removeEventListener("message", onMsg);
 	});
 
 	async function tandaiSelesai(chapterId: string) {
@@ -342,6 +357,14 @@
 	<a href="/peta-belajar/{productId}" class="btn btn-outline mt-3">
 		<Icon name="map" size={16} /> Lihat Peta Belajar
 	</a>
+	<div class="mt-2 flex flex-wrap gap-2">
+		<a href="/soal-cerita" class="btn btn-outline">
+			<Icon name="message" size={16} /> Latihan Soal Cerita
+		</a>
+		<a href="/soal-sulitku" class="btn btn-outline">
+			<Icon name="target" size={16} /> Soal Sulitku
+		</a>
+	</div>
 
 	{#if pack.externalUrl}
 		<div class="card mt-3 p-4">
@@ -435,6 +458,47 @@
 									>
 										<Icon name="play" size={14} /> Tonton Video Pembelajaran
 										{ch.video_duration ? `(${ch.video_duration})` : ""}
+									</button>
+								{/if}
+							</div>
+						{/if}
+
+						<!-- Kartu video pendek vertikal (9:16) -->
+						{#if ch.short_url}
+							<div class="mt-3 rounded-xl border border-[#e7e2d2] bg-[#f7f5ef] p-3">
+								{#if playingShort === ch.id}
+									<div class="mx-auto max-w-[300px] overflow-hidden rounded-lg border border-[#e7e2d2] bg-white">
+										<iframe
+											src={ch.short_url}
+											title="Video pendek {ch.title}"
+											class="aspect-[9/16] w-full"
+											allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+											allowfullscreen
+										></iframe>
+									</div>
+									<div class="mt-2 flex gap-2">
+										<a
+											href={`/belajar/${productId}/${ch.id}`}
+											class="btn btn-primary flex-1 text-xs"
+										>
+											<Icon name="file-text" size={14} /> Lanjut ke Kuis
+										</a>
+										<button
+											type="button"
+											class="btn btn-outline text-xs"
+											onclick={() => (playingShort = null)}
+										>
+											Tutup Video
+										</button>
+									</div>
+								{:else}
+									<button
+										type="button"
+										class="btn btn-sun w-full text-xs"
+										onclick={() => (playingShort = ch.id)}
+									>
+										<Icon name="play" size={14} /> Tonton Video Pendek (60 detik)
+										{ch.short_duration ? `(${ch.short_duration})` : ""}
 									</button>
 								{/if}
 							</div>

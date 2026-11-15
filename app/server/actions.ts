@@ -35,6 +35,8 @@ import { jobDate, runDailyJob, runWeeklyJob } from "./cron.js";
 import { dailyQuestions } from "./seed/study.js";
 // @ts-ignore
 import type { GeneratedQuestion } from "./seed/study.js";
+// @ts-ignore
+import { storyQuestions, storyRefId, parseStoryRef } from "./seed/story.js";
 
 // ---------------------------------------------------------------------------
 // Helper umum
@@ -487,6 +489,143 @@ function gradeOne(q: GradeInput, userAnswer: unknown): { earned: number; correct
   }
 }
 
+interface HardBankItem {
+  question_id: number;
+  type: string;
+  question: string;
+  options: unknown;
+  subject: string;
+  grade: number;
+  origin_kind: "quiz" | "simulation";
+  origin_title: string;
+  product_id: string | null;
+  last_wrong_at: string;
+}
+
+/**
+ * Bank Soal Sulitku — soal yang pernah dijawab salah (kuis bab +
+ * simulasi), dihitung ulang dari quiz_attempts + tabel questions.
+ * Tidak ada tabel soal baru: yang disimpan hanya penanda "dikuasai"
+ * (hard_bank_mastered). Soal yang sama salah di beberapa attempt
+ * muncul sekali (yang terbaru). Dibatasi 200 attempt terbaru + 100
+ * soal, dan query D1 dibatasi (IN ...) supaya hemat.
+ */
+async function computeHardBank(db: Database, userId: string): Promise<HardBankItem[]> {
+  const attempts = await db.all<{
+    kind: string;
+    ref_id: string;
+    answers: string;
+    created_at: string;
+  }>(
+    "SELECT kind, ref_id, answers, created_at FROM quiz_attempts WHERE user_id = ? AND kind IN ('quiz', 'simulation') ORDER BY created_at DESC LIMIT 200",
+    userId
+  );
+  if (attempts.length === 0) return [];
+  const chapterIds = new Set<string>();
+  const simIds = new Set<string>();
+  for (const a of attempts) {
+    if (a.kind === "quiz") chapterIds.add(a.ref_id);
+    else if (a.kind === "simulation") simIds.add(a.ref_id);
+  }
+  const questions: QuestionRow[] = [];
+  if (chapterIds.size > 0 || simIds.size > 0) {
+    const conds: string[] = [];
+    const vals: SQLInputValue[] = [];
+    if (chapterIds.size > 0) {
+      conds.push(`chapter_id IN (${[...chapterIds].map(() => "?").join(", ")})`);
+      vals.push(...[...chapterIds]);
+    }
+    if (simIds.size > 0) {
+      conds.push(`simulation_id IN (${[...simIds].map(() => "?").join(", ")})`);
+      vals.push(...[...simIds]);
+    }
+    const rows = await db.all<QuestionRow>(
+      `SELECT * FROM questions WHERE ${conds.join(" OR ")} ORDER BY id`,
+      ...vals
+    );
+    questions.push(...rows);
+  }
+  const byChapter = new Map<string, QuestionRow[]>();
+  const bySim = new Map<string, QuestionRow[]>();
+  for (const q of questions) {
+    if (q.chapter_id) {
+      const list = byChapter.get(q.chapter_id) ?? [];
+      list.push(q);
+      byChapter.set(q.chapter_id, list);
+    } else if (q.simulation_id) {
+      const list = bySim.get(q.simulation_id) ?? [];
+      list.push(q);
+      bySim.set(q.simulation_id, list);
+    }
+  }
+  // Metadata asal soal (judul bab / simulasi) — 2 query IN.
+  const origin = new Map<string, { title: string; subject: string; grade: number; product_id: string | null }>();
+  if (chapterIds.size > 0) {
+    const rows = await db.all<Chapter>(
+      `SELECT * FROM chapters WHERE id IN (${[...chapterIds].map(() => "?").join(", ")})`,
+      ...[...chapterIds]
+    );
+    for (const ch of rows) {
+      origin.set(`quiz:${ch.id}`, { title: ch.title, subject: ch.subject, grade: ch.grade, product_id: ch.product_id });
+    }
+  }
+  if (simIds.size > 0) {
+    const rows = await db.all<Simulation>(
+      `SELECT * FROM simulations WHERE id IN (${[...simIds].map(() => "?").join(", ")})`,
+      ...[...simIds]
+    );
+    for (const s of rows) {
+      origin.set(`simulation:${s.id}`, { title: s.title, subject: s.subject, grade: s.grade, product_id: s.product_id });
+    }
+  }
+  const mastered = new Set<number>(
+    (await db.all<{ question_id: number }>(
+      "SELECT question_id FROM hard_bank_mastered WHERE user_id = ?",
+      userId
+    )).map((r) => r.question_id)
+  );
+  const wrong = new Map<number, HardBankItem>();
+  for (const a of attempts) {
+    let answers: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(a.answers);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        answers = parsed as Record<string, unknown>;
+      }
+    } catch {
+      answers = {};
+    }
+    const list = a.kind === "quiz" ? byChapter.get(a.ref_id) ?? [] : bySim.get(a.ref_id) ?? [];
+    const meta = origin.get(`${a.kind}:${a.ref_id}`);
+    if (!meta) continue;
+    for (const q of list) {
+      const result = gradeOne(
+        { id: String(q.id), type: q.type, answer: q.answer, discussion: q.discussion, points: q.points },
+        answers[String(q.id)]
+      );
+      if (result.correct) continue;
+      if (mastered.has(q.id)) continue;
+      const prev = wrong.get(q.id);
+      if (prev && prev.last_wrong_at >= a.created_at) continue;
+      wrong.set(q.id, {
+        question_id: q.id,
+        type: q.type,
+        question: q.question,
+        options: parseOptions(q.options),
+        subject: meta.subject,
+        grade: meta.grade,
+        origin_kind: a.kind as "quiz" | "simulation",
+        origin_title: meta.title,
+        product_id: meta.product_id,
+        last_wrong_at: a.created_at
+      });
+    }
+  }
+  return [...wrong.values()]
+    .sort((x, y) => (x.last_wrong_at < y.last_wrong_at ? 1 : -1))
+    .slice(0, 100);
+}
+
 function isHttpUrl(u: string): boolean {
   try {
     const parsed = new URL(u);
@@ -780,7 +919,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         semester: ch.semester,
         sort_order: ch.sort_order,
         video_url: ch.video_url,
-        video_duration: ch.video_duration
+        video_duration: ch.video_duration,
+        short_url: ch.short_url,
+        short_duration: ch.short_duration
       })),
       images: images.map((im) => ({ id: im.id, url: im.url, kind: im.kind })),
       bundleItems
@@ -1117,10 +1258,26 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       return c.json({ error: "Link video harus diawali http:// atau https://." }, 400);
     }
     const videoDuration = videoUrl ? asString(body.video_duration).trim() || null : null;
+    // Video pendek vertikal (9:16): boleh URL http(s) atau path relatif
+    // situs (mis. /shorts/membilang-10.html) — halaman statis Ringkas.
+    const shortUrlRaw = asString(body.short_url).trim() || null;
+    let shortUrl: string | null = null;
+    if (shortUrlRaw) {
+      if (isHttpUrl(shortUrlRaw) || shortUrlRaw.startsWith("/")) shortUrl = shortUrlRaw;
+      else {
+        return c.json(
+          { error: "Link video pendek harus diawali http://, https://, atau / (path situs)." },
+          400
+        );
+      }
+    }
+    const shortDuration = shortUrl ? asString(body.short_duration).trim() || null : null;
     await db.run(
-      "UPDATE chapters SET video_url = ?, video_duration = ? WHERE id = ?",
+      "UPDATE chapters SET video_url = ?, video_duration = ?, short_url = ?, short_duration = ? WHERE id = ?",
       videoUrl,
       videoDuration,
+      shortUrl,
+      shortDuration,
       chapter.id
     );
     const updated = await db.get<Chapter>("SELECT * FROM chapters WHERE id = ?", chapter.id);
@@ -1562,6 +1719,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
           focus_text: "",
           video_url: null,
           video_duration: null,
+          short_url: null,
+          short_duration: null,
           sort_order: ch.sort_order,
           flashcards: [],
           quiz: [],
@@ -1581,6 +1740,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         focus_text: ch.focus_text,
         video_url: ch.video_url,
         video_duration: ch.video_duration,
+        short_url: ch.short_url,
+        short_duration: ch.short_duration,
         sort_order: ch.sort_order,
         flashcards: flashcards.map((f) => ({ front: f.front, back: f.back })),
         quiz,
@@ -1750,6 +1911,97 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     return c.json({ date, questions });
   });
 
+  // ------------------------- Bank Soal Sulitku -------------------------
+  // Soal yang pernah dijawab salah (kuis bab + simulasi). Dijawab benar
+  // saat latihan ulang = keluar dari bank (dianggap dikuasai).
+
+  app.get("/api/hard-bank", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const items = await computeHardBank(db, user.id);
+    return c.json({ total: items.length, items });
+  });
+
+  app.post("/api/hard-bank/practice", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const body = await readJson(c);
+    const answers =
+      body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
+        ? (body.answers as Record<string, unknown>)
+        : {};
+    const bank = await computeHardBank(db, user.id);
+    const bankIds = new Set(bank.map((b) => b.question_id));
+    const ids = Object.keys(answers)
+      .map((k) => Number(k))
+      .filter((n) => Number.isInteger(n) && bankIds.has(n));
+    if (ids.length === 0) {
+      return c.json({ error: "Tidak ada soal sulit yang dikirim." }, 400);
+    }
+    const rows = await db.all<QuestionRow>(
+      `SELECT * FROM questions WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      ...ids
+    );
+    let totalEarned = 0;
+    let maxScore = 0;
+    const correct: Record<string, boolean> = {};
+    const review: { questionId: string; correct: boolean; discussion: string }[] = [];
+    const masteredIds: number[] = [];
+    for (const q of rows) {
+      const result = gradeOne(
+        { id: String(q.id), type: q.type, answer: q.answer, discussion: q.discussion, points: q.points },
+        answers[String(q.id)]
+      );
+      totalEarned += result.earned;
+      maxScore += q.points;
+      correct[String(q.id)] = result.correct;
+      review.push({ questionId: String(q.id), correct: result.correct, discussion: q.discussion });
+      if (result.correct) masteredIds.push(q.id);
+    }
+    for (const qid of masteredIds) {
+      await db.run(
+        "INSERT OR IGNORE INTO hard_bank_mastered (user_id, question_id, mastered_at) VALUES (?, ?, ?)",
+        user.id,
+        qid,
+        nowIso()
+      );
+    }
+    await markStudyDay(db, user.id);
+    const remaining = await computeHardBank(db, user.id);
+    return c.json({
+      score: Math.round(totalEarned),
+      max_score: maxScore,
+      correct,
+      review,
+      mastered: masteredIds,
+      remaining: remaining.length
+    });
+  });
+
+  // ------------------------- Soal Cerita Sehari-hari -------------------------
+  // Latihan gratis untuk semua akun login (seperti Latihan Harian):
+  // 10 soal per kelas per mapel (Matematika & B. Indonesia), dinilai
+  // server lewat kind = "story" di /api/quiz/submit.
+
+  app.get("/api/story/:grade/:subject", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const grade = Number(c.req.param("grade"));
+    const slug = c.req.param("subject");
+    const subject =
+      slug === "matematika" ? "Matematika" : slug === "bahasa-indonesia" ? "B. Indonesia" : "";
+    if (!Number.isInteger(grade) || grade < 1 || grade > 6 || !subject) {
+      return c.json({ error: "Kelas atau mapel tidak dikenal." }, 400);
+    }
+    const questions: PublicQuestion[] = storyQuestions(grade, subject).map((q, i) => ({
+      id: `story-${i}`,
+      type: q.type,
+      question: q.question,
+      options: q.options
+    }));
+    return c.json({ grade, subject, ref_id: storyRefId(grade, subject), questions });
+  });
+
   app.get("/api/simulations/:id/questions", async (c) => {
     const user = await authUser(c, db);
     if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
@@ -1800,7 +2052,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
         ? (body.answers as Record<string, unknown>)
         : {};
-    if (kind !== "quiz" && kind !== "simulation" && kind !== "daily") {
+    if (kind !== "quiz" && kind !== "simulation" && kind !== "daily" && kind !== "story") {
       return c.json({ error: "Jenis kuis tidak dikenal." }, 400);
     }
     if (!refId) return c.json({ error: "ref_id wajib diisi." }, 400);
@@ -1837,6 +2089,18 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
           refId
         ))
         .map((q) => ({ id: String(q.id), type: q.type, answer: q.answer, discussion: q.discussion, points: q.points }));
+    } else if (kind === "story") {
+      // Latihan Soal Cerita: gratis untuk semua akun login; ref_id
+      // bentuk story-<kelas>-<mapel> (mis. story-3-matematika).
+      const parsed = parseStoryRef(refId);
+      if (!parsed) return c.json({ error: "Latihan cerita tidak dikenal." }, 400);
+      gradeList = storyQuestions(parsed.grade, parsed.subject).map((q, i) => ({
+        id: `story-${i}`,
+        type: q.type,
+        answer: typeof q.answer === "string" ? q.answer : JSON.stringify(q.answer),
+        discussion: q.discussion,
+        points: q.points
+      }));
     } else {
       const generated = dailyQuestions(refId, 1) as GeneratedQuestion[];
       gradeList = generated.map((q, i) => ({

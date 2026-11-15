@@ -198,6 +198,18 @@
 	</div>
 </section>
 
+<!-- Soal Cerita Sehari-hari -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Soal Cerita Sehari-hari">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="message" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Soal Cerita Sehari-hari</h2>
+			<p class="text-sm text-[#5f6b62]">Soal Matematika dan Bahasa Indonesia dari situasi nyata — belanja di warung, berbagi kue, antrean.</p>
+		</div>
+		<a href="/soal-cerita" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+	</div>
+</section>
+
 <!-- Chip jenjang -->
 <div class="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-6">
 	{#each jenjangList as j (j)}

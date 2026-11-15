@@ -77,6 +77,9 @@ export interface ChapterSeed {
   sort_order: number;
   flashcards: { front: string; back: string }[];
   quiz: GeneratedQuestion[];
+  /** Video pendek vertikal bawaan (9:16) — URL atau path relatif situs. */
+  short_url?: string | null;
+  short_duration?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -871,6 +874,13 @@ function buildK1Chapter(row: K1Row, sortOrder: number): ChapterSeed {
     const question = card.front.endsWith("?") ? card.front : `${card.front} adalah ...?`;
     return pg(question, options, options.indexOf(card.back), `Jawabannya ${card.back}. Coba ingat lagi kartu bab ini, ya.`);
   });
+  // Video pendek vertikal bawaan (dibangun sebagai halaman statis di
+  // app/static/shorts/) — hanya dua bab ini yang sudah punya videonya;
+  // bab lain diisi admin lewat tab "Video per Bab".
+  const SHORTS: Record<string, { url: string; duration: string }> = {
+    "k1-mtk-bilang": { url: "/shorts/membilang-10.html", duration: "1 menit" },
+    "k1-mtk-tambah": { url: "/shorts/penjumlahan-10.html", duration: "1 menit" }
+  };
   return {
     id,
     product_id: "k1",
@@ -884,6 +894,8 @@ function buildK1Chapter(row: K1Row, sortOrder: number): ChapterSeed {
     sort_order: sortOrder,
     flashcards,
     quiz: [...written, ...fromCards],
+    short_url: SHORTS[id]?.url ?? null,
+    short_duration: SHORTS[id]?.duration ?? null
   };
 }
 

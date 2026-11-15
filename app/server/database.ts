@@ -79,6 +79,9 @@ export interface Chapter {
   focus_text: string;
   video_url: string | null;
   video_duration: string | null;
+  /** Video pendek vertikal (9:16) — URL http(s) atau path relatif situs. */
+  short_url: string | null;
+  short_duration: string | null;
   sort_order: number;
 }
 

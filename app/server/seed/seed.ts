@@ -128,8 +128,8 @@ export async function seedDatabase(db: DB): Promise<void> {
       await db.run(
         `INSERT INTO chapters
            (id, product_id, title, subject, grade, semester, summary, points,
-            focus_text, video_url, video_duration, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            focus_text, video_url, video_duration, short_url, short_duration, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ch.id,
         ch.product_id,
         ch.title,
@@ -141,6 +141,8 @@ export async function seedDatabase(db: DB): Promise<void> {
         ch.focus_text,
         null,
         null,
+        ch.short_url ?? null,
+        ch.short_duration ?? null,
         ch.sort_order
       );
       for (const fc of ch.flashcards) {

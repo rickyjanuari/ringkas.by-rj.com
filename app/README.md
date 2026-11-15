@@ -146,7 +146,8 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 - Admin: `GET/POST/PUT/DELETE /api/admin/products`, `POST .../active`, `.../external-link`, `.../images`, `.../feature`, `DELETE /api/admin/images/:id`, `GET /api/admin/users`, `POST /api/admin/users/:id/role`, `POST /api/admin/chapters/:id/video`, `GET/POST /api/admin/vouchers`, `POST /api/admin/vouchers/:code/active`, `POST /api/admin/cron/run` (`{job: 'daily'|'weekly', date?}`)
 - Checkout KlikQRIS: `POST /api/checkout` (idempotency key, `voucher_code` opsional), `GET /api/voucher/validate?code=&total=`, `GET /api/payment/status/:order_id`, `POST /api/webhook/klikqris`
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
-- Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed` + `focus_switches`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/prediction` (prediksi nilai SAS), `GET /api/study/:product_id/:chapter_id/worksheet`
+- Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed` + `focus_switches`; kind baru `"story"`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/prediction` (prediksi nilai SAS), `GET /api/study/:product_id/:chapter_id/worksheet`
+- Soal Sulitku & Cerita: `GET /api/hard-bank`, `POST /api/hard-bank/practice`, `GET /api/story/:grade/:subject` (`:subject` = `matematika` | `bahasa-indonesia`)
 - Keluarga & kelas: `POST /api/parent/link|redeem`, `GET /api/parent/children`, `POST /api/parent/lock|target`, `POST /api/class`, `POST /api/class/join`, `GET /api/class/:id`, `GET /api/class/:id/recap` (CSV)
 - Admin statistik: `GET /api/admin/stats` (hanya admin) — kartu Ringkasan + 10 order terbaru
 
@@ -215,6 +216,11 @@ di Akun/tracker. Tidak ada endpoint/tabel/migrasi baru — peta memakai
 ulang `GET /api/study/:product_id` + `GET /api/tracker`. Tab bar bawah
 disembunyikan di rute ini (seperti halaman Belajar).
 
+**Bank Soal Sulitku + Soal Cerita + Video Pendek (2026-11-15):**
+- **Bank Soal Sulitku** (`/soal-sulitku`): soal yang pernah dijawab salah di kuis bab + simulasi terkumpul di satu tempat — dihitung ulang dari `quiz_attempts` + tabel `questions` (maks. 200 attempt terbaru, 100 soal), bukan tabel soal baru; yang disimpan hanya penanda "dikuasai" (`hard_bank_mastered`, migrasi `0007`). Latihan maks. 20 soal per sesi; yang dijawab benar keluar dari bank. Pintu masuk: kartu di Akun/tracker + tombol di halaman Belajar.
+- **Soal Cerita Sehari-hari** (`/soal-cerita`): 120 soal orisinal di `server/seed/story.ts` — Matematika & B. Indonesia, Kelas 1–6, 10 soal per kelas per mapel (belanja di warung, berbagi kue, antrean, dan sejenisnya), 1 poin per soal, jawaban dihitung manual. `GET /api/story/:grade/:subject` + submit kind `"story"`. **Gratis untuk semua akun login.** Pintu masuk: kartu di Beranda + tombol di halaman Belajar.
+- **Video pendek per bab (vertikal 9:16):** kolom `chapters.short_url` + `short_duration` (migrasi `0007` — terapkan remote SEBELUM deploy; migrasi juga memasang dua video bawaan ke babnya di database yang sudah berisi bab). **Yang sudah ada videonya baru 2 bab**: Matematika Kelas 1 Bab 1 (`/shorts/membilang-10.html`) dan Bab 2 (`/shorts/penjumlahan-10.html`) — halaman mandiri di `app/static/shorts/`, narasi `speechSynthesis` perangkat (suara Indonesia bila tersedia), 6 adegan ±60 detik, subtitle per kalimat, play/jeda/putar ulang, kecepatan 0,75×/1×/1,25×, bisu, bilah progres per adegan, timer cadangan bila TTS tidak tersedia, tombol "Lanjut ke Kuis" (postMessage `ringkas:lanjut-kuis` ke Ruang Belajar). Bab lain dipasang admin lewat tab "Video per Bab" (kolom video pendek: URL http/https atau path `/...`) — dibuat bertahap dengan pola yang sama. Pemutar di Ruang Belajar: kartu "Tonton Video Pendek (60 detik)" dengan iframe lazy 9:16.
+
 **Mode Ujian Fokus + Prediksi Nilai SAS (2026-11-15):** tiap kartu
 Simulasi SAS di Ruang Belajar punya tombol "Mulai dengan Mode Fokus"
 (selain "Mulai Simulasi" biasa, tanpa paksaan): layar penuh (Fullscreen
@@ -234,7 +240,7 @@ label jujur "Perkiraan, bukan nilai resmi"; tanpa simulasi sama sekali
 
 **Sudah jalan dan dites:**
 - `npm run build` hijau (vite build + `tsc -p tsconfig.server.json --noEmit`).
-- Server boot, migrasi 0001–0006 teraplikasi, seed: **57 produk**
+- Server boot, migrasi 0001–0007 teraplikasi, seed: **57 produk**
   (19 SD aktif di katalog pembeli — 13 produk + 6 bundel kelas,
   38 non-SD `active=0`), **148 bab**,
   **740 flashcard**, **3.396 soal**, **58 simulasi**.

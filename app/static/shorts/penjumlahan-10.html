@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Video Pendek — Penjumlahan sampai 10 | Ringkas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Nunito+Sans:wght@400;700;800&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --emerald: #177245;
+    --marigold: #f2b33d;
+    --ink: #22302a;
+    --paper: #f7f5ef;
+    --card: #fffdf7;
+    --line: #e7e2d2;
+    --muted: #5f6b62;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Nunito Sans", system-ui, sans-serif;
+  }
+  .phone {
+    max-width: 420px;
+    min-height: 100dvh;
+    margin: 0 auto;
+    background: var(--card);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  header .dot {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--emerald); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Lora, serif; font-weight: 700; font-size: 18px;
+  }
+  header p { margin: 0; line-height: 1.25; }
+  header .t { font-weight: 800; font-size: 15px; }
+  header .s { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .progress { display: flex; gap: 4px; padding: 10px 16px 0; }
+  .progress i { flex: 1; height: 5px; border-radius: 99px; background: var(--line); }
+  .progress i.done { background: var(--emerald); }
+  .progress i.now { background: var(--marigold); }
+  .stage {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; padding: 18px 16px 8px; text-align: center;
+  }
+  .stage h1 {
+    font-family: Lora, serif; font-size: 26px; line-height: 1.25; margin: 0;
+  }
+  .stage .big {
+    font-family: Lora, serif; font-size: 40px; font-weight: 700; color: var(--emerald);
+    margin: 0;
+  }
+  .objects {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; align-items: center;
+    min-height: 130px;
+  }
+  @keyframes pop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes joinIn {
+    from { transform: translateX(0) scale(0); opacity: 0; }
+    to { transform: translateX(0) scale(1); opacity: 1; }
+  }
+  .obj {
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 20px; color: #fff;
+    animation: pop .45s both; animation-delay: var(--d, 0s);
+    box-shadow: 0 2px 0 rgba(0,0,0,.12);
+  }
+  .obj.red { background: #d64541; }
+  .obj.orange { background: #e8833a; }
+  .obj.blue { background: #3b82c4; }
+  .obj.empty { background: #fff; border: 2px dashed #c9c2ae; box-shadow: none; }
+  .star {
+    width: 56px; height: 56px; background: var(--marigold);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    animation: pop .45s both; animation-delay: var(--d, 0s);
+  }
+  .star.blue { background: #3b82c4; }
+  .balloon {
+    width: 50px; height: 62px; border-radius: 50% 50% 50% 50% / 55% 55% 45% 45%;
+    position: relative;
+    animation: pop .45s both; animation-delay: var(--d, 0s);
+  }
+  .balloon::after {
+    content: ""; position: absolute; left: 50%; top: 60px;
+    width: 2px; height: 26px; background: #9aa096; transform: translateX(-50%);
+  }
+  .group {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 12px; border-radius: 14px;
+  }
+  .group.a { background: #fdeceb; }
+  .group.b { background: #eef4fb; }
+  .plus { font-size: 28px; font-weight: 800; color: var(--emerald); }
+  .numline { position: relative; width: 100%; max-width: 320px; height: 74px; }
+  .numline .track {
+    position: absolute; left: 6px; right: 6px; top: 34px; height: 4px;
+    background: var(--emerald); border-radius: 99px;
+  }
+  .numline .tick {
+    position: absolute; top: 30px; width: 12px; height: 12px;
+    border-radius: 50%; background: #fff; border: 2px solid var(--emerald);
+    transform: translateX(-50%);
+  }
+  .numline .lbl {
+    position: absolute; top: 48px; transform: translateX(-50%);
+    font-size: 12px; font-weight: 800; color: var(--muted);
+  }
+  @keyframes hop7 {
+    0% { left: 4%; top: 6px; }
+    25% { left: 32%; top: -4px; }
+    50% { left: 32%; top: 6px; }
+    75% { left: 69%; top: -4px; }
+    100% { left: 69%; top: 6px; }
+  }
+  .numline .frog {
+    position: absolute; left: 4%; top: 6px; width: 34px; height: 34px;
+    border-radius: 50%; background: #4caf50;
+    animation: hop7 4.5s ease-in-out both; animation-delay: .8s;
+  }
+  .numline .frog::before,
+  .numline .frog::after {
+    content: ""; position: absolute; top: 7px; width: 8px; height: 8px;
+    border-radius: 50%; background: #fff;
+    box-shadow: inset 0 0 0 2px #22302a;
+  }
+  .numline .frog::before { left: 6px; }
+  .numline .frog::after { right: 6px; }
+  .tenframe { display: grid; grid-template-columns: repeat(5, 52px); gap: 6px; }
+  .tenframe .cell {
+    width: 52px; height: 52px; border: 2px solid #c9c2ae; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; background: #fff;
+  }
+  .tenframe .fill {
+    width: 38px; height: 38px; border-radius: 50%;
+    animation: pop .45s both; animation-delay: var(--d, 0s);
+  }
+  .tenframe .fill.blue { background: #3b82c4; }
+  .tenframe .fill.orange { background: #e8833a; }
+  .subtitle {
+    min-height: 66px; padding: 0 16px;
+    font-size: 17px; font-weight: 800; line-height: 1.45; text-align: center;
+  }
+  .controls { display: flex; gap: 8px; padding: 6px 16px 0; align-items: center; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 10px 14px;
+    font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .btn-primary { background: var(--emerald); color: #fff; flex: 1; }
+  .btn-ghost { background: #ece9dc; color: var(--ink); }
+  .btn-sun { background: var(--marigold); color: var(--ink); flex: 1; }
+  .speeds { display: flex; gap: 6px; padding: 8px 16px 0; }
+  .speeds button {
+    flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 99px;
+    padding: 6px 0; font-family: inherit; font-weight: 800; font-size: 12px; cursor: pointer;
+  }
+  .speeds button.on { background: var(--emerald); color: #fff; border-color: var(--emerald); }
+  .scenes { padding: 10px 16px 16px; }
+  .scenes ol { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .scenes li.on { color: var(--emerald); font-weight: 800; }
+  .note {
+    margin: 0 16px 16px; padding: 10px 12px; border-radius: 12px;
+    background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 700;
+  }
+  .endcard { display: none; text-align: center; padding: 6px 16px 16px; }
+  .endcard.show { display: block; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <header>
+    <span class="dot">R</span>
+    <p><span class="t">Penjumlahan sampai 10</span><br /><span class="s">Matematika Kelas 1 • Bab 2 • Video pendek</span></p>
+  </header>
+  <div class="progress" id="progress"></div>
+  <div class="stage" id="stage"></div>
+  <p class="subtitle" id="subtitle">Tekan tombol putar untuk mulai menonton.</p>
+  <div class="controls">
+    <button class="btn btn-primary" id="playBtn" type="button">▶ Putar Video</button>
+    <button class="btn btn-ghost" id="muteBtn" type="button">Suara: Nyala</button>
+  </div>
+  <div class="speeds" id="speeds">
+    <button type="button" data-rate="0.75">0,75×</button>
+    <button type="button" data-rate="1" class="on">1×</button>
+    <button type="button" data-rate="1.25">1,25×</button>
+  </div>
+  <div class="scenes">
+    <ol id="sceneList"></ol>
+  </div>
+  <div class="endcard" id="endcard">
+    <p style="font-weight:800;margin:4px 0">Hebat! Kamu sudah belajar penjumlahan.</p>
+    <button class="btn btn-sun" id="lanjutBtn" type="button">Lanjut ke Kuis →</button>
+    <p class="note" id="lanjutNote" style="display:none;margin:10px 0 0">
+      Video ini dibuka di luar Ringkas. Buka dari Ruang Belajar untuk lanjut ke kuis.
+    </p>
+  </div>
+</div>
+
+<script>
+  // Video pendek vertikal ±60 detik. Narasi memakai speechSynthesis
+  // perangkat (suara Indonesia bila tersedia); bila tidak ada, adegan
+  // maju dengan timer cadangan (total ±60 detik).
+  const apples = (n, color, base) =>
+    Array.from({ length: n }, (_, i) =>
+      `<span class="obj ${color}" style="--d:${base + i * 0.45}s">${i + 1}</span>`).join("");
+  const stars = (n, cls, base) =>
+    Array.from({ length: n }, (_, i) =>
+      `<span class="star ${cls || ""}" style="--d:${base + i * 0.4}s"></span>`).join("");
+  const balloons = (n) => {
+    const colors = ["#d64541", "#f2b33d", "#3b82c4", "#4caf50", "#e8833a", "#8e6fc8"];
+    return Array.from({ length: n }, (_, i) =>
+      `<span class="balloon" style="--d:${0.4 + i * 0.45}s;background:${colors[i % colors.length]}"></span>`).join("");
+  };
+  const tenFrame62 = () =>
+    `<div class="tenframe">${Array.from({ length: 10 }, (_, i) => {
+      const filled = i < 6 ? "blue" : i < 8 ? "orange" : "";
+      return `<span class="cell">${filled ? `<span class="fill ${filled}" style="--d:${0.3 + i * 0.3}s"></span>` : ""}</span>`;
+    }).join("")}</div>`;
+
+  const scenes = [
+    {
+      title: "Pembuka",
+      text: "Halo, teman-teman! Penjumlahan artinya menggabungkan. Ayo kita coba!",
+      html: `<h1>Penjumlahan itu<br />menggabungkan!</h1><p class="big">2 + 3 = 5</p>`,
+      fallbackMs: 7000
+    },
+    {
+      title: "Menggabungkan apel 2+3",
+      text: "Dua apel ditambah tiga apel. Gabungkan semuanya! Satu, dua, tiga, empat, lima! Ada lima apel. Hebat!",
+      html: `<h1>2 apel + 3 apel = ?</h1><div class="objects"><span class="group a">${apples(2, "red", 0.4)}</span><span class="plus">+</span><span class="group b">${apples(3, "orange", 1.4)}</span></div><p class="big">2 + 3 = 5</p>`,
+      fallbackMs: 12000
+    },
+    {
+      title: "Menggabungkan bintang 4+2",
+      text: "Empat bintang ditambah dua bintang. Gabungkan! Ada enam bintang!",
+      html: `<h1>4 bintang + 2 bintang = ?</h1><div class="objects">${stars(4, "", 0.4)}<span class="plus">+</span>${stars(2, "blue", 2.2)}</div><p class="big">4 + 2 = 6</p>`,
+      fallbackMs: 11000
+    },
+    {
+      title: "Garis bilangan 3+4",
+      text: "Tiga ditambah empat. Katak melompat tiga kali, lalu empat kali lagi. Katak tiba di angka tujuh!",
+      html: `<h1>3 + 4 = ?</h1><div class="numline"><div class="track"></div>
+        ${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="tick" style="left:${4 + n * 9.2}%"></span><span class="lbl" style="left:${4 + n * 9.2}%">${n}</span>`).join("")}
+        <span class="frog"></span></div><p class="big">3 + 4 = 7</p>`,
+      fallbackMs: 11000
+    },
+    {
+      title: "Tebak balon 3+3",
+      text: "Tiga balon ditambah tiga balon. Ada berapa balon? Satu, dua, tiga, empat, lima, enam! Ada enam balon!",
+      html: `<h1>3 balon + 3 balon = ?</h1><div class="objects">${balloons(6)}</div><p class="big">3 + 3 = 6</p>`,
+      fallbackMs: 11000
+    },
+    {
+      title: "Penutup",
+      text: "Hebat! Penjumlahan itu menggabungkan. Lihat kotak sepuluh: enam biru ditambah dua oranye sama dengan delapan. Coba kuisnya, ya!",
+      html: `<h1>Kotak Sepuluh</h1>${tenFrame62()}<p style="font-weight:800">6 biru + 2 oranye = 8</p>`,
+      fallbackMs: 11000
+    }
+  ];
+
+  const stage = document.getElementById("stage");
+  const subtitle = document.getElementById("subtitle");
+  const playBtn = document.getElementById("playBtn");
+  const muteBtn = document.getElementById("muteBtn");
+  const progress = document.getElementById("progress");
+  const sceneList = document.getElementById("sceneList");
+  const endcard = document.getElementById("endcard");
+
+  let idx = -1;
+  let playing = false;
+  let rate = 1;
+  let muted = false;
+  let timer = null;
+  let utter = null;
+
+  scenes.forEach((s, i) => {
+    const bar = document.createElement("i");
+    progress.appendChild(bar);
+    const li = document.createElement("li");
+    li.textContent = `${i + 1}. ${s.title}`;
+    sceneList.appendChild(li);
+  });
+
+  function paint() {
+    [...progress.children].forEach((b, i) => {
+      b.className = i < idx ? "done" : i === idx ? "now" : "";
+    });
+    [...sceneList.children].forEach((li, i) => li.classList.toggle("on", i === idx));
+  }
+
+  function stopSpeech() {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    if (timer) { clearTimeout(timer); timer = null; }
+    utter = null;
+  }
+
+  function showScene(i) {
+    idx = i;
+    const s = scenes[i];
+    stage.innerHTML = s.html;
+    subtitle.textContent = s.text;
+    paint();
+    endcard.classList.remove("show");
+  }
+
+  function next() {
+    if (!playing) return;
+    if (idx + 1 >= scenes.length) {
+      finish();
+      return;
+    }
+    playScene(idx + 1);
+  }
+
+  function playScene(i) {
+    showScene(i);
+    const s = scenes[i];
+    stopSpeech();
+    if (!muted && "speechSynthesis" in window) {
+      utter = new SpeechSynthesisUtterance(s.text);
+      utter.lang = "id-ID";
+      utter.rate = rate;
+      const voices = window.speechSynthesis.getVoices();
+      const idVoice = voices.find((v) => (v.lang || "").toLowerCase().startsWith("id"));
+      if (idVoice) utter.voice = idVoice;
+      utter.onend = () => { timer = setTimeout(next, 500); };
+      utter.onerror = () => { timer = setTimeout(next, s.fallbackMs); };
+      window.speechSynthesis.speak(utter);
+      // Pengaman: bila onend tidak pernah datang, pakai timer cadangan.
+      timer = setTimeout(() => { if (playing && idx === i) next(); }, s.fallbackMs + 9000);
+    } else {
+      timer = setTimeout(next, s.fallbackMs);
+    }
+  }
+
+  function finish() {
+    playing = false;
+    stopSpeech();
+    playBtn.textContent = "↻ Putar Ulang";
+    endcard.classList.add("show");
+    [...progress.children].forEach((b) => (b.className = "done"));
+  }
+
+  function play() {
+    if (playing) {
+      playing = false;
+      stopSpeech();
+      playBtn.textContent = "▶ Lanjutkan";
+      return;
+    }
+    playing = true;
+    playBtn.textContent = "⏸ Jeda";
+    if (idx < 0 || idx >= scenes.length) playScene(0);
+    else playScene(idx);
+  }
+
+  playBtn.addEventListener("click", play);
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? "Suara: Mati" : "Suara: Nyala";
+    if (playing) playScene(idx);
+  });
+  document.querySelectorAll("#speeds button").forEach((b) => {
+    b.addEventListener("click", () => {
+      rate = Number(b.dataset.rate);
+      document.querySelectorAll("#speeds button").forEach((x) => x.classList.toggle("on", x === b));
+      if (playing) playScene(idx);
+    });
+  });
+  document.getElementById("lanjutBtn").addEventListener("click", () => {
+    try {
+      window.parent.postMessage({ type: "ringkas:lanjut-kuis" }, "*");
+    } catch (e) { /* abaikan */ }
+    if (window.parent === window) {
+      document.getElementById("lanjutNote").style.display = "block";
+    }
+  });
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  }
+</script>
+</body>
+</html>
