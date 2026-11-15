@@ -144,6 +144,7 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 - Auth: `POST /api/auth/register|login`, `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/account/whatsapp`
 - Katalog: `GET /api/catalog`, `GET /api/products/:id` (menambah `bundleItems` bila produk bundel)
 - Admin: `GET/POST/PUT/DELETE /api/admin/products`, `POST .../active`, `.../external-link`, `.../images`, `.../feature`, `DELETE /api/admin/images/:id`, `GET /api/admin/users`, `POST /api/admin/users/:id/role`, `POST /api/admin/chapters/:id/video`, `GET/POST /api/admin/vouchers`, `POST /api/admin/vouchers/:code/active`, `POST /api/admin/cron/run` (`{job: 'daily'|'weekly', date?}`)
+- Admin lanjutan: `GET /api/admin/orders` (cari `q`, filter `status`, `page`/`limit`), `GET /api/admin/orders/:id`, `POST /api/admin/users/:id/reset-password` (reset oleh admin — BUKAN alur lupa-kata-sandi mandiri, alur itu BELUM ada), `POST /api/admin/resend-email` (kirim ulang `welcome`/`pending`/`paid`/`expired` dengan `force: true`), `GET /api/admin/export/orders.csv` (`rekap-order-ringkas.csv`) + `GET /api/admin/export/users.csv` (`pengguna-ringkas.csv`), `GET/POST /api/admin/settings` (pengumuman & promo, migrasi `0008`), `GET /api/announcement` (publik, tanpa auth)
 - Checkout KlikQRIS: `POST /api/checkout` (idempotency key, `voucher_code` opsional), `GET /api/voucher/validate?code=&total=`, `GET /api/payment/status/:order_id`, `POST /api/webhook/klikqris`
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
 - Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed` + `focus_switches`; kind baru `"story"`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/prediction` (prediksi nilai SAS), `GET /api/study/:product_id/:chapter_id/worksheet`
@@ -238,12 +239,47 @@ label jujur "Perkiraan, bukan nilai resmi"; tanpa simulasi sama sekali
 → ajakan mengerjakan simulasi, bukan angka kosong. Endpoint
 `GET /api/prediction`, tanpa tabel baru.
 
+**Admin lanjutan (2026-11-15):** daftar order admin
+(`GET /api/admin/orders` — cari `q` ke id order/email pembeli, filter
+`status` PENDING/PAID/EXPIRED, `page`/`limit` clamp 1–100) + detail
+order (`GET /api/admin/orders/:id` — semua baris items termasuk
+anggota bundel `included_in_bundle`); reset kata sandi oleh admin
+(`POST /api/admin/users/:id/reset-password`, minimal 8 karakter,
+403 bila mereset diri sendiri — BUKAN alur lupa-kata-sandi mandiri,
+alur itu BELUM ada); kirim ulang email (`POST
+/api/admin/resend-email`, `force: true` — lihat bagian "Email otomatis
+& cron" di atas); ekspor CSV order/pengguna (RFC 4180, maks. 5000
+baris order); pengaturan situs (`GET/POST /api/admin/settings` —
+teks pengumuman/promo maks. 500 karakter, saklar 0/1) + pengumuman
+publik (`GET /api/announcement`, tanpa auth). Tabel `settings` +
+4 kunci bawaan dari migrasi `0008_admin_lanjutan.sql` — terapkan
+remote SEBELUM deploy (`wrangler d1 migrations apply ringkas-db
+--remote`), seperti migrasi 0006/0007. Semua endpoint admin: 401 bila
+belum login, 403 bila bukan admin. **Perbaikan yang ketahuan saat
+pengujian:** `parseItems` di `server/actions.ts` dulu membuang
+`included_in_bundle`, sehingga filter anggota bundel di orderOut,
+stats, idempotensi checkout, dan label "(termasuk bundel)" di struk
+menjadi no-op — sekarang penanda dipertahankan (lihat
+`API_CONTRACT.md`).
+
 **Sudah jalan dan dites:**
 - `npm run build` hijau (vite build + `tsc -p tsconfig.server.json --noEmit`).
-- Server boot, migrasi 0001–0007 teraplikasi, seed: **57 produk**
+- Server boot, migrasi 0001–0008 teraplikasi, seed: **57 produk**
   (19 SD aktif di katalog pembeli — 13 produk + 6 bundel kelas,
   38 non-SD `active=0`), **148 bab**,
   **740 flashcard**, **3.396 soal**, **58 simulasi**.
+- Admin lanjutan (smoke `wrangler dev --local` + D1 ter-seed,
+  2026-11-15): **69/69 cek lolos** — list order (cari/filter/paginasi),
+  detail bundel (3 baris items, anggota `included_in_bundle`), reset
+  kata sandi (baru bisa login, lama ditolak, reset diri ditolak), kirim
+  ulang tanpa `RESEND_API_KEY` (`skipped: "no-key"`, 0 klaim
+  menggantung), CSV ter-parse (header + baris cocok D1, nama berkoma
+  dikutip), settings simpan/baca + `/api/announcement` publik.
+  Semantik `force` teruji terpisah dengan fetch di-stub (11/11):
+  kirim ulang mencatat `resend_id` baru, tanpa force tetap
+  `already-sent`, baris cron berperiode tidak tersentuh, tanpa kunci
+  riwayat tidak terhapus. Order uji disisipkan langsung ke D1 lokal
+  (checkout butuh KlikQRIS); tidak ada email sungguhan yang dikirim.
 - Katalog mengembalikan tepat 19 produk SD (`k1`–`k6`, `mtk-sd`,
   `sas-k1-s1`, `sas-k2`–`sas-k6`, `bundle-k1`–`bundle-k6`).
 - Register/login (password salah → 401), WhatsApp ternormalisasi ke `62xx`,
@@ -432,6 +468,22 @@ menjadi no-op. Bila migrasi `0004`/`0005` belum diterapkan di D1
 remote, jalankan `wrangler d1 migrations apply ringkas-db --remote`
 sebelum deploy (atau email gagal dicatat dan pemicu dilewati dengan
 log error).
+
+**Kirim ulang oleh admin (`force`)** — admin dapat mengirim ulang
+email transaksional lewat `POST /api/admin/resend-email` dengan body
+`{template: "welcome"|"pending"|"paid"|"expired", userId? / orderId?}`
+(mengembalikan `SendEmailResult` yang sama: `{sent, skipped?, error?,
+resendId?}`). Di baliknya, `sendTemplatedEmail` + 4 helper
+(`sendWelcomeEmail`/`sendPendingEmail`/`sendPaidEmail`/
+`sendExpiredEmail`) menerima opsi `force: true` — HANYA dipakai
+endpoint admin ini, tidak pernah oleh pemicu otomatis. Dengan force,
+baris `sent_emails` yang cocok (order/user, template, `period = ''`)
+dihapus SEBELUM klaim baru, jadi kirim ulang selalu mencoba dan
+mencatat `resend_id` baru. Email cron berperiode tidak pernah
+tersentuh (penghapusan hanya `period = ''`), dan tanpa
+`RESEND_API_KEY` tidak ada riwayat yang terhapus (hasil tetap
+`skipped: "no-key"` tanpa klaim menggantung). Tanpa force, perilaku
+idempotensi tidak berubah.
 
 **Cron** — jadwal di `wrangler.toml` (`[triggers] crons`):
 `0 0 * * *` (tiap hari 00:00 UTC = 07:00 WIB: pengingat + streak)

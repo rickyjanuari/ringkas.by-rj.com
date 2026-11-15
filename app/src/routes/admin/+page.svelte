@@ -4,6 +4,8 @@
 	import { goto } from "$app/navigation";
 	import {
 		api,
+		apiBlob,
+		downloadBlob,
 		formatRupiah,
 		formatTanggal,
 		getToken,
@@ -13,7 +15,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "ringkasan" | "produk" | "pengguna" | "video" | "voucher" | "cron";
+	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman";
 	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -24,20 +26,24 @@
 
 	const MENU: { id: Tab; label: string; icon: string }[] = [
 		{ id: "ringkasan", label: "Ringkasan", icon: "chart" },
+		{ id: "pesanan", label: "Pesanan", icon: "shopping-cart" },
 		{ id: "produk", label: "Produk", icon: "package" },
 		{ id: "voucher", label: "Voucher", icon: "receipt" },
 		{ id: "pengguna", label: "Pengguna", icon: "users" },
 		{ id: "video", label: "Video per Bab", icon: "video" },
-		{ id: "cron", label: "Email & Cron", icon: "clock" }
+		{ id: "cron", label: "Email & Cron", icon: "clock" },
+		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" }
 	];
 
 	const TAB_TITLE: Record<Tab, string> = {
 		ringkasan: "Ringkasan",
+		pesanan: "Pesanan",
 		produk: "Produk",
 		voucher: "Voucher",
 		pengguna: "Pengguna & Role",
 		video: "Video per Bab",
-		cron: "Email & Cron"
+		cron: "Email & Cron",
+		pengumuman: "Pengumuman"
 	};
 
 	function navClass(t: Tab): string {
@@ -192,6 +198,282 @@
 	);
 	let cronError = $state("");
 
+	// ---- Pesanan ----
+	type AdminOrderList = {
+		id: string;
+		buyer_name: string | null;
+		buyer_email: string | null;
+		products: string[];
+		total: number;
+		status: string;
+		created_at: string;
+		paid_at: string | null;
+	};
+	type AdminOrderDetail = {
+		id: string;
+		user_id: string;
+		buyer_name: string | null;
+		buyer_email: string | null;
+		whatsapp: string | null;
+		items: { product_id: string; title: string; price: number; included_in_bundle: boolean }[];
+		total: number;
+		total_amount: number | null;
+		discount_amount: number;
+		voucher_code: string | null;
+		status: string;
+		created_at: string;
+		paid_at: string | null;
+		expired_at: string | null;
+		klikqris_order_id: string | null;
+	};
+	let orders = $state<AdminOrderList[]>([]);
+	let ordersTotal = $state(0);
+	let ordersPage = $state(1);
+	let ordersPages = $state(1);
+	let ordersLoading = $state(false);
+	let ordersError = $state("");
+	let ordersLoaded = $state(false);
+	let orderQuery = $state("");
+	let orderStatus = $state("Semua");
+	let orderDetail = $state<AdminOrderDetail | null>(null);
+	let orderDetailLoading = $state(false);
+	let orderDetailError = $state("");
+	let resendOrderStatus = $state("");
+	let resendingOrder = $state(false);
+	let exportingOrders = $state(false);
+
+	async function loadOrders(page = 1) {
+		ordersLoading = true;
+		ordersError = "";
+		try {
+			const params = new URLSearchParams({ page: String(page), limit: "20" });
+			if (orderQuery.trim()) params.set("q", orderQuery.trim());
+			if (orderStatus !== "Semua") params.set("status", orderStatus);
+			const data = await api<{
+				orders: AdminOrderList[];
+				total: number;
+				page: number;
+				pages: number;
+			}>(`/api/admin/orders?${params.toString()}`);
+			orders = data.orders ?? [];
+			ordersTotal = data.total ?? 0;
+			ordersPage = data.page ?? 1;
+			ordersPages = data.pages ?? 1;
+			ordersLoaded = true;
+		} catch (e) {
+			ordersError = e instanceof Error ? e.message : "Gagal memuat pesanan. Coba muat ulang ya.";
+		} finally {
+			ordersLoading = false;
+		}
+	}
+
+	function cariPesanan() {
+		loadOrders(1);
+	}
+
+	async function bukaDetailOrder(id: string) {
+		orderDetailLoading = true;
+		orderDetailError = "";
+		resendOrderStatus = "";
+		try {
+			const data = await api<{ order: AdminOrderDetail }>(
+				`/api/admin/orders/${encodeURIComponent(id)}`
+			);
+			orderDetail = data.order;
+		} catch (e) {
+			orderDetailError = e instanceof Error ? e.message : "Gagal memuat detail order.";
+		} finally {
+			orderDetailLoading = false;
+		}
+	}
+
+	function templateEmailOrder(status: string): "paid" | "pending" | "expired" {
+		if (status === "PAID") return "paid";
+		if (status === "EXPIRED") return "expired";
+		return "pending";
+	}
+
+	function labelKirimUlangOrder(status: string): string {
+		if (status === "PAID") return "Kirim ulang email Lunas";
+		if (status === "EXPIRED") return "Kirim ulang email Kedaluwarsa";
+		return "Kirim ulang email Menunggu Bayar";
+	}
+
+	async function kirimUlangEmailOrder() {
+		if (!orderDetail) return;
+		resendingOrder = true;
+		resendOrderStatus = "";
+		try {
+			const data = await api<{ sent: boolean; skipped?: boolean; error?: string }>(
+				"/api/admin/resend-email",
+				{
+					method: "POST",
+					body: JSON.stringify({
+						orderId: orderDetail.id,
+						template: templateEmailOrder(orderDetail.status)
+					})
+				}
+			);
+			resendOrderStatus = hasilKirimUlang(data);
+		} catch (e) {
+			resendOrderStatus = e instanceof Error ? e.message : "Gagal mengirim email.";
+		} finally {
+			resendingOrder = false;
+		}
+	}
+
+	/** Pesan hasil kirim ulang email dari respons { sent, skipped, error }. */
+	function hasilKirimUlang(data: { sent: boolean; skipped?: boolean; error?: string }): string {
+		if (data.sent) return "Email terkirim.";
+		if (data.skipped)
+			return "Email dilewati: RESEND_API_KEY belum disetel di server.";
+		return `Gagal mengirim email: ${data.error ?? "kesalahan tidak diketahui"}.`;
+	}
+
+	async function unduhCsvOrder() {
+		exportingOrders = true;
+		try {
+			const { blob, filename } = await apiBlob("/api/admin/export/orders.csv");
+			downloadBlob(blob, filename);
+			notice = "CSV order diunduh.";
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal mengunduh CSV order.";
+		} finally {
+			exportingOrders = false;
+		}
+	}
+
+	// ---- Reset kata sandi & kirim ulang email selamat datang (tab Pengguna) ----
+	let adminId = $state("");
+	let resetUser = $state<{ id: string; name: string; email: string } | null>(null);
+	let resetPw = $state("");
+	let resetPw2 = $state("");
+	let resetError = $state("");
+	let resetSaving = $state(false);
+	let resendUserId = $state<string | null>(null);
+	let userEmailResult = $state<Record<string, string>>({});
+	let exportingUsers = $state(false);
+
+	async function simpanResetPassword() {
+		if (!resetUser) return;
+		if (resetPw.length < 8) {
+			resetError = "Kata sandi baru minimal 8 karakter.";
+			return;
+		}
+		if (resetPw !== resetPw2) {
+			resetError = "Konfirmasi kata sandi tidak cocok.";
+			return;
+		}
+		resetSaving = true;
+		resetError = "";
+		try {
+			await api(`/api/admin/users/${resetUser.id}/reset-password`, {
+				method: "POST",
+				body: JSON.stringify({ password: resetPw })
+			});
+			notice = `Kata sandi ${resetUser.name} berhasil direset.`;
+			resetUser = null;
+			resetPw = "";
+			resetPw2 = "";
+		} catch (e) {
+			resetError = e instanceof Error ? e.message : "Gagal mereset kata sandi.";
+		} finally {
+			resetSaving = false;
+		}
+	}
+
+	async function kirimUlangEmailSelamatDatang(u: { id: string; name: string }) {
+		resendUserId = u.id;
+		try {
+			const data = await api<{ sent: boolean; skipped?: boolean; error?: string }>(
+				"/api/admin/resend-email",
+				{
+					method: "POST",
+					body: JSON.stringify({ userId: u.id, template: "welcome" })
+				}
+			);
+			userEmailResult = { ...userEmailResult, [u.id]: hasilKirimUlang(data) };
+		} catch (e) {
+			userEmailResult = {
+				...userEmailResult,
+				[u.id]: e instanceof Error ? e.message : "Gagal mengirim email."
+			};
+		} finally {
+			resendUserId = null;
+		}
+	}
+
+	async function unduhCsvPengguna() {
+		exportingUsers = true;
+		try {
+			const { blob, filename } = await apiBlob("/api/admin/export/users.csv");
+			downloadBlob(blob, filename);
+			notice = "CSV pengguna diunduh.";
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal mengunduh CSV pengguna.";
+		} finally {
+			exportingUsers = false;
+		}
+	}
+
+	// ---- Pengumuman ----
+	type AnnouncementSettings = {
+		announcement_text: string | null;
+		announcement_enabled: number | boolean;
+		promo_text: string | null;
+		promo_enabled: number | boolean;
+	};
+	let settingsLoaded = $state(false);
+	let settingsLoading = $state(false);
+	let settingsError = $state("");
+	let settingsSaving = $state(false);
+	let annText = $state("");
+	let annEnabled = $state(false);
+	let promoText = $state("");
+	let promoEnabled = $state(false);
+
+	async function loadSettings() {
+		settingsLoading = true;
+		settingsError = "";
+		try {
+			const data = await api<{ settings: AnnouncementSettings }>("/api/admin/settings");
+			annText = data.settings.announcement_text ?? "";
+			annEnabled = Boolean(data.settings.announcement_enabled);
+			promoText = data.settings.promo_text ?? "";
+			promoEnabled = Boolean(data.settings.promo_enabled);
+			settingsLoaded = true;
+		} catch (e) {
+			settingsError = e instanceof Error ? e.message : "Gagal memuat pengumuman.";
+		} finally {
+			settingsLoading = false;
+		}
+	}
+
+	async function simpanSettings() {
+		settingsSaving = true;
+		settingsError = "";
+		try {
+			const data = await api<{ settings: AnnouncementSettings }>("/api/admin/settings", {
+				method: "POST",
+				body: JSON.stringify({
+					announcement_text: annText.trim(),
+					announcement_enabled: annEnabled ? 1 : 0,
+					promo_text: promoText.trim(),
+					promo_enabled: promoEnabled ? 1 : 0
+				})
+			});
+			annText = data.settings.announcement_text ?? "";
+			annEnabled = Boolean(data.settings.announcement_enabled);
+			promoText = data.settings.promo_text ?? "";
+			promoEnabled = Boolean(data.settings.promo_enabled);
+			notice = "Pengumuman tersimpan.";
+		} catch (e) {
+			settingsError = e instanceof Error ? e.message : "Gagal menyimpan pengumuman.";
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
 	/** Tanggal saja (tanpa jam) untuk kolom kedaluwarsa voucher. */
 	function fmtDate(iso: string | null): string {
 		if (!iso) return "-";
@@ -213,6 +495,7 @@
 			} else {
 				isAdmin = true;
 				adminName = user.name;
+				adminId = user.id;
 				await loadProducts();
 				await loadStats();
 			}
@@ -254,6 +537,8 @@
 		if (t === "pengguna" && users.length === 0) loadUsers();
 		if (t === "voucher" && vouchers.length === 0) loadVouchers();
 		if (t === "ringkasan" && !stats && !statsLoading) loadStats();
+		if (t === "pesanan" && !ordersLoaded) loadOrders(1);
+		if (t === "pengumuman" && !settingsLoaded) loadSettings();
 	}
 
 	async function loadVouchers() {
@@ -755,6 +1040,155 @@
 						</div>
 					{/if}
 				{/if}
+			{:else if tab === "pesanan"}
+				<form
+					class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"
+					onsubmit={(e) => {
+						e.preventDefault();
+						cariPesanan();
+					}}
+				>
+					<div class="relative flex-1">
+						<input
+							class="input !pl-9"
+							type="search"
+							placeholder="Cari nomor order atau email pembeli..."
+							bind:value={orderQuery}
+							aria-label="Cari order"
+						/>
+						<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#5f6b62]"><Icon name="search" size={16} /></span>
+					</div>
+					<select
+						class="input sm:!w-44"
+						bind:value={orderStatus}
+						aria-label="Filter status order"
+						onchange={() => loadOrders(1)}
+					>
+						<option value="Semua">Semua status</option>
+						<option value="PENDING">PENDING</option>
+						<option value="PAID">PAID</option>
+						<option value="EXPIRED">EXPIRED</option>
+					</select>
+					<button type="submit" class="btn btn-primary">
+						<Icon name="search" size={16} /> Cari
+					</button>
+					<button type="button" class="btn btn-ghost" disabled={ordersLoading} onclick={() => loadOrders(ordersPage)}>
+						<Icon name="refresh" size={16} /> {ordersLoading ? "Memuat..." : "Muat ulang"}
+					</button>
+					<button type="button" class="btn btn-outline" disabled={exportingOrders} onclick={unduhCsvOrder}>
+						<Icon name="download" size={16} /> {exportingOrders ? "Mengunduh..." : "Unduh CSV Order"}
+					</button>
+				</form>
+				<p class="mt-3 text-sm font-bold text-[#3f4a42]">
+					Menampilkan {orders.length} dari {ordersTotal} order
+				</p>
+
+				{#if ordersLoading && !ordersLoaded}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if ordersError && !ordersLoaded}
+					<p class="err mt-4">{ordersError}</p>
+					<button type="button" class="btn btn-primary mt-3" onclick={() => loadOrders(1)}>Coba lagi</button>
+				{:else if orders.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">
+						{ordersTotal === 0 ? "Belum ada order." : "Tidak ada order yang cocok dengan pencarian."}
+					</p>
+				{:else}
+					{#if ordersError}
+						<p class="err mt-3">{ordersError}</p>
+					{/if}
+					<!-- Tabel desktop -->
+					<div class="card mt-3 hidden overflow-x-auto p-0 md:block">
+						<table class="w-full min-w-[760px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Order</th>
+									<th class="px-3 py-2.5 font-extrabold">Pembeli</th>
+									<th class="px-3 py-2.5 font-extrabold">Produk</th>
+									<th class="px-3 py-2.5 font-extrabold">Total</th>
+									<th class="px-3 py-2.5 font-extrabold">Status</th>
+									<th class="px-3 py-2.5 font-extrabold">Tanggal</th>
+									<th class="px-3 py-2.5 text-right font-extrabold">Aksi</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each orders as o (o.id)}
+									<tr class="cursor-pointer border-b border-[#f0ede2] align-top last:border-0 hover:bg-[#f7f5ef]" onclick={() => bukaDetailOrder(o.id)}>
+										<td class="px-3 py-2.5 font-extrabold">{o.id}</td>
+										<td class="px-3 py-2.5">
+											<p class="font-bold">{o.buyer_name ?? "-"}</p>
+											<p class="text-[#5f6b62]">{o.buyer_email ?? "-"}</p>
+										</td>
+										<td class="px-3 py-2.5">{o.products.join(", ") || "-"}</td>
+										<td class="px-3 py-2.5 font-bold">{formatRupiah(o.total)}</td>
+										<td class="px-3 py-2.5"><span class={statusBadge(o.status)}>{o.status}</span></td>
+										<td class="px-3 py-2.5">{formatTanggal(o.created_at)}</td>
+										<td class="px-3 py-2.5 text-right">
+											<button
+												type="button"
+												class="btn btn-outline !px-2.5 !py-1.5 text-xs"
+												onclick={(e) => {
+													e.stopPropagation();
+													bukaDetailOrder(o.id);
+												}}
+											>
+												Detail
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					<!-- Kartu mobile -->
+					<div class="mt-3 space-y-2 md:hidden">
+						{#each orders as o (o.id)}
+							<div
+								class="card cursor-pointer p-3"
+								role="button"
+								tabindex="0"
+								onclick={() => bukaDetailOrder(o.id)}
+								onkeydown={(e) => e.key === "Enter" && bukaDetailOrder(o.id)}
+							>
+								<div class="flex items-start justify-between gap-2">
+									<p class="text-sm font-extrabold">{o.id}</p>
+									<span class={statusBadge(o.status)}>{o.status}</span>
+								</div>
+								<p class="mt-1 text-xs font-bold">{o.buyer_name ?? "-"} • {o.buyer_email ?? "-"}</p>
+								<p class="mt-0.5 text-xs text-[#5f6b62]">{o.products.join(", ") || "-"}</p>
+								<p class="mt-1 text-sm font-bold">{formatRupiah(o.total)} <span class="text-xs font-normal text-[#5f6b62]">• {formatTanggal(o.created_at)}</span></p>
+								<button
+									type="button"
+									class="btn btn-outline mt-2 !px-2.5 !py-1.5 text-xs"
+									onclick={(e) => {
+										e.stopPropagation();
+										bukaDetailOrder(o.id);
+									}}
+								>
+									Detail
+								</button>
+							</div>
+						{/each}
+					</div>
+					<div class="mt-4 flex items-center justify-between gap-2">
+						<button
+							type="button"
+							class="btn btn-ghost !px-3 !py-2 text-xs"
+							disabled={ordersPage <= 1 || ordersLoading}
+							onclick={() => loadOrders(ordersPage - 1)}
+						>
+							<Icon name="chevron-left" size={15} /> Sebelumnya
+						</button>
+						<p class="text-sm font-bold text-[#3f4a42]">Halaman {ordersPage} dari {ordersPages}</p>
+						<button
+							type="button"
+							class="btn btn-ghost !px-3 !py-2 text-xs"
+							disabled={ordersPage >= ordersPages || ordersLoading}
+							onclick={() => loadOrders(ordersPage + 1)}
+						>
+							Berikutnya <Icon name="chevron-right" size={15} />
+						</button>
+					</div>
+				{/if}
 			{:else if tab === "produk"}
 				<div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
 					<div class="relative flex-1">
@@ -1009,6 +1443,12 @@
 					</div>
 				{/if}
 			{:else if tab === "pengguna"}
+				<div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+					<p class="text-sm font-bold text-[#3f4a42]">{users.length} pengguna terdaftar</p>
+					<button type="button" class="btn btn-outline" disabled={exportingUsers} onclick={unduhCsvPengguna}>
+						<Icon name="download" size={16} /> {exportingUsers ? "Mengunduh..." : "Unduh CSV Pengguna"}
+					</button>
+				</div>
 				{#if usersLoading}
 					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 				{:else if users.length === 0}
@@ -1039,22 +1479,57 @@
 											{/if}
 										</td>
 										<td class="px-3 py-2.5 text-right">
-											{#if u.role === "admin"}
+											<div class="flex flex-wrap justify-end gap-1.5">
+												{#if u.role === "admin"}
+													<button
+														type="button"
+														class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+														onclick={() => setRole(u, "customer")}
+													>
+														Jadikan Pelanggan
+													</button>
+												{:else}
+													<button
+														type="button"
+														class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+														onclick={() => setRole(u, "admin")}
+													>
+														Jadikan Admin
+													</button>
+												{/if}
+												{#if u.id === adminId}
+													<button type="button" class="btn btn-ghost !px-2.5 !py-1.5 text-xs" disabled title="Tidak bisa reset kata sandi sendiri">
+														<Icon name="lock" size={14} /> Reset Kata Sandi
+													</button>
+												{:else}
+													<button
+														type="button"
+														class="btn btn-outline !px-2.5 !py-1.5 text-xs"
+														onclick={() => {
+															resetUser = u;
+															resetPw = "";
+															resetPw2 = "";
+															resetError = "";
+														}}
+													>
+														<Icon name="lock" size={14} /> Reset Kata Sandi
+													</button>
+												{/if}
 												<button
 													type="button"
 													class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
-													onclick={() => setRole(u, "customer")}
+													disabled={resendUserId === u.id}
+													onclick={() => kirimUlangEmailSelamatDatang(u)}
 												>
-													Jadikan Pelanggan
+													<Icon name="message" size={14} />
+													{resendUserId === u.id ? "Mengirim..." : "Kirim Ulang Email"}
 												</button>
-											{:else}
-												<button
-													type="button"
-													class="btn btn-sun !px-2.5 !py-1.5 text-xs"
-													onclick={() => setRole(u, "admin")}
-												>
-													Jadikan Admin
-												</button>
+											</div>
+											{#if u.id === adminId}
+												<p class="mt-1 text-[11px] text-[#5f6b62]">Tidak bisa reset kata sandi sendiri.</p>
+											{/if}
+											{#if userEmailResult[u.id]}
+												<p class="mt-1 text-[11px] font-bold text-[#065f46]">{userEmailResult[u.id]}</p>
 											{/if}
 										</td>
 									</tr>
@@ -1064,30 +1539,67 @@
 					</div>
 					<div class="mt-3 space-y-2 md:hidden">
 						{#each users as u (u.id)}
-							<div class="card flex items-center gap-3 p-3">
-								<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ece9dc] text-[#177245]"><Icon name="user" size={18} /></span>
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm font-bold">{u.name}</p>
-									<p class="truncate text-xs text-[#5f6b62]">
-										{u.email} • {u.order_count} order • {#if u.role === "admin"}<Icon name="crown" size={13} class="inline-block align-[-2px]" /> Admin{:else}<Icon name="backpack" size={13} class="inline-block align-[-2px]" /> Pelanggan{/if}
-									</p>
+							<div class="card p-3">
+								<div class="flex items-center gap-3">
+									<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ece9dc] text-[#177245]"><Icon name="user" size={18} /></span>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-sm font-bold">{u.name}</p>
+										<p class="truncate text-xs text-[#5f6b62]">
+											{u.email} • {u.order_count} order • {#if u.role === "admin"}<Icon name="crown" size={13} class="inline-block align-[-2px]" /> Admin{:else}<Icon name="backpack" size={13} class="inline-block align-[-2px]" /> Pelanggan{/if}
+										</p>
+									</div>
 								</div>
-								{#if u.role === "admin"}
+								<div class="mt-2 flex flex-wrap gap-2">
+									{#if u.role === "admin"}
+										<button
+											type="button"
+											class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+											onclick={() => setRole(u, "customer")}
+										>
+											Jadikan Pelanggan
+										</button>
+									{:else}
+										<button
+											type="button"
+											class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+											onclick={() => setRole(u, "admin")}
+										>
+											Jadikan Admin
+										</button>
+									{/if}
+									{#if u.id === adminId}
+										<button type="button" class="btn btn-ghost !px-2.5 !py-1.5 text-xs" disabled title="Tidak bisa reset kata sandi sendiri">
+											<Icon name="lock" size={14} /> Reset Kata Sandi
+										</button>
+									{:else}
+										<button
+											type="button"
+											class="btn btn-outline !px-2.5 !py-1.5 text-xs"
+											onclick={() => {
+												resetUser = u;
+												resetPw = "";
+												resetPw2 = "";
+												resetError = "";
+											}}
+										>
+											<Icon name="lock" size={14} /> Reset Kata Sandi
+										</button>
+									{/if}
 									<button
 										type="button"
 										class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
-										onclick={() => setRole(u, "customer")}
+										disabled={resendUserId === u.id}
+										onclick={() => kirimUlangEmailSelamatDatang(u)}
 									>
-										Jadikan Pelanggan
+										<Icon name="message" size={14} />
+										{resendUserId === u.id ? "Mengirim..." : "Kirim Ulang Email"}
 									</button>
-								{:else}
-									<button
-										type="button"
-										class="btn btn-sun !px-2.5 !py-1.5 text-xs"
-										onclick={() => setRole(u, "admin")}
-									>
-										Jadikan Admin
-									</button>
+								</div>
+								{#if u.id === adminId}
+									<p class="mt-1.5 text-[11px] text-[#5f6b62]">Tidak bisa reset kata sandi sendiri.</p>
+								{/if}
+								{#if userEmailResult[u.id]}
+									<p class="mt-1.5 text-[11px] font-bold text-[#065f46]">{userEmailResult[u.id]}</p>
 								{/if}
 							</div>
 						{/each}
@@ -1350,6 +1862,61 @@
 						</div>
 					{/if}
 				</div>
+			{:else if tab === "pengumuman"}
+				<div class="card mt-4 space-y-3 p-4">
+					<p class="text-sm font-bold"><Icon name="sparkles" size={16} /> Pengumuman & Promo Beranda</p>
+					<p class="text-xs text-[#5f6b62]">
+						Pengumuman tampil sebagai banner di atas carousel Beranda. Teks promo menggantikan teks
+						slide ke-3 carousel ("Paket SAS…") bila diaktifkan.
+					</p>
+					{#if settingsLoading && !settingsLoaded}
+						<p class="text-sm text-[#5f6b62]">Memuat...</p>
+					{:else}
+						<div>
+							<label class="lbl" for="ann-text">Teks pengumuman (maks. 500 karakter)</label>
+							<textarea
+								id="ann-text"
+								class="input"
+								rows="3"
+								maxlength="500"
+								bind:value={annText}
+								placeholder="Contoh: Promo akhir tahun — semua paket SAS diskon 10% sampai 31 Desember."
+							></textarea>
+							<p class="mt-1 text-right text-xs text-[#5f6b62]">{annText.length}/500 karakter</p>
+							<label class="mt-1 flex cursor-pointer items-center gap-2 text-sm font-bold text-[#3f4a42]">
+								<input type="checkbox" class="h-4 w-4 accent-[#177245]" bind:checked={annEnabled} />
+								Tampilkan pengumuman
+							</label>
+						</div>
+						<div>
+							<label class="lbl" for="promo-text">Teks promo slide ke-3 carousel (maks. 500 karakter)</label>
+							<textarea
+								id="promo-text"
+								class="input"
+								rows="3"
+								maxlength="500"
+								bind:value={promoText}
+								placeholder="Contoh: Paket SAS Kelas 1–6 kini Rp15 ribu — beli sekali, langsung bisa dipakai latihan."
+							></textarea>
+							<p class="mt-1 text-right text-xs text-[#5f6b62]">{promoText.length}/500 karakter</p>
+							<label class="mt-1 flex cursor-pointer items-center gap-2 text-sm font-bold text-[#3f4a42]">
+								<input type="checkbox" class="h-4 w-4 accent-[#177245]" bind:checked={promoEnabled} />
+								Pakai teks promo
+							</label>
+						</div>
+						{#if settingsError}
+							<p class="err">{settingsError}</p>
+						{/if}
+						<div class="flex flex-wrap gap-2">
+							<button type="button" class="btn btn-primary" disabled={settingsSaving} onclick={simpanSettings}>
+								{#if settingsSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan{/if}
+							</button>
+							<button type="button" class="btn btn-ghost" disabled={settingsLoading} onclick={loadSettings}>
+								<Icon name="refresh" size={16} /> Muat ulang
+							</button>
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -1441,6 +2008,227 @@
 						{#if formSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan{/if}
 					</button>
 					<button type="button" class="btn btn-ghost" onclick={() => (editId = null)}>Batal</button>
+				</div>
+			</form>
+		</div>
+	{/if}
+
+	<!-- Modal detail order -->
+	{#if orderDetailLoading || orderDetail || orderDetailError}
+		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Detail Order">
+			<button
+				type="button"
+				aria-label="Tutup detail order"
+				class="absolute inset-0 bg-black/40"
+				onclick={() => {
+					orderDetail = null;
+					orderDetailError = "";
+					resendOrderStatus = "";
+				}}
+			></button>
+			<div class="relative max-h-[92dvh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-2xl bg-[#fffdf7] p-4 shadow-xl sm:rounded-2xl">
+				<div class="flex items-center justify-between gap-2">
+					<p class="font-extrabold">Detail Order</p>
+					<button
+						type="button"
+						aria-label="Tutup detail order"
+						class="btn btn-ghost !px-2 !py-1.5"
+						onclick={() => {
+							orderDetail = null;
+							orderDetailError = "";
+							resendOrderStatus = "";
+						}}
+					>
+						<Icon name="x" size={18} />
+					</button>
+				</div>
+				{#if orderDetailLoading}
+					<p class="text-sm font-semibold text-[#5f6b62]">Memuat detail order...</p>
+				{:else if orderDetailError}
+					<p class="err">{orderDetailError}</p>
+				{:else if orderDetail}
+					<div class="flex flex-wrap items-center gap-2">
+						<p class="text-sm font-extrabold">{orderDetail.id}</p>
+						<span class={statusBadge(orderDetail.status)}>{orderDetail.status}</span>
+					</div>
+					<dl class="space-y-1.5 text-sm">
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">Pembeli</dt>
+							<dd class="text-right font-bold">{orderDetail.buyer_name ?? "-"}</dd>
+						</div>
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">Email</dt>
+							<dd class="text-right font-bold">{orderDetail.buyer_email ?? "-"}</dd>
+						</div>
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">WhatsApp</dt>
+							<dd class="text-right font-bold">{orderDetail.whatsapp ?? "-"}</dd>
+						</div>
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">Dibuat</dt>
+							<dd class="text-right font-bold">{formatTanggal(orderDetail.created_at)}</dd>
+						</div>
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">Dibayar</dt>
+							<dd class="text-right font-bold">{formatTanggal(orderDetail.paid_at)}</dd>
+						</div>
+						<div class="flex justify-between gap-3">
+							<dt class="text-[#5f6b62]">Kedaluwarsa</dt>
+							<dd class="text-right font-bold">{formatTanggal(orderDetail.expired_at)}</dd>
+						</div>
+						{#if orderDetail.klikqris_order_id}
+							<div class="flex justify-between gap-3">
+								<dt class="text-[#5f6b62]">No. KlikQRIS</dt>
+								<dd class="text-right font-bold">{orderDetail.klikqris_order_id}</dd>
+							</div>
+						{/if}
+					</dl>
+					<div class="border-t border-[#e7e2d2] pt-3">
+						<p class="text-sm font-extrabold">Item</p>
+						<ul class="mt-1.5 space-y-1.5">
+							{#each orderDetail.items as item (item.product_id)}
+								<li class="flex items-start justify-between gap-3 text-sm">
+									<span>
+										{item.title}
+										{#if item.included_in_bundle}
+											<span class="badge badge-brand ml-1">BUNDEL</span>
+										{/if}
+									</span>
+									<span class="shrink-0 font-bold">{formatRupiah(item.price)}</span>
+								</li>
+							{/each}
+						</ul>
+					</div>
+					<dl class="space-y-1.5 border-t border-[#e7e2d2] pt-3 text-sm">
+						{#if orderDetail.voucher_code}
+							<div class="flex justify-between gap-3">
+								<dt class="text-[#5f6b62]">Voucher ({orderDetail.voucher_code})</dt>
+								<dd class="text-right font-bold">−{formatRupiah(orderDetail.discount_amount || 0)}</dd>
+							</div>
+						{/if}
+						{#if orderDetail.total_amount != null && orderDetail.total_amount !== orderDetail.total}
+							<div class="flex justify-between gap-3">
+								<dt class="text-[#5f6b62]">Kode unik</dt>
+								<dd class="text-right font-bold">{formatRupiah(orderDetail.total_amount - orderDetail.total)}</dd>
+							</div>
+						{/if}
+						<div class="flex justify-between gap-3 text-base">
+							<dt class="font-extrabold">Total</dt>
+							<dd class="font-extrabold text-[#177245]">{formatRupiah(orderDetail.total)}</dd>
+						</div>
+						{#if orderDetail.total_amount != null}
+							<div class="flex justify-between gap-3">
+								<dt class="text-[#5f6b62]">Total dibayar (dengan kode unik)</dt>
+								<dd class="text-right font-bold">{formatRupiah(orderDetail.total_amount)}</dd>
+							</div>
+						{/if}
+					</dl>
+					<div class="border-t border-[#e7e2d2] pt-3">
+						<button
+							type="button"
+							class="btn btn-primary w-full"
+							disabled={resendingOrder}
+							onclick={kirimUlangEmailOrder}
+						>
+							{#if resendingOrder}
+								Mengirim...
+							{:else}
+								<Icon name="message" size={16} /> {labelKirimUlangOrder(orderDetail.status)}
+							{/if}
+						</button>
+						{#if resendOrderStatus}
+							<p class="ok-msg mt-2">{resendOrderStatus}</p>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Modal reset kata sandi -->
+	{#if resetUser}
+		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Reset Kata Sandi">
+			<button
+				type="button"
+				aria-label="Tutup reset kata sandi"
+				class="absolute inset-0 bg-black/40"
+				onclick={() => {
+					resetUser = null;
+					resetPw = "";
+					resetPw2 = "";
+					resetError = "";
+				}}
+			></button>
+			<form
+				class="relative max-h-[92dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-[#fffdf7] p-4 shadow-xl sm:rounded-2xl"
+				onsubmit={(e) => {
+					e.preventDefault();
+					simpanResetPassword();
+				}}
+			>
+				<div class="flex items-center justify-between gap-2">
+					<p class="flex items-center gap-2 font-extrabold"><Icon name="lock" size={18} /> Reset Kata Sandi</p>
+					<button
+						type="button"
+						aria-label="Tutup reset kata sandi"
+						class="btn btn-ghost !px-2 !py-1.5"
+						onclick={() => {
+							resetUser = null;
+							resetPw = "";
+							resetPw2 = "";
+							resetError = "";
+						}}
+					>
+						<Icon name="x" size={18} />
+					</button>
+				</div>
+				<p class="text-sm text-[#5f6b62]">
+					Kata sandi baru untuk <b>{resetUser.name}</b> ({resetUser.email}). Kata sandi tidak pernah
+					ditampilkan kembali.
+				</p>
+				<div>
+					<label class="lbl" for="reset-pw">Kata sandi baru (min. 8 karakter)</label>
+					<input
+						id="reset-pw"
+						class="input"
+						type="password"
+						autocomplete="new-password"
+						minlength="8"
+						bind:value={resetPw}
+						required
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="reset-pw2">Konfirmasi kata sandi baru</label>
+					<input
+						id="reset-pw2"
+						class="input"
+						type="password"
+						autocomplete="new-password"
+						minlength="8"
+						bind:value={resetPw2}
+						required
+					/>
+				</div>
+				{#if resetError}
+					<p class="err">{resetError}</p>
+				{/if}
+				<div class="flex gap-2">
+					<button type="submit" class="btn btn-primary flex-1" disabled={resetSaving}>
+						{#if resetSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Kata Sandi{/if}
+					</button>
+					<button
+						type="button"
+						class="btn btn-ghost"
+						onclick={() => {
+							resetUser = null;
+							resetPw = "";
+							resetPw2 = "";
+							resetError = "";
+						}}
+					>
+						Batal
+					</button>
 				</div>
 			</form>
 		</div>

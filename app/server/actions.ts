@@ -208,11 +208,62 @@ function parseItems(raw: string): OrderItem[] {
       .map((it) => ({
         product_id: it.product_id,
         title: typeof it.title === "string" ? it.title : it.product_id,
-        price: typeof it.price === "number" ? it.price : 0
+        price: typeof it.price === "number" ? it.price : 0,
+        // Penanda anggota bundel DIPERTAHANKAN: orderOut, /api/admin/stats,
+        // daftar order admin, CSV, idempotensi checkout, dan struk
+        // (pdf.ts: "(termasuk bundel)") semuanya mengandalkannya.
+        // (Sebelumnya penanda ini terbuang di sini, sehingga semua
+        // filter `!it.included_in_bundle` di atas menjadi no-op dan
+        // anggota bundel bocor ke klien/stats/CSV — ketahuan lewat
+        // smoke test 2026-11-15.)
+        ...(typeof it.included_in_bundle === "string"
+          ? { included_in_bundle: it.included_in_bundle }
+          : {})
       }));
   } catch {
     return [];
   }
+}
+
+// ------------------------- Pengaturan situs (tabel settings) -------------------------
+// Migrasi 0008: kunci-nilai umum. Nilai tersimpan sebagai TEXT;
+// enabled '0'/'1' dikonversi ke 0/1 di sini. Kunci yang belum ada di
+// tabel dianggap nilai default.
+
+interface SiteSettings {
+  announcement_text: string;
+  announcement_enabled: 0 | 1;
+  promo_text: string;
+  promo_enabled: 0 | 1;
+}
+
+const DEFAULT_SETTINGS: SiteSettings = {
+  announcement_text: "",
+  announcement_enabled: 0,
+  promo_text: "",
+  promo_enabled: 0
+};
+
+async function readSettings(db: Database): Promise<SiteSettings> {
+  // Tabel belum ada (migrasi 0008 belum diterapkan di DB lama) →
+  // kembalikan default, bukan 500; endpoint tetap merespons.
+  const rows = await db
+    .all<{ key: string; value: string }>("SELECT key, value FROM settings")
+    .catch(() => [] as { key: string; value: string }[]);
+  const out: SiteSettings = { ...DEFAULT_SETTINGS };
+  for (const r of rows) {
+    if (r.key === "announcement_text") out.announcement_text = r.value;
+    else if (r.key === "promo_text") out.promo_text = r.value;
+    else if (r.key === "announcement_enabled") out.announcement_enabled = r.value === "1" ? 1 : 0;
+    else if (r.key === "promo_enabled") out.promo_enabled = r.value === "1" ? 1 : 0;
+  }
+  return out;
+}
+
+/** Escape satu sel CSV (RFC 4180): kutip bila ada koma/kutip/baris baru. */
+function csvCell(v: string | number | null | undefined): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function todayIso(): string {
@@ -1244,6 +1295,322 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     await db.run("UPDATE users SET role = ? WHERE id = ?", role, targetId);
     const updated = await db.get<User>("SELECT * FROM users WHERE id = ?", targetId);
     return c.json({ user: publicUser(updated ?? target) });
+  });
+
+  app.post("/api/admin/users/:id/reset-password", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const targetId = c.req.param("id");
+    if (targetId === admin.id) {
+      return c.json({ error: "Admin tidak dapat mereset kata sandi akunnya sendiri." }, 403);
+    }
+    const target = await db.get<User>("SELECT * FROM users WHERE id = ?", targetId);
+    if (!target) return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+    const body = await readJson(c);
+    const password = asString(body.password);
+    if (password.length < 8) {
+      return c.json({ error: "Kata sandi baru minimal 8 karakter." }, 400);
+    }
+    // Kata sandi TIDAK PERNAH masuk log/respons — hanya hash-nya yang
+    // disimpan, persis seperti register (bcryptjs, salt 10). Ini reset
+    // oleh admin, BUKAN alur lupa-kata-sandi mandiri (alur itu belum ada).
+    const hash = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+    await db.run("UPDATE users SET password_hash = ? WHERE id = ?", hash, targetId);
+    return c.json({ ok: true });
+  });
+
+  // ------------------------- Admin: order (daftar + detail) -------------------------
+
+  app.get("/api/admin/orders", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const q = (c.req.query("q") ?? "").trim();
+    const statusRaw = (c.req.query("status") ?? "").trim().toUpperCase();
+    const status = statusRaw === "" ? null : statusRaw;
+    if (status !== null && status !== "PENDING" && status !== "PAID" && status !== "EXPIRED") {
+      return c.json({ error: "Status harus PENDING, PAID, atau EXPIRED." }, 400);
+    }
+    const page = Math.max(1, Math.floor(Number(c.req.query("page") ?? 1) || 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(c.req.query("limit") ?? 20) || 20)));
+    const conds: string[] = [];
+    const params: SQLInputValue[] = [];
+    if (q) {
+      const like = `%${q}%`;
+      conds.push("(o.id LIKE ? OR u.email LIKE ?)");
+      params.push(like, like);
+    }
+    if (status) {
+      conds.push("o.status = ?");
+      params.push(status);
+    }
+    const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
+    const total = (await db.get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders o LEFT JOIN users u ON u.id = o.user_id ${where}`,
+      ...params
+    ))?.n ?? 0;
+    const rows = await db.all<{
+      id: string;
+      total: number;
+      total_amount: number | null;
+      status: string;
+      created_at: string;
+      paid_at: string | null;
+      items: string;
+      buyer_name: string | null;
+      buyer_email: string | null;
+    }>(
+      `SELECT o.id, o.total, o.total_amount, o.status, o.created_at, o.paid_at, o.items,
+              u.name AS buyer_name, u.email AS buyer_email
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id
+       ${where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      (page - 1) * limit
+    );
+    const pages = Math.max(1, Math.ceil(total / limit));
+    return c.json({
+      orders: rows.map((o) => ({
+        id: o.id,
+        buyer_name: o.buyer_name,
+        buyer_email: o.buyer_email,
+        // Seperti /api/admin/stats: baris anggota bundel disembunyikan.
+        products: parseItems(o.items)
+          .filter((it) => !it.included_in_bundle)
+          .map((it) => it.title),
+        total: o.total_amount ?? o.total,
+        status: o.status,
+        created_at: o.created_at,
+        paid_at: o.paid_at
+      })),
+      total,
+      page,
+      pages
+    });
+  });
+
+  app.get("/api/admin/orders/:id", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", c.req.param("id"));
+    if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
+    const buyer = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
+    return c.json({
+      order: {
+        id: order.id,
+        user_id: order.user_id,
+        buyer_name: buyer?.name ?? null,
+        buyer_email: buyer?.email ?? null,
+        whatsapp: order.whatsapp ?? buyer?.whatsapp ?? null,
+        // Detail admin menampilkan SEMUA baris items, termasuk anggota
+        // bundel (included_in_bundle) — beda dengan orderOut klien.
+        items: parseItems(order.items),
+        total: order.total,
+        total_amount: order.total_amount,
+        discount_amount: order.discount_amount ?? 0,
+        voucher_code: order.voucher_code ?? null,
+        status: order.status,
+        created_at: order.created_at,
+        paid_at: order.paid_at,
+        expired_at: order.expired_at,
+        klikqris_order_id: order.klikqris_order_id
+      }
+    });
+  });
+
+  // ------------------------- Admin: kirim ulang email -------------------------
+  // Satu-satunya pemakai `force: true` — lihat server/email.ts. Pemicu
+  // otomatis (register/checkout/webhook/polling/cron) TIDAK PERNAH
+  // memakai force, jadi idempotensi mereka tidak berubah.
+
+  app.post("/api/admin/resend-email", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const body = await readJson(c);
+    const template = asString(body.template);
+    if (
+      template !== "welcome" &&
+      template !== "pending" &&
+      template !== "paid" &&
+      template !== "expired"
+    ) {
+      return c.json({ error: "Template harus welcome, pending, paid, atau expired." }, 400);
+    }
+    if (template === "welcome") {
+      const userId = asString(body.userId);
+      if (!userId) return c.json({ error: "userId wajib diisi untuk template welcome." }, 400);
+      const user = await db.get<User>("SELECT * FROM users WHERE id = ?", userId);
+      if (!user) return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+      return c.json(await sendWelcomeEmail(db, user, { force: true }));
+    }
+    const orderId = asString(body.orderId);
+    if (!orderId) return c.json({ error: "orderId wajib diisi untuk template ini." }, 400);
+    const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
+    if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
+    // paid menuntut status PAID — diperiksa di dalam sendPaidEmail
+    // (mengembalikan { sent: false, error: "Order belum lunas." }).
+    if (template === "pending") return c.json(await sendPendingEmail(db, order, { force: true }));
+    if (template === "paid") return c.json(await sendPaidEmail(db, order, { force: true }));
+    return c.json(await sendExpiredEmail(db, order, { force: true }));
+  });
+
+  // ------------------------- Admin: ekspor CSV -------------------------
+  // RFC 4180 lewat csvCell (kutip bila ada koma/kutip/baris baru,
+  // gandakan kutip). Tanpa BOM — sama seperti rekap kelas di
+  // GET /api/class/:id/recap.
+
+  app.get("/api/admin/export/orders.csv", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const rows = await db.all<{
+      id: string;
+      created_at: string;
+      paid_at: string | null;
+      total: number;
+      total_amount: number | null;
+      voucher_code: string | null;
+      discount_amount: number;
+      status: string;
+      whatsapp: string | null;
+      items: string;
+      buyer_name: string | null;
+      buyer_email: string | null;
+    }>(
+      `SELECT o.id, o.created_at, o.paid_at, o.total, o.total_amount,
+              o.voucher_code, o.discount_amount, o.status, o.whatsapp, o.items,
+              u.name AS buyer_name, u.email AS buyer_email
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id
+       ORDER BY o.created_at DESC LIMIT 5000`
+    );
+    const lines = [
+      "order_id,tanggal_buat,tanggal_bayar,pembeli_nama,pembeli_email,whatsapp,produk,total,total_dibayar,kode_voucher,diskon,status"
+    ];
+    for (const o of rows) {
+      // Produk digabung "; " (bukan koma) supaya tetap satu sel yang
+      // mudah dibaca; baris anggota bundel disembunyikan seperti stats.
+      const produk = parseItems(o.items)
+        .filter((it) => !it.included_in_bundle)
+        .map((it) => it.title)
+        .join("; ");
+      lines.push(
+        [
+          csvCell(o.id),
+          csvCell(o.created_at),
+          csvCell(o.paid_at),
+          csvCell(o.buyer_name),
+          csvCell(o.buyer_email),
+          csvCell(o.whatsapp),
+          csvCell(produk),
+          csvCell(o.total),
+          csvCell(o.total_amount ?? o.total),
+          csvCell(o.voucher_code),
+          csvCell(o.discount_amount ?? 0),
+          csvCell(o.status)
+        ].join(",")
+      );
+    }
+    return c.body(lines.join("\n"), 200, {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="rekap-order-ringkas.csv"`
+    });
+  });
+
+  app.get("/api/admin/export/users.csv", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const rows = await db.all<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      whatsapp: string | null;
+      created_at: string;
+      order_count: number;
+    }>(
+      `SELECT u.id, u.name, u.email, u.role, u.whatsapp, u.created_at,
+              COUNT(o.id) AS order_count
+       FROM users u LEFT JOIN orders o ON o.user_id = u.id
+       GROUP BY u.id ORDER BY u.created_at, u.email`
+    );
+    const lines = ["nama,email,whatsapp,role,tanggal_daftar,jumlah_order"];
+    for (const u of rows) {
+      lines.push(
+        [
+          csvCell(u.name),
+          csvCell(u.email),
+          csvCell(u.whatsapp),
+          csvCell(u.role),
+          csvCell(u.created_at),
+          csvCell(u.order_count)
+        ].join(",")
+      );
+    }
+    return c.body(lines.join("\n"), 200, {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="pengguna-ringkas.csv"`
+    });
+  });
+
+  // ------------------------- Admin: pengaturan situs -------------------------
+  // Tabel settings (migrasi 0008). Teks maks. 500 karakter; saklar
+  // hanya 0/1. Body parsial — hanya kunci yang dikirim yang diubah.
+
+  app.get("/api/admin/settings", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    return c.json({ settings: await readSettings(db) });
+  });
+
+  app.post("/api/admin/settings", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const body = await readJson(c);
+    const updates: [string, string][] = [];
+    for (const key of ["announcement_text", "promo_text"] as const) {
+      if (key in body) {
+        const v = body[key];
+        if (typeof v !== "string" || v.length > 500) {
+          return c.json({ error: `${key} harus teks maksimal 500 karakter.` }, 400);
+        }
+        updates.push([key, v]);
+      }
+    }
+    for (const key of ["announcement_enabled", "promo_enabled"] as const) {
+      if (key in body) {
+        const v = body[key];
+        if (v !== 0 && v !== 1) {
+          return c.json({ error: `${key} harus 0 atau 1.` }, 400);
+        }
+        updates.push([key, String(v)]);
+      }
+    }
+    if (updates.length === 0) return c.json({ error: "Tidak ada perubahan." }, 400);
+    const stamp = nowIso();
+    for (const [key, value] of updates) {
+      await db.run(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        key,
+        value,
+        stamp
+      );
+    }
+    return c.json({ settings: await readSettings(db) });
+  });
+
+  // ------------------------- Pengumuman (publik) -------------------------
+  // Dibaca halaman beranda tanpa login; hanya teks + saklar tampil
+  // (tidak ada data pengguna/order di sini).
+
+  app.get("/api/announcement", async (c) => {
+    return c.json(await readSettings(db));
   });
 
   app.post("/api/admin/chapters/:id/video", async (c) => {

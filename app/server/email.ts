@@ -31,6 +31,15 @@ import { TEMPLATE_07_STREAK_HTML } from "./email-templates/07-streak.js";
 //   - Idempotensi lewat tabel sent_emails (migrasi 0004): baris klaim
 //     disisipkan SEBELUM kirim; gagal kirim → klaim dihapus (bisa coba
 //     lagi); klaim basi > 10 menit tanpa resend_id boleh direbut ulang.
+//   - Kirim ulang admin (`force: true`, lihat sendTemplatedEmail):
+//     HANYA dipakai endpoint admin POST /api/admin/resend-email —
+//     tidak pernah dipakai pemicu otomatis (register/checkout/webhook/
+//     polling/cron). Dengan force, baris sent_emails yang cocok untuk
+//     (order_id/user_id, template, period = '') dihapus SEBELUM klaim
+//     baru, sehingga kirim ulang selalu mencoba dan mencatat resend_id
+//     baru. Hapus hanya menyentuh period = '' — email cron yang memakai
+//     kunci periode (reminder/weekly/streak) TIDAK PERNAH tersentuh
+//     force. Tanpa force, perilaku idempotensi tidak berubah.
 //   - Setiap panggilan Resend WAJIB membawa header User-Agent — tanpa
 //     itu API mengembalikan 403 code 1010.
 // ---------------------------------------------------------------------------
@@ -256,6 +265,15 @@ async function claimSlot(
  * 'reminder:usr-XXX:2026-11-15' atau 'weekly:usr-XXX:2026-W46'.
  * Bila RESEND_API_KEY belum disetel: log + skipped: "no-key" (tanpa klaim
  * yang tertinggal, jadi percobaan berikut tetap bisa mengirim).
+ *
+ * Opsi `force` (kirim ulang admin saja — lihat komentar di atas):
+ * bila true, baris sent_emails yang cocok untuk (order_id/user_id,
+ * template, period = '') dihapus SEBELUM klaim baru, sehingga kirim
+ * ulang selalu mencoba dan mencatat resend_id baru. Penghapusan hanya
+ * untuk period = '' (email cron berperiode tidak tersentuh) dan hanya
+ * terjadi SETELAH pemeriksaan RESEND_API_KEY — bila kunci belum
+ * disetel, tidak ada baris yang dihapus dan hasil tetap
+ * skipped: "no-key" tanpa klaim menggantung.
  */
 export async function sendTemplatedEmail(
   db: DB,
@@ -267,12 +285,14 @@ export async function sendTemplatedEmail(
     orderId?: string | null;
     userId?: string | null;
     period?: string;
+    force?: boolean;
   }
 ): Promise<SendEmailResult> {
   const { template, to, subject, variables } = opts;
   const orderId = opts.orderId ?? null;
   const userId = opts.userId ?? null;
   const period = opts.period ?? "";
+  const force = opts.force === true;
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     console.warn(`[email] alamat tujuan tidak valid (${template}) — dilewati.`);
     return { sent: false, error: "Alamat email tujuan tidak valid." };
@@ -294,6 +314,29 @@ export async function sendTemplatedEmail(
     return { sent: false, skipped: "no-key" };
   }
   try {
+    // Kirim ulang admin (force): hapus klaim lama period = '' supaya
+    // klaim baru di bawah selalu berhasil — baru di sini, setelah
+    // pemeriksaan kunci, supaya tanpa RESEND_API_KEY tidak ada riwayat
+    // terkirim yang terhapus. Email cron (period != '') tidak tersentuh.
+    if (force) {
+      if (orderId) {
+        await db
+          .run(
+            "DELETE FROM sent_emails WHERE order_id = ? AND template = ? AND period = ''",
+            orderId,
+            template
+          )
+          .catch(() => undefined);
+      } else if (userId) {
+        await db
+          .run(
+            "DELETE FROM sent_emails WHERE user_id = ? AND template = ? AND period = ''",
+            userId,
+            template
+          )
+          .catch(() => undefined);
+      }
+    }
     if (await alreadySent(db, template, orderId, userId, period)) {
       return { sent: false, skipped: "already-sent" };
     }
@@ -365,7 +408,11 @@ export function background(
 // ---------------------------------------------------------------------------
 
 /** Register berhasil → template 01 (sekali per user). */
-export async function sendWelcomeEmail(db: DB, user: User): Promise<SendEmailResult> {
+export async function sendWelcomeEmail(
+  db: DB,
+  user: User,
+  opts?: { force?: boolean }
+): Promise<SendEmailResult> {
   const base = appUrl();
   return sendTemplatedEmail(db, {
     template: "welcome",
@@ -377,7 +424,8 @@ export async function sendWelcomeEmail(db: DB, user: User): Promise<SendEmailRes
       url_katalog: `${base}/katalog`,
       url_aplikasi: base
     },
-    userId: user.id
+    userId: user.id,
+    force: opts?.force
   });
 }
 
@@ -386,7 +434,11 @@ export async function sendWelcomeEmail(db: DB, user: User): Promise<SendEmailRes
  * Dipanggil HANYA saat order baru dibuat (bukan saat order lama yang
  * masih PENDING dikembalikan karena idempotensi checkout).
  */
-export async function sendPendingEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+export async function sendPendingEmail(
+  db: DB,
+  order: OrderForEmail,
+  opts?: { force?: boolean }
+): Promise<SendEmailResult> {
   const user = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
   if (!user) return { sent: false, error: "Pengguna order tidak ditemukan." };
   const items = parseItems(order.items);
@@ -408,12 +460,17 @@ export async function sendPendingEmail(db: DB, order: OrderForEmail): Promise<Se
       batas_bayar: formatTanggal(order.expired_at),
       url_pesanan: `${base}/pesanan`
     },
-    orderId: order.id
+    orderId: order.id,
+    force: opts?.force
   });
 }
 
 /** PAID terdeteksi (webhook / polling) → template 03 (sekali per order). */
-export async function sendPaidEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+export async function sendPaidEmail(
+  db: DB,
+  order: OrderForEmail,
+  opts?: { force?: boolean }
+): Promise<SendEmailResult> {
   if (order.status !== "PAID") return { sent: false, error: "Order belum lunas." };
   const data = await getOrderEmailData(db, order.id);
   const items = parseItems(order.items);
@@ -436,12 +493,17 @@ export async function sendPaidEmail(db: DB, order: OrderForEmail): Promise<SendE
       url_struk: `${base}/pesanan`,
       url_produk: absoluteUrl(data.url_produk)
     },
-    orderId: order.id
+    orderId: order.id,
+    force: opts?.force
   });
 }
 
 /** EXPIRED terdeteksi (pemeriksaan status) → template 04 (sekali per order). */
-export async function sendExpiredEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+export async function sendExpiredEmail(
+  db: DB,
+  order: OrderForEmail,
+  opts?: { force?: boolean }
+): Promise<SendEmailResult> {
   const user = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
   if (!user) return { sent: false, error: "Pengguna order tidak ditemukan." };
   const items = parseItems(order.items);
@@ -460,7 +522,8 @@ export async function sendExpiredEmail(db: DB, order: OrderForEmail): Promise<Se
       batas_bayar: formatTanggal(order.expired_at),
       url_katalog: `${base}/katalog`
     },
-    orderId: order.id
+    orderId: order.id,
+    force: opts?.force
   });
 }
 

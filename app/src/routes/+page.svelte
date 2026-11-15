@@ -10,6 +10,12 @@
 	let error = $state("");
 	let jenjang = $state("Semua");
 
+	// ---- Pengumuman & promo (dari /api/announcement, gagal diam-diam) ----
+	let announcementText = $state("");
+	let announcementShown = $state(false);
+	let bannerClosed = $state(false);
+	let promoText = $state("");
+
 	// ---- Carousel promo ----
 	const slides = [
 		{
@@ -87,6 +93,23 @@
 	);
 
 	onMount(async () => {
+		// Pengumuman tidak boleh memperlambat katalog: muat paralel, gagal diam-diam.
+		api<{
+			announcement_text: string | null;
+			announcement_enabled: number | boolean;
+			promo_text: string | null;
+			promo_enabled: number | boolean;
+		}>("/api/announcement")
+			.then((d) => {
+				if (d.announcement_enabled && d.announcement_text) {
+					announcementText = d.announcement_text;
+					announcementShown = true;
+				}
+				if (d.promo_enabled && d.promo_text) promoText = d.promo_text;
+			})
+			.catch(() => {
+				/* banner diam-diam tidak tampil */
+			});
 		try {
 			const data = await api<{ products: ProductPublic[] }>("/api/catalog");
 			products = data.products ?? [];
@@ -107,6 +130,22 @@
 	}
 </script>
 
+<!-- Banner pengumuman -->
+{#if announcementShown && !bannerClosed}
+	<div class="mb-3 flex items-start gap-2 rounded-xl bg-[#177245] px-3 py-2.5 text-sm font-bold text-white" role="status">
+		<Icon name="sparkles" size={18} class="mt-0.5 shrink-0" />
+		<p class="flex-1">{announcementText}</p>
+		<button
+			type="button"
+			aria-label="Tutup pengumuman"
+			class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-white"
+			onclick={() => (bannerClosed = true)}
+		>
+			<Icon name="x" size={16} />
+		</button>
+	</div>
+{/if}
+
 <!-- Carousel promo -->
 <section class="card overflow-hidden" aria-label="Promo Ringkas">
 	<div
@@ -122,13 +161,13 @@
 			class="flex transition-transform duration-500 ease-in-out"
 			style="transform: translateX(-{slideIdx * 100}%)"
 		>
-			{#each slides as s (s.title)}
+			{#each slides as s, i (s.title)}
 				<div class="w-full shrink-0 px-5 py-6 text-white lg:px-10 lg:py-10" style="background: {s.bg}">
 					<p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#f2b33d]">
 						<Icon name={s.icon} size={14} /> {s.kicker}
 					</p>
 					<h1 class="mt-1 text-2xl font-extrabold leading-snug lg:text-4xl">{s.title}</h1>
-					<p class="mt-1 max-w-2xl text-sm text-white/90 lg:text-base">{s.text}</p>
+					<p class="mt-1 max-w-2xl text-sm text-white/90 lg:text-base">{i === 2 && promoText ? promoText : s.text}</p>
 					<a href={s.href} class="btn btn-sun mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
 				</div>
 			{/each}
