@@ -15,7 +15,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman";
+	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit";
 	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -32,7 +32,8 @@
 		{ id: "pengguna", label: "Pengguna", icon: "users" },
 		{ id: "video", label: "Video per Bab", icon: "video" },
 		{ id: "cron", label: "Email & Cron", icon: "clock" },
-		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" }
+		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" },
+		{ id: "audit", label: "Log Aktivitas", icon: "history" }
 	];
 
 	const TAB_TITLE: Record<Tab, string> = {
@@ -43,7 +44,8 @@
 		pengguna: "Pengguna & Role",
 		video: "Video per Bab",
 		cron: "Email & Cron",
-		pengumuman: "Pengumuman"
+		pengumuman: "Pengumuman",
+		audit: "Log Aktivitas"
 	};
 
 	function navClass(t: Tab): string {
@@ -482,6 +484,226 @@
 		return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 	}
 
+	// ---- Log Aktivitas (audit log) ----
+	type AuditItem = {
+		id: number;
+		admin_email: string;
+		action: string;
+		target: string | null;
+		detail: string | null;
+		created_at: string;
+	};
+	const AUDIT_ACTIONS: { value: string; label: string }[] = [
+		{ value: "Semua", label: "Semua aksi" },
+		{ value: "product_create", label: "Buat produk" },
+		{ value: "product_update", label: "Ubah produk" },
+		{ value: "product_delete", label: "Hapus produk" },
+		{ value: "product_set_active", label: "Ubah status tampil produk" },
+		{ value: "product_external_link", label: "Ubah link eksternal produk" },
+		{ value: "product_image_upload", label: "Unggah gambar produk" },
+		{ value: "product_image_delete", label: "Hapus gambar produk" },
+		{ value: "product_set_feature", label: "Ubah gambar utama produk" },
+		{ value: "user_set_role", label: "Ubah role pengguna" },
+		{ value: "user_reset_password", label: "Reset kata sandi pengguna" },
+		{ value: "email_resend", label: "Kirim ulang email" },
+		{ value: "export_orders", label: "Export order (CSV)" },
+		{ value: "export_users", label: "Export pengguna (CSV)" },
+		{ value: "settings_update", label: "Ubah pengaturan" },
+		{ value: "chapter_video_set", label: "Ubah video bab" },
+		{ value: "voucher_create", label: "Buat voucher" },
+		{ value: "voucher_set_active", label: "Ubah status voucher" },
+		{ value: "cron_run", label: "Jalankan cron email" }
+	];
+	const AUDIT_LIMIT = 20;
+	let auditItems = $state<AuditItem[]>([]);
+	let auditTotal = $state(0);
+	let auditPage = $state(1);
+	let auditPages = $derived(Math.max(1, Math.ceil(auditTotal / AUDIT_LIMIT)));
+	let auditLoading = $state(false);
+	let auditError = $state("");
+	let auditLoaded = $state(false);
+	let auditAction = $state("Semua");
+	let auditQuery = $state("");
+
+	function labelAksi(action: string): string {
+		return AUDIT_ACTIONS.find((a) => a.value === action)?.label ?? action;
+	}
+
+	async function loadAudit(page = 1) {
+		auditLoading = true;
+		auditError = "";
+		try {
+			const params = new URLSearchParams({ page: String(page), limit: String(AUDIT_LIMIT) });
+			if (auditAction !== "Semua") params.set("action", auditAction);
+			if (auditQuery.trim()) params.set("q", auditQuery.trim());
+			const data = await api<{
+				items: AuditItem[];
+				total: number;
+				page: number;
+				limit: number;
+			}>(`/api/admin/audit-log?${params.toString()}`);
+			auditItems = data.items ?? [];
+			auditTotal = data.total ?? 0;
+			auditPage = data.page ?? 1;
+			auditLoaded = true;
+		} catch (e) {
+			auditError =
+				e instanceof Error ? e.message : "Gagal memuat log aktivitas. Coba muat ulang ya.";
+		} finally {
+			auditLoading = false;
+		}
+	}
+
+	function cariAudit() {
+		loadAudit(1);
+	}
+
+	// ---- Keamanan & Backup ----
+	let lastBackupAt = $state<string | null>(null);
+	let backupInfoLoaded = $state(false);
+	let backupInfoError = $state("");
+	let backupDownloading = $state(false);
+	let backupStale = $derived(
+		!lastBackupAt ||
+			Number.isNaN(new Date(lastBackupAt).getTime()) ||
+			Date.now() - new Date(lastBackupAt).getTime() > 7 * 24 * 60 * 60 * 1000
+	);
+
+	async function loadBackupInfo() {
+		try {
+			const data = await api<{ settings: { last_backup_at?: string | null } }>(
+				"/api/admin/settings"
+			);
+			lastBackupAt = data.settings?.last_backup_at ?? null;
+			backupInfoLoaded = true;
+		} catch (e) {
+			backupInfoError = e instanceof Error ? e.message : "Gagal memuat info backup.";
+		}
+	}
+
+	async function unduhBackup() {
+		backupDownloading = true;
+		try {
+			const { blob, filename } = await apiBlob("/api/admin/backup");
+			downloadBlob(blob, filename);
+			notice = "Backup database diunduh.";
+			await loadBackupInfo();
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal mengunduh backup.";
+		} finally {
+			backupDownloading = false;
+		}
+	}
+
+	// ---- Keamanan Akun (2FA) ----
+	// Secret dan kode pemulihan hanya disimpan di state selama proses
+	// aktivasi; tidak pernah ditulis ke log.
+	type TwoFaSetup = {
+		secret: string;
+		otpauthUrl: string;
+		qrSvg: string;
+		recoveryCodes: string[];
+	};
+	let twoFaEnabled = $state<boolean | null>(null);
+	let twoFaLoading = $state(false);
+	let twoFaError = $state("");
+	let twoFaSetup = $state<TwoFaSetup | null>(null);
+	let twoFaStarting = $state(false);
+	let twoFaCode = $state("");
+	let twoFaConfirming = $state(false);
+	let twoFaConfirmError = $state("");
+	let twoFaDisableOpen = $state(false);
+	let twoFaDisableCode = $state("");
+	let twoFaDisabling = $state(false);
+	let twoFaDisableError = $state("");
+	let secretCopied = $state(false);
+
+	async function loadTwoFa() {
+		twoFaLoading = true;
+		twoFaError = "";
+		try {
+			const data = await api<{ enabled: boolean }>("/api/2fa/status");
+			twoFaEnabled = Boolean(data.enabled);
+		} catch (e) {
+			twoFaError = e instanceof Error ? e.message : "Gagal memuat status 2FA.";
+		} finally {
+			twoFaLoading = false;
+		}
+	}
+
+	async function mulaiSetup2fa() {
+		twoFaStarting = true;
+		twoFaConfirmError = "";
+		try {
+			const data = await api<TwoFaSetup>("/api/2fa/setup/start", { method: "POST" });
+			twoFaSetup = data;
+			twoFaCode = "";
+		} catch (e) {
+			twoFaError = e instanceof Error ? e.message : "Gagal memulai aktivasi 2FA.";
+		} finally {
+			twoFaStarting = false;
+		}
+	}
+
+	async function konfirmasiSetup2fa() {
+		if (!/^\d{6}$/.test(twoFaCode.trim())) {
+			twoFaConfirmError = "Masukkan kode 6 digit dari aplikasi authenticator kamu.";
+			return;
+		}
+		twoFaConfirming = true;
+		twoFaConfirmError = "";
+		try {
+			await api("/api/2fa/setup/confirm", {
+				method: "POST",
+				body: JSON.stringify({ code: twoFaCode.trim() })
+			});
+			twoFaSetup = null;
+			twoFaEnabled = true;
+			twoFaCode = "";
+			notice = "2FA aktif. Akun kamu sekarang lebih aman.";
+		} catch (e) {
+			twoFaConfirmError =
+				e instanceof Error ? e.message : "Kode tidak cocok. Periksa lagi kodenya ya.";
+		} finally {
+			twoFaConfirming = false;
+		}
+	}
+
+	async function nonaktifkan2fa() {
+		if (!/^\d{6}$/.test(twoFaDisableCode.trim())) {
+			twoFaDisableError = "Masukkan kode 6 digit dari aplikasi authenticator kamu.";
+			return;
+		}
+		twoFaDisabling = true;
+		twoFaDisableError = "";
+		try {
+			await api("/api/2fa/disable", {
+				method: "POST",
+				body: JSON.stringify({ code: twoFaDisableCode.trim() })
+			});
+			twoFaEnabled = false;
+			twoFaDisableOpen = false;
+			twoFaDisableCode = "";
+			notice = "2FA dinonaktifkan.";
+		} catch (e) {
+			twoFaDisableError =
+				e instanceof Error ? e.message : "Kode tidak cocok. Periksa lagi kodenya ya.";
+		} finally {
+			twoFaDisabling = false;
+		}
+	}
+
+	async function salinSecret2fa() {
+		if (!twoFaSetup) return;
+		try {
+			await navigator.clipboard.writeText(twoFaSetup.secret);
+			secretCopied = true;
+			setTimeout(() => (secretCopied = false), 2000);
+		} catch {
+			twoFaConfirmError = "Gagal menyalin. Salin secret secara manual ya.";
+		}
+	}
+
 	onMount(async () => {
 		if (!getToken()) {
 			goto("/akun");
@@ -498,6 +720,8 @@
 				adminId = user.id;
 				await loadProducts();
 				await loadStats();
+				loadBackupInfo();
+				loadTwoFa();
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memeriksa hak akses.";
@@ -539,6 +763,7 @@
 		if (t === "ringkasan" && !stats && !statsLoading) loadStats();
 		if (t === "pesanan" && !ordersLoaded) loadOrders(1);
 		if (t === "pengumuman" && !settingsLoaded) loadSettings();
+		if (t === "audit" && !auditLoaded) loadAudit(1);
 	}
 
 	async function loadVouchers() {
@@ -1040,6 +1265,228 @@
 						</div>
 					{/if}
 				{/if}
+
+				<!-- Keamanan: backup database & 2FA akun admin -->
+				<h2 class="mt-5 text-base font-extrabold">Keamanan</h2>
+				<div class="mt-2 grid gap-3 lg:grid-cols-2">
+					<div class="card space-y-3 p-4">
+						<p class="flex items-center gap-2 text-sm font-bold">
+							<Icon name="shield" size={16} /> Keamanan & Backup
+						</p>
+						<p class="text-xs text-[#5f6b62]">
+							Unduh salinan database toko (berkas SQL) dan simpan di tempat yang aman.
+						</p>
+						{#if backupInfoError && !backupInfoLoaded}
+							<p class="err">{backupInfoError}</p>
+						{:else if lastBackupAt}
+							<p class="text-sm">
+								Backup terakhir: <b>{formatTanggal(lastBackupAt)}</b>
+							</p>
+							{#if backupStale}
+								<p class="rounded-xl border border-[#fde68a] bg-[#fef3c7] px-3 py-2 text-sm font-bold text-[#92400e]">
+									<Icon name="alert" size={15} class="inline-block align-[-2px]" />
+									Sudah lebih dari 7 hari sejak backup terakhir.
+								</p>
+							{/if}
+						{:else}
+							<p class="rounded-xl border border-[#fde68a] bg-[#fef3c7] px-3 py-2 text-sm font-bold text-[#92400e]">
+								<Icon name="alert" size={15} class="inline-block align-[-2px]" />
+								Belum pernah backup.
+							</p>
+						{/if}
+						<div>
+							<button
+								type="button"
+								class="btn btn-primary"
+								disabled={backupDownloading}
+								onclick={unduhBackup}
+							>
+								{#if backupDownloading}
+									Mengunduh...
+								{:else}
+									<Icon name="download" size={16} /> Unduh Backup Database
+								{/if}
+							</button>
+						</div>
+					</div>
+
+					<div class="card space-y-3 p-4">
+						<p class="flex items-center gap-2 text-sm font-bold">
+							<Icon name="shield" size={16} /> Keamanan Akun (2FA)
+						</p>
+						<p class="text-xs text-[#5f6b62]">
+							Autentikasi dua faktor: setiap masuk, selain kata sandi kamu juga memasukkan
+							kode 6 digit dari aplikasi authenticator.
+						</p>
+						{#if twoFaLoading && twoFaEnabled === null}
+							<p class="text-sm font-semibold text-[#5f6b62]">Memuat status 2FA...</p>
+						{:else if twoFaError && twoFaEnabled === null}
+							<p class="err">{twoFaError}</p>
+							<button type="button" class="btn btn-ghost" onclick={loadTwoFa}>
+								<Icon name="refresh" size={16} /> Coba lagi
+							</button>
+						{:else if twoFaSetup}
+							<p class="text-sm font-bold">
+								Pindai kode QR ini dengan aplikasi authenticator (mis. Google Authenticator):
+							</p>
+							<div class="flex justify-center rounded-xl bg-white p-3">
+								<div class="w-48 [&_svg]:h-auto [&_svg]:w-full">{@html twoFaSetup.qrSvg}</div>
+							</div>
+							<div>
+								<p class="lbl">Atau masukkan secret ini secara manual</p>
+								<div class="flex items-center gap-2">
+									<code class="min-w-0 flex-1 break-all rounded-lg bg-[#f7f5ef] px-2.5 py-2 text-sm font-bold">
+										{twoFaSetup.secret}
+									</code>
+									<button
+										type="button"
+										class="btn btn-outline shrink-0 !px-2.5 !py-1.5 text-xs"
+										onclick={salinSecret2fa}
+									>
+										{secretCopied ? "Disalin" : "Salin"}
+									</button>
+								</div>
+							</div>
+							<div>
+								<p class="lbl">Kode pemulihan — simpan di tempat aman</p>
+								<p class="rounded-xl border border-[#fde68a] bg-[#fef3c7] px-3 py-2 text-sm font-bold text-[#92400e]">
+									<Icon name="alert" size={15} class="inline-block align-[-2px]" />
+									Simpan kode ini di tempat aman — kode hanya tampil sekali.
+								</p>
+								<ul class="mt-2 grid grid-cols-2 gap-1.5">
+									{#each twoFaSetup.recoveryCodes as c (c)}
+										<li>
+											<code class="block rounded-lg bg-[#f7f5ef] px-2 py-1.5 text-center text-sm font-bold tracking-wide">
+												{c}
+											</code>
+										</li>
+									{/each}
+								</ul>
+							</div>
+							<div>
+								<label class="lbl" for="2fa-code">Kode 6 digit dari aplikasi authenticator</label>
+								<input
+									id="2fa-code"
+									class="input"
+									inputmode="numeric"
+									autocomplete="one-time-code"
+									maxlength="6"
+									placeholder="123456"
+									bind:value={twoFaCode}
+								/>
+							</div>
+							{#if twoFaConfirmError}
+								<p class="err">{twoFaConfirmError}</p>
+							{/if}
+							<div class="flex flex-wrap gap-2">
+								<button
+									type="button"
+									class="btn btn-primary"
+									disabled={twoFaConfirming}
+									onclick={konfirmasiSetup2fa}
+								>
+									{twoFaConfirming ? "Memeriksa..." : "Konfirmasi & Aktifkan 2FA"}
+								</button>
+								<button
+									type="button"
+									class="btn btn-ghost"
+									onclick={() => {
+										twoFaSetup = null;
+										twoFaCode = "";
+										twoFaConfirmError = "";
+									}}
+								>
+									Batal
+								</button>
+							</div>
+						{:else if twoFaEnabled}
+							<p>
+								<span class="badge badge-leaf">
+									<Icon name="check-circle" size={12} /> 2FA aktif
+								</span>
+							</p>
+							<p class="text-sm text-[#5f6b62]">
+								Akun ini dilindungi kode authenticator.
+							</p>
+							{#if !twoFaDisableOpen}
+								<div>
+									<button
+										type="button"
+										class="btn btn-outline"
+										onclick={() => {
+											twoFaDisableOpen = true;
+											twoFaDisableCode = "";
+											twoFaDisableError = "";
+										}}
+									>
+										<Icon name="unlock" size={16} /> Nonaktifkan 2FA
+									</button>
+								</div>
+							{:else}
+								<div>
+									<label class="lbl" for="2fa-disable-code">Kode 6 digit saat ini</label>
+									<input
+										id="2fa-disable-code"
+										class="input"
+										inputmode="numeric"
+										autocomplete="one-time-code"
+										maxlength="6"
+										placeholder="123456"
+										bind:value={twoFaDisableCode}
+									/>
+								</div>
+								{#if twoFaDisableError}
+									<p class="err">{twoFaDisableError}</p>
+								{/if}
+								<div class="flex flex-wrap gap-2">
+									<button
+										type="button"
+										class="btn btn-danger"
+										disabled={twoFaDisabling}
+										onclick={nonaktifkan2fa}
+									>
+										{twoFaDisabling ? "Memproses..." : "Nonaktifkan 2FA"}
+									</button>
+									<button
+										type="button"
+										class="btn btn-ghost"
+										onclick={() => {
+											twoFaDisableOpen = false;
+											twoFaDisableCode = "";
+											twoFaDisableError = "";
+										}}
+									>
+										Batal
+									</button>
+								</div>
+							{/if}
+						{:else}
+							<p>
+								<span class="badge badge-sun">
+									<Icon name="alert" size={12} /> 2FA nonaktif
+								</span>
+							</p>
+							<p class="text-sm text-[#5f6b62]">Aktifkan 2FA supaya akun admin lebih aman.</p>
+							{#if twoFaError}
+								<p class="err">{twoFaError}</p>
+							{/if}
+							<div>
+								<button
+									type="button"
+									class="btn btn-primary"
+									disabled={twoFaStarting}
+									onclick={mulaiSetup2fa}
+								>
+									{#if twoFaStarting}
+										Memuat...
+									{:else}
+										<Icon name="shield" size={16} /> Aktifkan 2FA
+									{/if}
+								</button>
+							</div>
+						{/if}
+					</div>
+				</div>
 			{:else if tab === "pesanan"}
 				<form
 					class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"
@@ -1862,6 +2309,125 @@
 						</div>
 					{/if}
 				</div>
+			{:else if tab === "audit"}
+				<form
+					class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"
+					onsubmit={(e) => {
+						e.preventDefault();
+						cariAudit();
+					}}
+				>
+					<select
+						class="input sm:!w-64"
+						bind:value={auditAction}
+						aria-label="Filter aksi"
+						onchange={() => loadAudit(1)}
+					>
+						{#each AUDIT_ACTIONS as a (a.value)}
+							<option value={a.value}>{a.label}</option>
+						{/each}
+					</select>
+					<div class="relative flex-1">
+						<input
+							class="input !pl-9"
+							type="search"
+							placeholder="Cari email admin..."
+							bind:value={auditQuery}
+							aria-label="Cari email admin"
+						/>
+						<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#5f6b62]"><Icon name="search" size={16} /></span>
+					</div>
+					<button type="submit" class="btn btn-primary">
+						<Icon name="search" size={16} /> Cari
+					</button>
+					<button type="button" class="btn btn-ghost" disabled={auditLoading} onclick={() => loadAudit(auditPage)}>
+						<Icon name="refresh" size={16} /> {auditLoading ? "Memuat..." : "Muat ulang"}
+					</button>
+				</form>
+				<p class="mt-3 text-sm font-bold text-[#3f4a42]">
+					Menampilkan {auditItems.length} dari {auditTotal} aktivitas
+				</p>
+
+				{#if auditLoading && !auditLoaded}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if auditError && !auditLoaded}
+					<p class="err mt-4">{auditError}</p>
+					<button type="button" class="btn btn-primary mt-3" onclick={() => loadAudit(1)}>Coba lagi</button>
+				{:else if auditItems.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">
+						{auditTotal === 0
+							? "Belum ada aktivitas tercatat."
+							: "Tidak ada aktivitas yang cocok dengan pencarian."}
+					</p>
+				{:else}
+					{#if auditError}
+						<p class="err mt-3">{auditError}</p>
+					{/if}
+					<!-- Tabel desktop -->
+					<div class="card mt-3 hidden overflow-x-auto p-0 md:block">
+						<table class="w-full min-w-[760px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Waktu</th>
+									<th class="px-3 py-2.5 font-extrabold">Admin</th>
+									<th class="px-3 py-2.5 font-extrabold">Aksi</th>
+									<th class="px-3 py-2.5 font-extrabold">Target</th>
+									<th class="px-3 py-2.5 font-extrabold">Detail</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each auditItems as a (a.id)}
+									<tr class="border-b border-[#f0ede2] align-top last:border-0">
+										<td class="whitespace-nowrap px-3 py-2.5">{formatTanggal(a.created_at)}</td>
+										<td class="break-all px-3 py-2.5 font-bold">{a.admin_email}</td>
+										<td class="px-3 py-2.5">
+											<span class="badge badge-brand">{labelAksi(a.action)}</span>
+										</td>
+										<td class="break-all px-3 py-2.5">{a.target ?? "-"}</td>
+										<td class="break-words px-3 py-2.5">{a.detail ?? "-"}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					<!-- Kartu mobile -->
+					<div class="mt-3 space-y-2 md:hidden">
+						{#each auditItems as a (a.id)}
+							<article class="card p-3">
+								<div class="flex items-start justify-between gap-2">
+									<span class="badge badge-brand">{labelAksi(a.action)}</span>
+									<span class="shrink-0 text-xs text-[#5f6b62]">{formatTanggal(a.created_at)}</span>
+								</div>
+								<p class="mt-1.5 break-all text-xs font-bold">{a.admin_email}</p>
+								{#if a.target}
+									<p class="mt-0.5 break-all text-xs text-[#5f6b62]">Target: {a.target}</p>
+								{/if}
+								{#if a.detail}
+									<p class="mt-0.5 break-words text-xs text-[#5f6b62]">{a.detail}</p>
+								{/if}
+							</article>
+						{/each}
+					</div>
+					<div class="mt-4 flex items-center justify-between gap-2">
+						<button
+							type="button"
+							class="btn btn-ghost !px-3 !py-2 text-xs"
+							disabled={auditPage <= 1 || auditLoading}
+							onclick={() => loadAudit(auditPage - 1)}
+						>
+							<Icon name="chevron-left" size={15} /> Sebelumnya
+						</button>
+						<p class="text-sm font-bold text-[#3f4a42]">Halaman {auditPage} dari {auditPages}</p>
+						<button
+							type="button"
+							class="btn btn-ghost !px-3 !py-2 text-xs"
+							disabled={auditPage >= auditPages || auditLoading}
+							onclick={() => loadAudit(auditPage + 1)}
+						>
+							Berikutnya <Icon name="chevron-right" size={15} />
+						</button>
+					</div>
+				{/if}
 			{:else if tab === "pengumuman"}
 				<div class="card mt-4 space-y-3 p-4">
 					<p class="text-sm font-bold"><Icon name="sparkles" size={16} /> Pengumuman & Promo Beranda</p>

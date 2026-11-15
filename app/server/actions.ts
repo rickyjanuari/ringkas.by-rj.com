@@ -16,6 +16,17 @@ import {
   nowIso
 } from "./database.js";
 import { getEnv } from "./env.js";
+import { validatePassword } from "./password.js";
+import { verifyTurnstile } from "./turnstile.js";
+import { logAdminAction } from "./audit.js";
+import {
+  generateSecret,
+  otpauthUrl,
+  verifyTotp,
+  generateRecoveryCodes,
+  hashRecoveryCode
+} from "./totp.js";
+import QRCode from "qrcode";
 import type { ImageStorage } from "./storage.js";
 import { createQris, checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
 import { certificatePdf, receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
@@ -235,13 +246,16 @@ interface SiteSettings {
   announcement_enabled: 0 | 1;
   promo_text: string;
   promo_enabled: 0 | 1;
+  /** ISO waktu backup terakhir (diisi endpoint /api/admin/backup). */
+  last_backup_at: string | null;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
   announcement_text: "",
   announcement_enabled: 0,
   promo_text: "",
-  promo_enabled: 0
+  promo_enabled: 0,
+  last_backup_at: null
 };
 
 async function readSettings(db: Database): Promise<SiteSettings> {
@@ -256,6 +270,7 @@ async function readSettings(db: Database): Promise<SiteSettings> {
     else if (r.key === "promo_text") out.promo_text = r.value;
     else if (r.key === "announcement_enabled") out.announcement_enabled = r.value === "1" ? 1 : 0;
     else if (r.key === "promo_enabled") out.promo_enabled = r.value === "1" ? 1 : 0;
+    else if (r.key === "last_backup_at") out.last_backup_at = r.value || null;
   }
   return out;
 }
@@ -326,6 +341,145 @@ function publicUser(u: User): Record<string, unknown> {
     role: u.role,
     created_at: u.created_at
   };
+}
+
+// ------------------------- Keamanan: lockout login & batas per IP -------------------------
+// Migrasi 0009 (auth_lockouts, ip_rate_limits). Semua helper di sini
+// DEFENSIF: bila tabel belum ada (migrasi belum diterapkan), login/
+// register/checkout tetap jalan — keamanan tambahan tidak boleh
+// memblokir layanan inti.
+
+/** User + kolom 2FA (migrasi 0009). */
+type UserWithTotp = User & { totp_secret?: string | null; totp_enabled?: number | null };
+
+/** IP klien: CF-Connecting-IP, lalu entri pertama X-Forwarded-For. */
+function clientIp(c: Context): string {
+  const cf = c.req.header("CF-Connecting-IP")?.trim();
+  if (cf) return cf;
+  const xff = c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
+  if (xff) return xff;
+  return "unknown";
+}
+
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+async function getLockout(
+  db: Database,
+  userId: string
+): Promise<{ failed_count: number; locked_until: string | null } | undefined> {
+  try {
+    return await db.get<{ failed_count: number; locked_until: string | null }>(
+      "SELECT failed_count, locked_until FROM auth_lockouts WHERE user_id = ?",
+      userId
+    );
+  } catch (err) {
+    console.error("[lockout] baca gagal:", err);
+    return undefined;
+  }
+}
+
+/** Password salah: naikkan hitungan; saat mencapai 5 -> kunci 15 menit. */
+async function recordFailedLogin(db: Database, userId: string): Promise<void> {
+  try {
+    const row = await getLockout(db, userId);
+    const count = (row?.failed_count ?? 0) + 1;
+    const lockedUntil =
+      count >= MAX_FAILED_LOGINS
+        ? new Date(Date.now() + LOCKOUT_MS).toISOString()
+        : (row?.locked_until ?? null);
+    await db.run(
+      `INSERT INTO auth_lockouts (user_id, failed_count, locked_until) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET failed_count = excluded.failed_count, locked_until = excluded.locked_until`,
+      userId,
+      count,
+      lockedUntil
+    );
+  } catch (err) {
+    console.error("[lockout] catat gagal:", err);
+  }
+}
+
+/** Login sukses: reset hitungan gagal + buka kunci. */
+async function resetLockout(db: Database, userId: string): Promise<void> {
+  try {
+    await db.run(
+      "UPDATE auth_lockouts SET failed_count = 0, locked_until = NULL WHERE user_id = ?",
+      userId
+    );
+  } catch (err) {
+    console.error("[lockout] reset gagal:", err);
+  }
+}
+
+/**
+ * Batas per IP dalam satu jendela waktu (kind = 'register' | 'checkout').
+ * true = masih di bawah batas (hitungan dinaikkan), false = sudah mencapai
+ * batas. Jendela berganti -> hitungan mulai dari 1 lagi.
+ */
+async function checkIpLimit(
+  db: Database,
+  kind: string,
+  ip: string,
+  max: number,
+  windowMs: number
+): Promise<boolean> {
+  try {
+    const key = `${kind}:${ip}`;
+    const now = Date.now();
+    const row = await db.get<{ count: number; window_start: string }>(
+      "SELECT count, window_start FROM ip_rate_limits WHERE key = ?",
+      key
+    );
+    if (!row || now - new Date(row.window_start).getTime() >= windowMs) {
+      await db.run(
+        `INSERT INTO ip_rate_limits (key, count, window_start) VALUES (?, 1, ?)
+         ON CONFLICT(key) DO UPDATE SET count = 1, window_start = excluded.window_start`,
+        key,
+        new Date(now).toISOString()
+      );
+      return true;
+    }
+    if (row.count >= max) return false;
+    await db.run("UPDATE ip_rate_limits SET count = count + 1 WHERE key = ?", key);
+    return true;
+  } catch (err) {
+    console.error("[rate-limit] gagal, diizinkan:", err);
+    return true;
+  }
+}
+
+/** Escape satu nilai untuk dump SQL backup (pola dump-seed-sql.ts). */
+function sqlEsc(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "NULL";
+  if (typeof value === "bigint") return value.toString();
+  if (value instanceof Uint8Array) {
+    return `X'${[...value].map((b) => b.toString(16).padStart(2, "0")).join("")}'`;
+  }
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+/** Nama kolom sebuah tabel (pragma, fallback ke kunci baris pertama). */
+async function tableColumns(db: Database, table: string): Promise<string[]> {
+  try {
+    const rows = await db.all<{ name: string }>(
+      "SELECT name FROM pragma_table_info(?) ORDER BY cid",
+      table
+    );
+    if (rows.length > 0) return rows.map((r) => r.name);
+  } catch {
+    // D1 membatasi sebagian PRAGMA — lanjut ke fallback di bawah.
+  }
+  try {
+    const rows = await db.all<Record<string, unknown>>(
+      `SELECT * FROM "${table.replace(/"/g, '""')}" LIMIT 1`
+    );
+    if (rows.length > 0) return Object.keys(rows[0]);
+  } catch {
+    // abaikan — tabel dilewati dari dump
+  }
+  return [];
 }
 
 function publicProduct(p: Product): Record<string, unknown> {
@@ -699,11 +853,26 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const email = asString(body.email).trim().toLowerCase();
     const password = asString(body.password);
     const whatsappRaw = asString(body.whatsapp).trim();
+    // Batas per IP: maks 10 pendaftaran/jam/IP.
+    if (!(await checkIpLimit(db, "register", clientIp(c), 10, 60 * 60 * 1000))) {
+      return c.json({ error: "Terlalu banyak pendaftaran dari alamat ini. Coba lagi nanti." }, 429);
+    }
     if (!name) return c.json({ error: "Nama tidak boleh kosong." }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return c.json({ error: "Format email tidak valid." }, 400);
     }
-    if (password.length < 6) return c.json({ error: "Password minimal 6 karakter." }, 400);
+    // Turnstile: wajib + valid bila secret terkonfigurasi; dilewati bila
+    // secret kosong (verifyTurnstile mengembalikan true + log).
+    if (getEnv().turnstileSecretKey) {
+      const captchaOk = await verifyTurnstile(asString(body.turnstile_token), clientIp(c));
+      if (!captchaOk) {
+        return c.json({ error: "Verifikasi CAPTCHA gagal. Silakan coba lagi." }, 400);
+      }
+    }
+    // Kebijakan kata sandi: minimal 8 karakter + denylist + cek bocor
+    // HaveIBeenPwned (gagal-terbuka).
+    const pwCheck = await validatePassword(password);
+    if (!pwCheck.ok) return c.json({ error: pwCheck.error }, 400);
     let whatsapp: string | null = null;
     if (whatsappRaw) {
       whatsapp = normalizeWhatsapp(whatsappRaw);
@@ -736,13 +905,182 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const body = await readJson(c);
     const email = asString(body.email).trim().toLowerCase();
     const password = asString(body.password);
-    const user = await db.get<User>("SELECT * FROM users WHERE email = ?", email);
+    const user = await db.get<UserWithTotp>("SELECT * FROM users WHERE email = ?", email);
+    // Akun terkunci: tolak apa pun (walau password benar) sampai batas
+    // waktu habis. Email tak terdaftar tetap 401 generik di bawah.
+    if (user) {
+      const lock = await getLockout(db, user.id);
+      if (lock?.locked_until && new Date(lock.locked_until).getTime() > Date.now()) {
+        const minutes = Math.max(
+          1,
+          Math.ceil((new Date(lock.locked_until).getTime() - Date.now()) / 60000)
+        );
+        return c.json(
+          { error: `Akun terkunci karena terlalu banyak percobaan gagal. Coba lagi dalam ${minutes} menit.` },
+          401
+        );
+      }
+    }
+    // Turnstile: wajib + valid bila secret terkonfigurasi.
+    if (getEnv().turnstileSecretKey) {
+      const captchaOk = await verifyTurnstile(asString(body.turnstile_token), clientIp(c));
+      if (!captchaOk) {
+        return c.json({ error: "Verifikasi CAPTCHA gagal. Silakan coba lagi." }, 400);
+      }
+    }
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      if (user) await recordFailedLogin(db, user.id);
       return c.json({ error: "Email atau password salah." }, 401);
+    }
+    await resetLockout(db, user.id);
+    // 2FA admin: bila aktif, JANGAN buat sesi dulu — kembalikan challenge
+    // yang harus ditebus lewat POST /api/auth/login-2fa.
+    if (user.role === "admin" && user.totp_enabled === 1) {
+      try {
+        const challengeId = newId("tfa");
+        await db.run(
+          "INSERT INTO totp_challenges (id, user_id, expires_at) VALUES (?, ?, ?)",
+          challengeId,
+          user.id,
+          new Date(Date.now() + 5 * 60 * 1000).toISOString()
+        );
+        return c.json({ needs2fa: true, challenge: challengeId });
+      } catch (err) {
+        // Tabel challenge belum ada (migrasi 0009 belum diterapkan) ->
+        // login tetap jalan tanpa 2FA, bukan 500.
+        console.error("[login] challenge 2FA gagal dibuat, lanjut tanpa 2FA:", err);
+      }
     }
     const token = newToken();
     await db.run("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", token, user.id, nowIso());
     return c.json({ user: publicUser(user), token });
+  });
+
+  // ------------------------- Login 2FA & TOTP -------------------------
+  // Admin dengan totp_enabled=1 menebus challenge dari /api/auth/login
+  // di sini (kode TOTP ATAU satu kode pemulihan sekali pakai). Challenge
+  // TIDAK dihapus bila kode salah — bisa coba lagi sampai kedaluwarsa.
+
+  app.post("/api/auth/login-2fa", async (c) => {
+    const body = await readJson(c);
+    const challengeId = asString(body.challenge);
+    const code = asString(body.code).trim();
+    if (!challengeId || !code) {
+      return c.json({ error: "Challenge dan kode wajib diisi." }, 400);
+    }
+    const challenge = await db
+      .get<{ id: string; user_id: string; expires_at: string }>(
+        "SELECT * FROM totp_challenges WHERE id = ?",
+        challengeId
+      )
+      .catch(() => undefined);
+    if (!challenge) {
+      return c.json({ error: "Sesi verifikasi tidak ditemukan. Silakan login ulang." }, 400);
+    }
+    if (new Date(challenge.expires_at).getTime() <= Date.now()) {
+      await db.run("DELETE FROM totp_challenges WHERE id = ?", challengeId).catch(() => undefined);
+      return c.json({ error: "Sesi verifikasi kedaluwarsa. Silakan login ulang." }, 400);
+    }
+    const user = await db.get<UserWithTotp>("SELECT * FROM users WHERE id = ?", challenge.user_id);
+    if (!user) return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+    let ok = false;
+    if (user.totp_secret && (await verifyTotp(user.totp_secret, code))) {
+      ok = true;
+    } else {
+      // Kode pemulihan: bandingkan hash SHA-256, sekali pakai.
+      const hash = await hashRecoveryCode(code);
+      const rc = await db
+        .get<{ id: number; used: number }>(
+          "SELECT id, used FROM recovery_codes WHERE user_id = ? AND code_hash = ?",
+          user.id,
+          hash
+        )
+        .catch(() => undefined);
+      if (rc && rc.used === 0) {
+        await db.run("UPDATE recovery_codes SET used = 1 WHERE id = ?", rc.id);
+        ok = true;
+      }
+    }
+    if (!ok) return c.json({ error: "Kode verifikasi salah." }, 400);
+    await db.run("DELETE FROM totp_challenges WHERE id = ?", challengeId);
+    const token = newToken();
+    await db.run("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", token, user.id, nowIso());
+    return c.json({ user: publicUser(user), token });
+  });
+
+  // Setup 2FA (admin-only). Secret + kode pemulihan HANYA dikembalikan
+  // di sini (saat setup) — tidak pernah di endpoint lain.
+  app.post("/api/2fa/setup/start", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const secret = generateSecret();
+    const url = otpauthUrl(secret, admin.email);
+    const qrSvg = await QRCode.toString(url, { type: "svg" });
+    const recoveryCodes = generateRecoveryCodes();
+    const stamp = nowIso();
+    await db.run("UPDATE users SET totp_secret = ? WHERE id = ?", secret, admin.id);
+    await db.run("DELETE FROM recovery_codes WHERE user_id = ?", admin.id);
+    for (const code of recoveryCodes) {
+      await db.run(
+        "INSERT INTO recovery_codes (user_id, code_hash, used, created_at) VALUES (?, ?, 0, ?)",
+        admin.id,
+        await hashRecoveryCode(code),
+        stamp
+      );
+    }
+    return c.json({ secret, otpauthUrl: url, qrSvg, recoveryCodes });
+  });
+
+  app.post("/api/2fa/setup/confirm", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const user = await db.get<UserWithTotp>("SELECT * FROM users WHERE id = ?", admin.id);
+    if (!user?.totp_secret) {
+      return c.json({ error: "2FA belum disiapkan. Mulai setup terlebih dahulu." }, 400);
+    }
+    const code = asString((await readJson(c)).code).trim();
+    if (!(await verifyTotp(user.totp_secret, code))) {
+      return c.json({ error: "Kode verifikasi salah." }, 400);
+    }
+    await db.run("UPDATE users SET totp_enabled = 1 WHERE id = ?", admin.id);
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/2fa/disable", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const user = await db.get<UserWithTotp>("SELECT * FROM users WHERE id = ?", admin.id);
+    if (!user?.totp_secret || user.totp_enabled !== 1) {
+      return c.json({ error: "2FA belum aktif." }, 400);
+    }
+    const code = asString((await readJson(c)).code).trim();
+    if (!(await verifyTotp(user.totp_secret, code))) {
+      return c.json({ error: "Kode verifikasi salah." }, 400);
+    }
+    await db.run("UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?", admin.id);
+    await db.run("DELETE FROM recovery_codes WHERE user_id = ?", admin.id);
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/2fa/status", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const user = await db.get<UserWithTotp>(
+      "SELECT totp_enabled FROM users WHERE id = ?",
+      admin.id
+    );
+    return c.json({ enabled: (user?.totp_enabled ?? 0) === 1 });
+  });
+
+  // ------------------------- Konfigurasi publik -------------------------
+  // Hanya site key Turnstile (publik). Secret TIDAK PERNAH di sini.
+
+  app.get("/api/config", async (c) => {
+    return c.json({ turnstileSiteKey: getEnv().turnstileSiteKey || null });
   });
 
   app.get("/api/auth/me", async (c) => {
@@ -1087,6 +1425,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       nowIso()
     );
     const product = await db.get<Product>("SELECT * FROM products WHERE id = ?", id);
+    await logAdminAction(db, admin, "product_create", id, title);
     return c.json({ product }, 201);
   });
 
@@ -1129,6 +1468,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (sets.length === 0) return c.json({ error: "Tidak ada perubahan." }, 400);
     await db.run(`UPDATE products SET ${sets.join(", ")} WHERE id = ?`, ...params, id);
     const updated = await db.get<Product>("SELECT * FROM products WHERE id = ?", id);
+    await logAdminAction(db, admin, "product_update", id, updated?.title ?? product.title);
     return c.json({ product: updated });
   });
 
@@ -1139,6 +1479,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const product = await db.get<Product>("SELECT * FROM products WHERE id = ?", c.req.param("id"));
     if (!product) return c.json({ error: "Produk tidak ditemukan." }, 404);
     await db.run("DELETE FROM products WHERE id = ?", product.id);
+    await logAdminAction(db, admin, "product_delete", product.id, product.title);
     return c.json({ ok: true });
   });
 
@@ -1153,6 +1494,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (active !== 0 && active !== 1) return c.json({ error: "Nilai active harus 0 atau 1." }, 400);
     await db.run("UPDATE products SET active = ? WHERE id = ?", active, product.id);
     const updated = await db.get<Product>("SELECT * FROM products WHERE id = ?", product.id);
+    await logAdminAction(db, admin, "product_set_active", product.id, `${product.title} -> active=${active}`);
     return c.json({ product: updated });
   });
 
@@ -1169,6 +1511,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     }
     await db.run("UPDATE products SET external_url = ? WHERE id = ?", url, product.id);
     const updated = await db.get<Product>("SELECT * FROM products WHERE id = ?", product.id);
+    await logAdminAction(db, admin, "product_external_link", product.id, url ?? "(dihapus)");
     return c.json({ product: updated });
   });
 
@@ -1225,6 +1568,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       "SELECT * FROM product_images WHERE id = ?",
       Number(result.lastInsertRowid)
     );
+    await logAdminAction(db, admin, "product_image_upload", product.id, `${safeName} (${kind})`);
     return c.json({ image }, 201);
   });
 
@@ -1237,6 +1581,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     // Berkas dihapus best-effort; baris DB tetap dihapus apa pun hasilnya.
     await storage.delete(image.url);
     await db.run("DELETE FROM product_images WHERE id = ?", image.id);
+    await logAdminAction(db, admin, "product_image_delete", String(image.id), `produk ${image.product_id}`);
     return c.json({ ok: true });
   });
 
@@ -1258,6 +1603,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     await db.run("UPDATE product_images SET kind = 'gallery' WHERE product_id = ? AND kind = 'feature'", product.id);
     await db.run("UPDATE product_images SET kind = 'feature' WHERE id = ?", imageId);
     const updated = await db.get<ProductImage>("SELECT * FROM product_images WHERE id = ?", imageId);
+    await logAdminAction(db, admin, "product_set_feature", product.id, `gambar ${imageId}`);
     return c.json({ image: updated });
   });
 
@@ -1294,6 +1640,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     }
     await db.run("UPDATE users SET role = ? WHERE id = ?", role, targetId);
     const updated = await db.get<User>("SELECT * FROM users WHERE id = ?", targetId);
+    await logAdminAction(db, admin, "user_set_role", targetId, `${target.email} -> ${role}`);
     return c.json({ user: publicUser(updated ?? target) });
   });
 
@@ -1309,14 +1656,14 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (!target) return c.json({ error: "Pengguna tidak ditemukan." }, 404);
     const body = await readJson(c);
     const password = asString(body.password);
-    if (password.length < 8) {
-      return c.json({ error: "Kata sandi baru minimal 8 karakter." }, 400);
-    }
+    const pwCheck = await validatePassword(password);
+    if (!pwCheck.ok) return c.json({ error: pwCheck.error }, 400);
     // Kata sandi TIDAK PERNAH masuk log/respons — hanya hash-nya yang
     // disimpan, persis seperti register (bcryptjs, salt 10). Ini reset
     // oleh admin, BUKAN alur lupa-kata-sandi mandiri (alur itu belum ada).
     const hash = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
     await db.run("UPDATE users SET password_hash = ? WHERE id = ?", hash, targetId);
+    await logAdminAction(db, admin, "user_reset_password", targetId, target.email);
     return c.json({ ok: true });
   });
 
@@ -1439,22 +1786,32 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     ) {
       return c.json({ error: "Template harus welcome, pending, paid, atau expired." }, 400);
     }
+    let result: Awaited<ReturnType<typeof sendWelcomeEmail>>;
+    let target = "";
+    let detail = "";
     if (template === "welcome") {
       const userId = asString(body.userId);
       if (!userId) return c.json({ error: "userId wajib diisi untuk template welcome." }, 400);
       const user = await db.get<User>("SELECT * FROM users WHERE id = ?", userId);
       if (!user) return c.json({ error: "Pengguna tidak ditemukan." }, 404);
-      return c.json(await sendWelcomeEmail(db, user, { force: true }));
+      result = await sendWelcomeEmail(db, user, { force: true });
+      target = user.id;
+      detail = `welcome -> ${user.email}`;
+    } else {
+      const orderId = asString(body.orderId);
+      if (!orderId) return c.json({ error: "orderId wajib diisi untuk template ini." }, 400);
+      const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
+      if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
+      // paid menuntut status PAID — diperiksa di dalam sendPaidEmail
+      // (mengembalikan { sent: false, error: "Order belum lunas." }).
+      if (template === "pending") result = await sendPendingEmail(db, order, { force: true });
+      else if (template === "paid") result = await sendPaidEmail(db, order, { force: true });
+      else result = await sendExpiredEmail(db, order, { force: true });
+      target = order.id;
+      detail = `${template} -> order ${order.id}`;
     }
-    const orderId = asString(body.orderId);
-    if (!orderId) return c.json({ error: "orderId wajib diisi untuk template ini." }, 400);
-    const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
-    if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
-    // paid menuntut status PAID — diperiksa di dalam sendPaidEmail
-    // (mengembalikan { sent: false, error: "Order belum lunas." }).
-    if (template === "pending") return c.json(await sendPendingEmail(db, order, { force: true }));
-    if (template === "paid") return c.json(await sendPaidEmail(db, order, { force: true }));
-    return c.json(await sendExpiredEmail(db, order, { force: true }));
+    await logAdminAction(db, admin, "email_resend", target, detail);
+    return c.json(result);
   });
 
   // ------------------------- Admin: ekspor CSV -------------------------
@@ -1513,6 +1870,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         ].join(",")
       );
     }
+    await logAdminAction(db, admin, "export_orders", undefined, `${rows.length} order`);
     return c.body(lines.join("\n"), 200, {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="rekap-order-ringkas.csv"`
@@ -1550,6 +1908,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         ].join(",")
       );
     }
+    await logAdminAction(db, admin, "export_users", undefined, `${rows.length} pengguna`);
     return c.body(lines.join("\n"), 200, {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="pengguna-ringkas.csv"`
@@ -1602,6 +1961,13 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         stamp
       );
     }
+    await logAdminAction(
+      db,
+      admin,
+      "settings_update",
+      undefined,
+      updates.map(([key]) => key).join(", ")
+    );
     return c.json({ settings: await readSettings(db) });
   });
 
@@ -1648,6 +2014,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       chapter.id
     );
     const updated = await db.get<Chapter>("SELECT * FROM chapters WHERE id = ?", chapter.id);
+    await logAdminAction(db, admin, "chapter_video_set", chapter.id, chapter.title);
     return c.json({ chapter: updated });
   });
 
@@ -1706,6 +2073,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       nowIso()
     );
     const voucher = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+    await logAdminAction(db, admin, "voucher_create", code, `${type} ${value}`);
     return c.json({ voucher: voucher ? publicVoucher(voucher) : null }, 201);
   });
 
@@ -1723,6 +2091,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     }
     await db.run("UPDATE vouchers SET active = ? WHERE code = ?", active, code);
     const updated = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+    await logAdminAction(db, admin, "voucher_set_active", code, `active=${active}`);
     return c.json({ voucher: updated ? publicVoucher(updated) : null });
   });
 
@@ -1733,9 +2102,112 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const body = await readJson(c);
     const job = asString(body.job);
     const date = jobDate(asString(body.date) || undefined);
-    if (job === "daily") return c.json(await runDailyJob(db, date));
-    if (job === "weekly") return c.json(await runWeeklyJob(db, date));
-    return c.json({ error: "job harus 'daily' atau 'weekly'." }, 400);
+    if (job !== "daily" && job !== "weekly") {
+      return c.json({ error: "job harus 'daily' atau 'weekly'." }, 400);
+    }
+    const result = job === "daily" ? await runDailyJob(db, date) : await runWeeklyJob(db, date);
+    await logAdminAction(db, admin, "cron_run", undefined, job);
+    return c.json(result);
+  });
+
+  // ------------------------- Admin: audit log & backup -------------------------
+  // Audit log (migrasi 0009) dibaca di sini; backup mendump semua tabel
+  // pengguna sebagai SQL dan mencatat last_backup_at di settings.
+
+  app.get("/api/admin/audit-log", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const action = (c.req.query("action") ?? "").trim();
+    const q = (c.req.query("q") ?? "").trim();
+    const page = Math.max(1, Math.floor(Number(c.req.query("page") ?? 1) || 1));
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(c.req.query("limit") ?? 20) || 20)));
+    const conds: string[] = [];
+    const params: SQLInputValue[] = [];
+    if (action) {
+      conds.push("action = ?");
+      params.push(action);
+    }
+    if (q) {
+      const like = `%${q}%`;
+      conds.push("(admin_email LIKE ? OR detail LIKE ?)");
+      params.push(like, like);
+    }
+    const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
+    const total = (await db.get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM admin_audit_log ${where}`,
+      ...params
+    ))?.n ?? 0;
+    const items = await db.all<{
+      id: number;
+      admin_email: string;
+      action: string;
+      target: string | null;
+      detail: string | null;
+      created_at: string;
+    }>(
+      `SELECT id, admin_email, action, target, detail, created_at
+       FROM admin_audit_log ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      (page - 1) * limit
+    );
+    return c.json({ items, total, page, limit });
+  });
+
+  app.get("/api/admin/backup", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const tables = await db.all<{ name: string }>(
+      // _migrations (jejak migrasi lokal, dibuat db.migrate() — bukan
+      // oleh berkas migrasi) dikecualikan seperti d1_migrations: tabel
+      // pembukuan internal, bukan data pengguna.
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('d1_migrations', '_migrations') ORDER BY name"
+    );
+    const lines: string[] = [
+      "-- ringkas-backup — dump database Ringkas (semua tabel pengguna).",
+      `-- Dibuat: ${nowIso()}`,
+      "-- Pulihkan dengan: sqlite3 ringkas.db < berkas-ini  (atau wrangler d1 execute --file=...)",
+      "PRAGMA foreign_keys=OFF;",
+      "BEGIN TRANSACTION;"
+    ];
+    for (const t of tables) {
+      const cols = await tableColumns(db, t.name);
+      if (cols.length === 0) continue;
+      const safeName = t.name.replace(/"/g, '""');
+      const rows = await db.all<Record<string, unknown>>(`SELECT * FROM "${safeName}"`);
+      const colList = cols.map((col) => `"${col.replace(/"/g, '""')}"`).join(", ");
+      for (const row of rows) {
+        // INSERT OR REPLACE: restore ke DB yang sudah dimigrasi/di-seed
+        // (mis. baris settings bawaan migrasi 0008) tidak boleh gagal
+        // karena konflik PRIMARY KEY — nilai backup yang menang.
+        lines.push(
+          `INSERT OR REPLACE INTO "${safeName}" (${colList}) VALUES (${cols.map((col) => sqlEsc(row[col])).join(", ")});`
+        );
+      }
+      lines.push(`-- ${t.name}: ${rows.length} baris`);
+    }
+    lines.push("COMMIT;");
+    const sql = `${lines.join("\n")}\n`;
+    // Catat waktu backup terakhir (best-effort; tabel settings dari
+    // migrasi 0008 — bila belum ada, backup tetap dikembalikan).
+    const stamp = nowIso();
+    await db
+      .run(
+        `INSERT INTO settings (key, value, updated_at) VALUES ('last_backup_at', ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        stamp,
+        stamp
+      )
+      .catch((err) => console.error("[backup] gagal mencatat last_backup_at:", err));
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const filename = `ringkas-backup-${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}.sql`;
+    return c.body(sql, 200, {
+      "Content-Type": "application/sql",
+      "Content-Disposition": `attachment; filename="${filename}"`
+    });
   });
 
   // ------------------------- Voucher (cek sebelum checkout) -------------------------
@@ -1765,6 +2237,10 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
   app.post("/api/checkout", async (c) => {
     const user = await authUser(c, db);
     if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    // Batas per IP: maks 20 checkout/jam/IP (setelah auth).
+    if (!(await checkIpLimit(db, "checkout", clientIp(c), 20, 60 * 60 * 1000))) {
+      return c.json({ error: "Terlalu banyak percobaan checkout dari alamat ini. Coba lagi nanti." }, 429);
+    }
     const body = await readJson(c);
     const items = Array.isArray(body.items)
       ? body.items.filter((x): x is string => typeof x === "string")

@@ -32,6 +32,15 @@ compatibility_flags = ["nodejs_compat"]
 directory = "./build"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# Worker JALAN DULU untuk semua request (termasuk aset statis): tanpa ini,
+# request yang cocok dengan aset statis disajikan langsung oleh lapisan
+# aset TANPA melewati Worker — header keamanan di server/worker.ts
+# (CSP, X-Frame-Options, dll.) tidak akan pernah menempel di /, /shorts/*,
+# atau berkas JS/CSS. Dengan run_worker_first, Worker memanggil
+# env.ASSETS.fetch() lalu membungkus respons dengan header keamanan.
+# Trade-off: tiap request aset melewati Worker (latensi sedikit naik) —
+# itu harga yang wajar demi header keamanan di semua respons.
+run_worker_first = true
 
 [[d1_databases]]
 binding = "DB"
@@ -44,6 +53,11 @@ migrations_dir = "server/migrations"
 RESEND_FROM = "halo@ringkas.by-rj.com"
 # Bukan secret — URL dasar situs, dipakai untuk tautan di email otomatis.
 APP_URL = "https://ringkas.by-rj.com"
+# Bukan secret (site key publik) — diisi pemilik dari dashboard Cloudflare
+# Turnstile. Bila kosong, widget Turnstile tidak tampil dan verifikasi
+# dilewati (lihat src/routes/akun/+page.svelte). Secret pasangannya
+# (TURNSTILE_SECRET_KEY) JANGAN ditulis di sini — pakai `wrangler secret put`.
+TURNSTILE_SITE_KEY = ""
 
 # Cron email (scheduled handler di server/worker.ts):
 #   "0 0 * * *"  → tiap hari 00:00 UTC (07:00 WIB): pengingat belajar

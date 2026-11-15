@@ -32,6 +32,139 @@
 	let authLoading = $state(false);
 	let authError = $state("");
 
+	// ---- Turnstile (anti-bot di login/daftar) ----
+	// Site key diambil sekali dari GET /api/config (publik). Bila tidak
+	// ada site key, atau skrip gagal dimuat, widget tidak tampil dan auth
+	// jalan tanpa token — server yang memutuskan menerimanya.
+	type TurnstileApi = {
+		render: (
+			el: HTMLElement,
+			opts: {
+				sitekey: string;
+				callback?: (token: string) => void;
+				"expired-callback"?: () => void;
+				"error-callback"?: () => void;
+			}
+		) => string;
+		reset: (widgetId?: string) => void;
+		remove?: (widgetId?: string) => void;
+	};
+	let turnstileSiteKey = $state("");
+	let turnstileToken = $state("");
+	let turnstileReady = $state(false);
+	let turnstileWidgetId = $state<string | null>(null);
+	let turnstileEl: HTMLDivElement | null = $state(null);
+
+	function getTurnstile(): TurnstileApi | undefined {
+		return (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+	}
+
+	function loadTurnstileScript(): Promise<void> {
+		return new Promise((resolve) => {
+			if (getTurnstile()) {
+				turnstileReady = true;
+				resolve();
+				return;
+			}
+			const src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+			const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+			let done = false;
+			const finish = () => {
+				if (done) return;
+				done = true;
+				if (getTurnstile()) turnstileReady = true;
+				resolve();
+			};
+			if (existing) {
+				existing.addEventListener("load", finish);
+				existing.addEventListener("error", finish);
+			} else {
+				const s = document.createElement("script");
+				s.src = src;
+				s.async = true;
+				s.defer = true;
+				s.onload = finish;
+				s.onerror = finish;
+				document.head.appendChild(s);
+			}
+			// Pengaman: jangan gantung selamanya bila skrip macet.
+			setTimeout(finish, 8000);
+		});
+	}
+
+	function renderTurnstile() {
+		const w = getTurnstile();
+		if (!turnstileSiteKey || !turnstileEl || !w) return;
+		try {
+			if (turnstileWidgetId) w.remove?.(turnstileWidgetId);
+		} catch {
+			/* abaikan */
+		}
+		turnstileWidgetId = null;
+		try {
+			turnstileWidgetId = w.render(turnstileEl, {
+				sitekey: turnstileSiteKey,
+				callback: (token: string) => {
+					turnstileToken = token;
+				},
+				"expired-callback": () => {
+					turnstileToken = "";
+				},
+				"error-callback": () => {
+					turnstileToken = "";
+				}
+			});
+		} catch {
+			/* widget gagal render — lanjut tanpa token */
+		}
+	}
+
+	function resetTurnstile() {
+		turnstileToken = "";
+		if (!turnstileWidgetId) return;
+		try {
+			getTurnstile()?.reset(turnstileWidgetId);
+		} catch {
+			/* abaikan */
+		}
+	}
+
+	async function initTurnstile() {
+		let siteKey = "";
+		try {
+			const cfg = await api<{ turnstileSiteKey?: string }>("/api/config");
+			siteKey = cfg.turnstileSiteKey ?? "";
+		} catch {
+			/* endpoint belum ada / gagal — lanjut tanpa Turnstile */
+			return;
+		}
+		if (!siteKey) return;
+		turnstileSiteKey = siteKey;
+		await loadTurnstileScript();
+		renderTurnstile();
+	}
+
+	// Render ulang widget bila wadahnya muncul kembali (mis. setelah logout).
+	$effect(() => {
+		if (turnstileReady && turnstileSiteKey && turnstileEl) renderTurnstile();
+	});
+
+	// ---- Verifikasi dua langkah (2FA) ----
+	let twofaStep = $state(false);
+	let twofaChallenge = $state("");
+	let twofaCode = $state("");
+	let twofaUseRecovery = $state(false);
+	let twofaLoading = $state(false);
+	let twofaError = $state("");
+
+	function batal2fa() {
+		twofaStep = false;
+		twofaChallenge = "";
+		twofaCode = "";
+		twofaError = "";
+		twofaUseRecovery = false;
+	}
+
 	// ---- Profil ----
 	let tracker = $state<TrackerData | null>(null);
 	let trackerError = $state("");
@@ -152,6 +285,8 @@
 	let isAdmin = $derived($auth.user?.role === "admin");
 
 	onMount(async () => {
+		// Konfigurasi publik (Turnstile) — sekali, tanpa menunggu hasil.
+		void initTurnstile();
 		if (!getToken()) return;
 		try {
 			const { user } = await api<{ user: { id: string; name: string; email: string; whatsapp: string | null; role: string; created_at: string } }>("/api/auth/me");
@@ -190,6 +325,10 @@
 		}
 	}
 
+	type LoginResponse =
+		| { user: Parameters<typeof auth.login>[0]; token: string; needs2fa?: false }
+		| { needs2fa: true; challenge: string };
+
 	async function submitAuth() {
 		authLoading = true;
 		authError = "";
@@ -203,27 +342,62 @@
 							name: name.trim(),
 							email: email.trim(),
 							password,
-							whatsapp: whatsapp.trim() || undefined
+							whatsapp: whatsapp.trim() || undefined,
+							turnstile_token: turnstileToken || undefined
 						})
 					}
 				);
 				auth.login(data.user, data.token);
 			} else {
-				const data = await api<{ user: Parameters<typeof auth.login>[0]; token: string }>(
-					"/api/auth/login",
-					{
-						method: "POST",
-						body: JSON.stringify({ email: email.trim(), password })
-					}
-				);
+				const data = await api<LoginResponse>("/api/auth/login", {
+					method: "POST",
+					body: JSON.stringify({
+						email: email.trim(),
+						password,
+						turnstile_token: turnstileToken || undefined
+					})
+				});
+				if ("needs2fa" in data && data.needs2fa) {
+					// Langkah kedua: akun memakai 2FA — minta kode autentikator.
+					twofaChallenge = data.challenge;
+					twofaCode = "";
+					twofaError = "";
+					twofaUseRecovery = false;
+					twofaStep = true;
+					return;
+				}
 				auth.login(data.user, data.token);
 			}
 			waEdit = $auth.user?.whatsapp ?? "";
 			await loadTracker();
 		} catch (e) {
 			authError = e instanceof Error ? e.message : "Gagal masuk. Coba lagi ya.";
+			resetTurnstile();
 		} finally {
 			authLoading = false;
+		}
+	}
+
+	async function submit2fa() {
+		if (!twofaChallenge || twofaLoading) return;
+		twofaLoading = true;
+		twofaError = "";
+		try {
+			const data = await api<{ user: Parameters<typeof auth.login>[0]; token: string }>(
+				"/api/auth/login-2fa",
+				{
+					method: "POST",
+					body: JSON.stringify({ challenge: twofaChallenge, code: twofaCode.trim() })
+				}
+			);
+			auth.login(data.user, data.token);
+			waEdit = $auth.user?.whatsapp ?? "";
+			batal2fa();
+			await loadTracker();
+		} catch (e) {
+			twofaError = e instanceof Error ? e.message : "Kode salah. Coba lagi ya.";
+		} finally {
+			twofaLoading = false;
 		}
 	}
 
@@ -485,6 +659,61 @@
 	<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="user" size={22} /> Akun</h1>
 	<p class="text-sm text-[#5f6b62]">Masuk untuk menyimpan progres belajarmu.</p>
 
+	{#if twofaStep}
+		<!-- Langkah kedua: verifikasi dua langkah -->
+		<form
+			class="card mt-3 space-y-3 p-4 lg:max-w-xl"
+			onsubmit={(e) => {
+				e.preventDefault();
+				submit2fa();
+			}}
+		>
+			<div class="flex items-center gap-3">
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="shield" size={22} /></span>
+				<div class="min-w-0">
+					<p class="font-extrabold">Verifikasi Dua Langkah</p>
+					<p class="text-xs text-[#5f6b62]">
+						Akunmu memakai autentikator. Masukkan kode dari aplikasi autentikatormu.
+					</p>
+				</div>
+			</div>
+			<div>
+				<label class="lbl" for="2fa-code">{twofaUseRecovery ? "Kode pemulihan" : "Kode autentikator"}</label>
+				<input
+					id="2fa-code"
+					class="input text-center font-extrabold tracking-[0.3em]"
+					bind:value={twofaCode}
+					placeholder={twofaUseRecovery ? "Contoh: ABCD-1234" : "123456"}
+					maxlength={twofaUseRecovery ? undefined : 6}
+					inputmode={twofaUseRecovery ? "text" : "numeric"}
+					autocomplete="one-time-code"
+					required
+				/>
+			</div>
+			{#if twofaError}
+				<p class="err">{twofaError}</p>
+			{/if}
+			<button type="submit" class="btn btn-primary btn-block" disabled={twofaLoading}>
+				{#if twofaLoading}Memeriksa...{:else}<Icon name="key" size={16} /> Verifikasi{/if}
+			</button>
+			<div class="flex items-center justify-between gap-2 text-sm">
+				<button
+					type="button"
+					class="font-bold text-[#177245] underline"
+					onclick={() => {
+						twofaUseRecovery = !twofaUseRecovery;
+						twofaCode = "";
+						twofaError = "";
+					}}
+				>
+					{twofaUseRecovery ? "Gunakan kode autentikator" : "Gunakan kode pemulihan"}
+				</button>
+				<button type="button" class="font-bold text-[#5f6b62] underline" onclick={batal2fa}>
+					Kembali
+				</button>
+			</div>
+		</form>
+	{:else}
 	<div class="mt-4 flex gap-2">
 		<button type="button" class="chip flex-1 justify-center" class:active={mode === "login"} onclick={() => (mode = "login")}>
 			Masuk
@@ -525,10 +754,15 @@
 				class="input"
 				type="password"
 				bind:value={password}
-				placeholder={mode === "register" ? "Minimal 6 karakter" : "Password kamu"}
-				minlength={mode === "register" ? 6 : undefined}
+				placeholder={mode === "register" ? "Minimal 8 karakter" : "Password kamu"}
+				minlength={mode === "register" ? 8 : undefined}
 				required
 			/>
+			{#if mode === "register"}
+				<p class="mt-1 text-xs text-[#5f6b62]">
+					Minimal 8 karakter, jangan pakai kata sandi yang mudah ditebak atau pernah bocor.
+				</p>
+			{/if}
 		</div>
 		{#if mode === "register"}
 			<div>
@@ -542,6 +776,9 @@
 				/>
 			</div>
 		{/if}
+		{#if turnstileSiteKey}
+			<div bind:this={turnstileEl} class="flex justify-center"></div>
+		{/if}
 		{#if authError}
 			<p class="err">{authError}</p>
 		{/if}
@@ -549,6 +786,7 @@
 			{#if authLoading}Memproses...{:else if mode === "register"}<Icon name="sparkles" size={16} /> Daftar Sekarang{:else}<Icon name="rocket" size={16} /> Masuk{/if}
 		</button>
 	</form>
+	{/if}
 {:else}
 	<!-- Profil -->
 	<div class="card flex items-center gap-3 p-4">

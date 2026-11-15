@@ -20,6 +20,10 @@ export interface AppEnv {
   resendFrom: string;
   /** URL dasar situs, dipakai untuk tautan di email (bukan secret). */
   appUrl: string;
+  /** Secret server Turnstile (JANGAN PERNAH dikirim ke klien). */
+  turnstileSecretKey: string;
+  /** Site key publik Turnstile (boleh dikirim ke klien via /api/config). */
+  turnstileSiteKey: string;
 }
 
 function fromProcessEnv(): AppEnv {
@@ -33,7 +37,9 @@ function fromProcessEnv(): AppEnv {
     klikqrisWebhookSecret: p.KLIKQRIS_WEBHOOK_SECRET ?? "",
     resendApiKey: p.RESEND_API_KEY ?? "",
     resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com",
-    appUrl: p.APP_URL ?? "https://ringkas.by-rj.com"
+    appUrl: p.APP_URL ?? "https://ringkas.by-rj.com",
+    turnstileSecretKey: p.TURNSTILE_SECRET_KEY ?? "",
+    turnstileSiteKey: p.TURNSTILE_SITE_KEY ?? ""
   };
 }
 

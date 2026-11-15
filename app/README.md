@@ -58,6 +58,8 @@ Buka http://localhost:5173 (dev) atau http://localhost:8787 (setelah build).
 | `KLIKQRIS_WEBHOOK_SECRET` | bila diaktifkan | Secret validasi signature webhook. |
 | `RESEND_API_KEY` | tidak (belum dipakai) | Untuk pengiriman email bila di-wire nanti. |
 | `RESEND_FROM` | tidak | Alamat pengirim, mis. `halo@ringkas.by-rj.com`. |
+| `TURNSTILE_SECRET_KEY` | tidak | Secret key Cloudflare Turnstile (bila diisi, login/daftar memakai CAPTCHA; bila kosong, dilewati — lihat "Keamanan"). |
+| `TURNSTILE_SITE_KEY` | tidak | Site key Turnstile (bukan secret — di `[vars]` wrangler.toml, bukan `wrangler secret put`). |
 
 Tidak ada default admin. Daftarkan satu akun, lalu:
 `npm run make-admin -- email@akun.id`. Jangan menyimpan `.env` atau
@@ -201,6 +203,75 @@ menampilkan judul halaman + nama admin yang login.
   ada dipindah ke shell dashboard (pengguna jadi tabel di desktop); semua
   fungsi tetap: buat/nonaktifkan voucher, ubah role (guard demote diri
   sendiri tetap di server), set video per bab, jalankan cron manual.
+
+## Keamanan (2026-11-15, migrasi `0009_keamanan.sql`)
+
+- **Batas percobaan login:** 5 kali kata sandi salah → akun terkunci 15 menit
+  (percobaan dengan kata sandi benar pun ditolak selama terkunci, dengan
+  pesan + sisa menit; kunci selalu kedaluwarsa sendiri, tidak ada kunci
+  permanen). Email yang tidak terdaftar tetap dijawab generik "Email atau
+  password salah." Batas per IP: register maks. 10/jam/IP, checkout maks.
+  20/jam/IP (IP dari `CF-Connecting-IP`, fallback `X-Forwarded-For`, lalu
+  `"unknown"`). Tabel `auth_lockouts` + `ip_rate_limits`.
+- **Kata sandi lebih kuat** (`server/password.ts`): minimal 8 karakter,
+  ditolak bila ada di denylist lokal (~233 kata sandi paling umum), lalu
+  diperiksa ke HaveIBeenPwned lewat k-anonymity — hanya 5 karakter pertama
+  hash SHA-1 yang dikirim, pencocokan suffix dilakukan lokal; bila API
+  tidak terjangkau/timeout (2 detik), cek dilewati (fail-open, dicatat di
+  log) dan pendaftaran tidak diblokir. Berlaku di register dan reset kata
+  sandi oleh admin.
+- **2FA (TOTP) untuk admin — opt-in, bukan dipaksa:** admin mengaktifkannya
+  sendiri dari `/admin` → tab Ringkasan → kartu "Keamanan Akun (2FA)".
+  Setup: server membuat secret, menampilkan QR (SVG, pustaka `qrcode`,
+  tanpa layanan eksternal) + secret manual + 8 kode pemulihan sekali pakai
+  (disimpan sebagai hash SHA-256, hanya tampil sekali). Login admin yang
+  2FA-nya aktif: setelah kata sandi benar, server mengembalikan
+  `{needs2fa:true, challenge}` dan meminta kode 6 digit authenticator
+  (atau kode pemulihan) di `POST /api/auth/login-2fa`. TOTP dihitung manual
+  (base32 + HMAC-SHA1 WebCrypto, langkah 30 detik, toleransi ±1) —
+  `server/totp.ts`, tanpa dependensi otplib. Nonaktifkan 2FA butuh kode saat
+  ini. **Bila admin kehilangan authenticator DAN kode pemulihan**, pemilik
+  bisa menonaktifkan manual dari D1:
+  `wrangler d1 execute ringkas-db --remote --command="UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE email = 'admin@contoh.id';"`
+- **CAPTCHA Turnstile (opt-in):** buat kunci di dashboard Cloudflare
+  (Turnstile → Add Site, pilih mode Managed) → `wrangler secret put
+  TURNSTILE_SECRET_KEY` + isi `TURNSTILE_SITE_KEY` di `[vars]`
+  `wrangler.toml`. Bila secret belum disetel, login/daftar tetap berjalan
+  normal (dicatat di log `[turnstile] belum dikonfigurasi — dilewati`);
+  bila sudah disetel, widget tampil di form login/daftar dan server
+  memverifikasi token ke `siteverify` (token tidak valid → 400).
+- **Header keamanan** (`server/worker.ts`, semua respons): CSP,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`
+  (kamera/mikrofon/geolokasi dimatikan). CSP utama memakai
+  `'unsafe-inline'` di `script-src` karena `build/index.html` berisi SATU
+  `<script>` inline (bootstrap hidrasi SvelteKit) — tanpa itu SPA tidak
+  bisa boot. `/shorts/*` memakai CSP lebih longgar (`frame-ancestors
+  'self'`, tanpa `X-Frame-Options`) karena video pendek diputar di
+  `<iframe>` dari halaman Belajar. **Penting:** `[assets]` di
+  `wrangler.toml` memakai `run_worker_first = true` — tanpa itu, request
+  aset statis disajikan langsung tanpa melewati Worker, sehingga header
+  keamanan tidak akan pernah menempel di `/`, `/shorts/*`, dan berkas
+  JS/CSS (hanya `/api/*` yang terlindungi).
+- **Log aktivitas admin:** tabel `admin_audit_log` (admin, aksi, target,
+  detail, waktu) + tab "Log Aktivitas" di `/admin` (filter aksi, cari
+  email admin, pagination). Tercatat 18 aksi bermutasi: CRUD produk, ubah
+  tampil produk, link eksternal, upload/hapus gambar, set feature image,
+  ubah role, reset kata sandi, kirim ulang email, export CSV, ubah
+  settings, set video per bab, buat/nonaktifkan voucher, jalankan cron
+  manual. Pencatatan tidak pernah melempar — bila gagal, hanya dicatat di
+  log dan aksi admin tetap jalan.
+- **Backup database:** `GET /api/admin/backup` (admin saja) mengunduh dump
+  SQL lengkap (semua tabel pengguna, `INSERT OR REPLACE` agar restore ke
+  DB yang sudah dimigrasi/di-seed tidak gagal karena konflik PK) + tombol
+  "Unduh Backup" di tab Ringkasan; `last_backup_at` tercatat di `settings`
+  dan tampil di admin dengan peringatan bila sudah >7 hari. **Tidak ada
+  backup otomatis ke penyimpanan** (Worker tanpa R2 tidak punya tempat
+  menyimpan dump) — jadwalkan dari luar, mis. cron di mesin pemilik:
+  `wrangler d1 export ringkas-db --remote --output=backup-YYYYMMDD.sql`,
+  atau unduh berkala dari panel admin. Berkas backup berisi seluruh isi
+  database (termasuk hash kata sandi dan token sesi) — simpan di tempat
+  yang aman, jangan diunggah ke repo publik.
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
@@ -425,6 +496,7 @@ wrangler secret put KLIKQRIS_API_KEY
 wrangler secret put KLIKQRIS_MERCHANT_ID
 wrangler secret put KLIKQRIS_WEBHOOK_SECRET
 wrangler secret put RESEND_API_KEY
+wrangler secret put TURNSTILE_SECRET_KEY   # opsional — hanya bila memakai CAPTCHA Turnstile (lihat "Keamanan")
 ```
 
 Setiap perintah meminta nilainya secara interaktif (tidak tertulis di

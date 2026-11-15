@@ -32,6 +32,8 @@ export interface Env {
   RESEND_API_KEY?: string;
   RESEND_FROM?: string;
   APP_URL?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_SITE_KEY?: string;
 }
 
 // Aplikasi dibuat sekali per isolate Worker, lalu dipakai ulang.
@@ -47,7 +49,9 @@ function initEnv(env: Env): void {
     klikqrisWebhookSecret: env.KLIKQRIS_WEBHOOK_SECRET ?? "",
     resendApiKey: env.RESEND_API_KEY ?? "",
     resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com",
-    appUrl: env.APP_URL ?? "https://ringkas.by-rj.com"
+    appUrl: env.APP_URL ?? "https://ringkas.by-rj.com",
+    turnstileSecretKey: env.TURNSTILE_SECRET_KEY ?? "",
+    turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? ""
   });
   envReady = true;
 }
@@ -82,22 +86,81 @@ async function runScheduled(env: Env, cron: string): Promise<void> {
   }
 }
 
+// ---- Header keamanan (semua respons) ----
+//
+// CSP utama memakai 'unsafe-inline' di script-src karena build/index.html
+// SvelteKit berisi SATU <script> inline: bootstrap hidrasi
+// (__sveltekit_... + import() dinamis ke /_app/immutable/entry/*.js).
+// Tanpa 'unsafe-inline', SPA tidak bisa boot sama sekali. Semua JS lain
+// dimuat dari berkas eksternal ('self'), jadi 'unsafe-inline' di sini
+// hanya menutupi bootstrap tersebut, bukan skrip aplikasi.
+//
+// /shorts/* memakai CSP lebih longgar: halaman video pendek memakai
+// skrip inline, DAN diputar di dalam <iframe> dari halaman Belajar
+// (src/routes/belajar/[product]/+page.svelte). Karena itu:
+//   - frame-ancestors 'self' (bukan 'none'), dan
+//   - TANPA header X-Frame-Options (DENY akan memblokir iframe itu).
+// Di browser modern frame-ancestors sudah menggantikan X-Frame-Options.
+const CSP_MAIN =
+  "default-src 'self'; " +
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; " +
+  "img-src 'self' data: blob:; " +
+  "connect-src 'self' https://challenges.cloudflare.com; " +
+  "frame-src https://challenges.cloudflare.com; " +
+  "frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+
+const CSP_SHORTS =
+  "default-src 'self'; " +
+  "script-src 'self' 'unsafe-inline'; " +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; " +
+  "img-src 'self' data: blob:; " +
+  "connect-src 'self'; " +
+  "frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
+
+/**
+ * Bungkus respons dengan header keamanan. Respons dari ASSETS bersifat
+ * immutable, jadi selalu dibuat Response baru dengan body + status +
+ * header yang sama.
+ */
+function withSecurityHeaders(res: Response, pathname: string): Response {
+  const isShorts = pathname.startsWith("/shorts/");
+  const headers = new Headers(res.headers);
+  headers.set("Content-Security-Policy", isShorts ? CSP_SHORTS : CSP_MAIN);
+  // X-Frame-Options DENY memblokir <iframe> video pendek di halaman
+  // Belajar — untuk /shorts/* cukup frame-ancestors 'self' di CSP.
+  if (!isShorts) headers.set("X-Frame-Options", "DENY");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) {
-      return getApp(env).fetch(request);
+      return withSecurityHeaders(await getApp(env).fetch(request), url.pathname);
     }
     if (url.pathname.startsWith("/uploads/")) {
-      return Response.json(
-        {
-          error:
-            "Berkas gambar tidak tersedia di deployment Cloudflare — upload tidak persisten di Workers. Pasang R2 (lihat README bagian Deploy ke Cloudflare)."
-        },
-        { status: 404 }
+      return withSecurityHeaders(
+        Response.json(
+          {
+            error:
+              "Berkas gambar tidak tersedia di deployment Cloudflare — upload tidak persisten di Workers. Pasang R2 (lihat README bagian Deploy ke Cloudflare)."
+          },
+          { status: 404 }
+        ),
+        url.pathname
       );
     }
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await env.ASSETS.fetch(request), url.pathname);
   },
 
   async scheduled(
