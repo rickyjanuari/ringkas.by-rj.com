@@ -57,7 +57,12 @@
 			// tampilkan lagi supaya bisa "Lanjutkan Bayar".
 			const lastId = localStorage.getItem(LAST_ORDER_KEY);
 			if (lastId && $cart.length === 0) {
-				await loadOrder(lastId);
+				const restored = await loadOrder(lastId);
+				if (restored && restored.status === "PAID") {
+					cart.clear();
+					localStorage.removeItem(LAST_ORDER_KEY);
+					goto(`/sukses?order_id=${restored.id}`);
+				}
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memuat katalog.";
@@ -106,9 +111,9 @@
 			const data = await api<{ order: Order }>(`/api/payment/status/${order.id}`);
 			order = data.order;
 			if (data.order.status === "PAID") {
-				statusMsg = "Pembayaran berhasil! Produk sudah bisa dibuka di Ruang Belajar.";
 				cart.clear();
 				localStorage.removeItem(LAST_ORDER_KEY);
+				goto(`/sukses?order_id=${data.order.id}`);
 			} else if (data.order.status === "EXPIRED") {
 				statusMsg = "Kode QRIS ini sudah kedaluwarsa. Silakan buat pembayaran baru.";
 			} else {
@@ -143,24 +148,9 @@
 {:else if error}
 	<p class="err mt-6">{error}</p>
 {:else if order}
-	<!-- Tampilan pembayaran QRIS -->
+	<!-- Tampilan pembayaran QRIS (bila order sudah PAID, pengguna diarahkan ke /sukses) -->
 	<div class="card mt-4 p-4 text-center">
-		{#if order.status === "PAID"}
-			<p class="flex justify-center"><Icon name="party-popper" size={40} class="text-[#177245]" /></p>
-			<p class="mt-2 text-lg font-extrabold text-[#065f46]">Pembayaran Berhasil!</p>
-			<p class="mt-1 text-sm text-[#3f4a42]">Nomor order: <b>{order.id}</b></p>
-			<p class="mt-1 text-sm text-[#3f4a42]">
-				Total dibayar: <b>{formatRupiah(order.total_amount ?? order.total)}</b>
-			</p>
-			<div class="mt-4 flex flex-col gap-2">
-				<a href="/pesanan" class="btn btn-primary btn-block">Lihat Pesanan Saya</a>
-				{#each order.items as it (it.product_id)}
-					<a href={`/belajar/${it.product_id}`} class="btn btn-leaf btn-block">
-						<Icon name="book-open" size={16} /> Buka Ruang Belajar — {it.title}
-					</a>
-				{/each}
-			</div>
-		{:else if order.status === "EXPIRED"}
+		{#if order.status === "EXPIRED"}
 			<p class="flex justify-center"><Icon name="alarm-clock" size={40} class="text-[#b91c1c]" /></p>
 			<p class="mt-2 text-lg font-extrabold">Kode QRIS Kedaluwarsa</p>
 			<p class="mt-1 text-sm text-[#3f4a42]">
