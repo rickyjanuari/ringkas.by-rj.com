@@ -39,6 +39,15 @@
 	let simTimeLeft = $state(0);
 	let certLoading = $state(false);
 	let certError = $state("");
+	// ---- Mode Ujian Fokus ----
+	let focusOn = $state(false);
+	let focusSwitches = $state(0);
+	let focusUsed = $state(false);
+	let simFocusSwitches = $state(0);
+	let focusWarn = $state("");
+	let focusNotice = $state("");
+	let focusFullscreen = $state(false);
+	let focusWarnTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let simCurrent = $derived(simQuestions[simIdx]);
 	let simTotal = $derived(simQuestions.length);
@@ -63,6 +72,66 @@
 		}, 1000);
 		return () => clearInterval(t);
 	});
+
+	// Mode Ujian Fokus: hitung setiap kali anak pindah tab/jendela.
+	// Satu episode "pergi" dihitung sekali (flag away mencegah dobel
+	// dari visibilitychange + blur yang datang berbarengan). Tidak ada
+	// auto-submit dan tidak ada kunci navigasi — hanya peringatan.
+	$effect(() => {
+		if (!focusOn || !activeSim || simResult) return;
+		let away = false;
+		function markAway() {
+			if (away) return;
+			away = true;
+			focusSwitches += 1;
+			focusWarn = `Kamu pindah tab/jendela. Tetap fokus, ya! (Pindah ${focusSwitches}×)`;
+			if (focusWarnTimer) clearTimeout(focusWarnTimer);
+			focusWarnTimer = setTimeout(() => {
+				focusWarn = "";
+			}, 5000);
+		}
+		function markBack() {
+			away = false;
+		}
+		function onVis() {
+			if (document.hidden) markAway();
+			else markBack();
+		}
+		function onFsChange() {
+			focusFullscreen = !!document.fullscreenElement;
+			// Keluar layar penuh (mis. tombol Esc) tidak mematikan mode
+			// fokus — hanya beri tahu anak.
+			if (focusOn && !document.fullscreenElement) {
+				focusNotice =
+					"Layar penuh dimatikan — mode fokus tetap aktif, peringatan pindah tab masih jalan.";
+			}
+		}
+		document.addEventListener("visibilitychange", onVis);
+		window.addEventListener("blur", markAway);
+		window.addEventListener("focus", markBack);
+		document.addEventListener("fullscreenchange", onFsChange);
+		return () => {
+			document.removeEventListener("visibilitychange", onVis);
+			window.removeEventListener("blur", markAway);
+			window.removeEventListener("focus", markBack);
+			document.removeEventListener("fullscreenchange", onFsChange);
+			if (focusWarnTimer) clearTimeout(focusWarnTimer);
+		};
+	});
+
+	/** Matikan mode fokus (dan layar penuh bila masih aktif). */
+	async function keluarModeFokus() {
+		focusOn = false;
+		focusWarn = "";
+		if (typeof document !== "undefined" && document.fullscreenElement) {
+			try {
+				await document.exitFullscreen();
+			} catch {
+				/* abaikan */
+			}
+		}
+		focusFullscreen = false;
+	}
 
 	// Jumlah soal per simulasi mengikuti tabel baku di API_CONTRACT.md.
 	function simQuestionCount(sim: SimulationMeta): number {
@@ -123,13 +192,37 @@
 		}
 	}
 
-	async function mulaiSimulasi(sim: SimulationMeta) {
+	async function mulaiSimulasi(sim: SimulationMeta, useFocus = false) {
 		simNotice = "";
 		simError = "";
 		simResult = null;
 		simAnswers = {};
 		simIdx = 0;
 		simLoading = true;
+		focusOn = useFocus;
+		focusSwitches = 0;
+		focusUsed = false;
+		simFocusSwitches = 0;
+		focusWarn = "";
+		focusNotice = "";
+		focusFullscreen = false;
+		// Layar penuh: dicoba dari gestur klik ini; bila perangkat tidak
+		// mendukung (mis. sebagian HP), mode fokus tetap jalan sebagai
+		// pemantau pindah tab — bukan kegagalan.
+		if (useFocus && typeof document !== "undefined") {
+			try {
+				if (document.fullscreenEnabled && !document.fullscreenElement) {
+					await document.documentElement.requestFullscreen();
+					focusFullscreen = true;
+				} else if (!document.fullscreenEnabled) {
+					focusNotice =
+						"Perangkat ini tidak mendukung layar penuh — mode fokus tetap jalan dengan peringatan pindah tab.";
+				}
+			} catch {
+				focusNotice =
+					"Layar penuh tidak bisa dibuka — mode fokus tetap jalan dengan peringatan pindah tab.";
+			}
+		}
 		try {
 			const data = await api<SimulationPack>(`/api/simulations/${sim.id}/questions`);
 			simQuestions = data.questions;
@@ -137,17 +230,21 @@
 			simTimeLeft = data.simulation.total_minutes * 60;
 		} catch (e) {
 			simNotice = e instanceof Error ? e.message : "Soal simulasi gagal dimuat.";
+			await keluarModeFokus();
 		} finally {
 			simLoading = false;
 		}
 	}
 
 	function tutupSimulasi() {
+		void keluarModeFokus();
 		activeSim = null;
 		simQuestions = [];
 		simResult = null;
 		simAnswers = {};
 		simIdx = 0;
+		focusUsed = false;
+		simFocusSwitches = 0;
 	}
 
 	function pilihSim(opt: unknown) {
@@ -185,15 +282,29 @@
 		if (!activeSim || simSubmitting || simResult) return;
 		simSubmitting = true;
 		simError = "";
+		// Catat hitungan pindah tab SEBELUM mode fokus dimatikan.
+		focusUsed = focusOn;
+		simFocusSwitches = focusOn ? focusSwitches : 0;
 		try {
 			simResult = await api<QuizResult>("/api/quiz/submit", {
 				method: "POST",
-				body: JSON.stringify({ kind: "simulation", ref_id: activeSim.id, answers: simAnswers })
+				body: JSON.stringify({
+					kind: "simulation",
+					ref_id: activeSim.id,
+					answers: simAnswers,
+					focus_switches: simFocusSwitches
+				})
 			});
+			// Server juga mengembalikan angka yang tersimpan; pakai itu
+			// bila ada agar tampilan hasil konsisten dengan database.
+			if (typeof simResult.focus_switches === "number") {
+				simFocusSwitches = simResult.focus_switches;
+			}
 		} catch (e) {
 			simError = e instanceof Error ? e.message : "Gagal mengirim jawaban simulasi.";
 		} finally {
 			simSubmitting = false;
+			await keluarModeFokus();
 		}
 	}
 
@@ -404,6 +515,24 @@
 					</button>
 				</div>
 
+				{#if focusOn}
+					<div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-[#ecfdf5] px-3 py-2 text-xs font-bold text-[#065f46]">
+						<Icon name="eye" size={14} /> Mode Ujian Fokus aktif
+						<span class="rounded-full bg-white px-2 py-0.5">Pindah tab: {focusSwitches}×</span>
+						<button type="button" class="ml-auto underline" onclick={keluarModeFokus}>
+							<Icon name="minimize" size={13} class="inline-block align-[-2px]" /> Keluar dari Mode Fokus
+						</button>
+					</div>
+				{/if}
+				{#if focusWarn}
+					<p class="mt-2 rounded-lg bg-[#fef3c7] px-3 py-2 text-xs font-bold text-[#92400e]">
+						<Icon name="alert" size={14} class="inline-block align-[-2px]" /> {focusWarn}
+					</p>
+				{/if}
+				{#if focusNotice}
+					<p class="mt-2 text-xs text-[#5f6b62]">{focusNotice}</p>
+				{/if}
+
 				{#if !simResult && simCurrent}
 					<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {simIdx + 1} dari {simTotal}</p>
 					<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
@@ -564,6 +693,22 @@
 							<p class="err mt-2">{certError}</p>
 						{/if}
 					{/if}
+					{#if focusUsed}
+						<div class="mt-3 rounded-lg bg-[#f7f5ef] p-3 text-sm">
+							<p class="font-bold">
+								<Icon name="eye" size={15} class="inline-block align-[-2px]" /> Mode Ujian Fokus
+							</p>
+							<p class="mt-0.5 text-[#3f4a42]">
+								Kamu pindah tab {simFocusSwitches}× selama simulasi ini.
+							</p>
+							<a
+								href="/akun"
+								class="mt-1 inline-flex items-center gap-1 text-sm font-bold text-[#177245]"
+							>
+								<Icon name="chart" size={14} /> Lihat Prediksi Nilai SAS
+							</a>
+						</div>
+					{/if}
 					<div class="mt-3 space-y-2">
 						{#each simResult.review as r (r.questionId)}
 							<div class="card !rounded-lg p-3 text-sm">
@@ -623,6 +768,17 @@
 						>
 							{#if pack.simLocked}<Icon name="lock" size={16} /> Dikunci Orang Tua{:else}<Icon name="rocket" size={16} /> Mulai Simulasi{/if}
 						</button>
+						<button
+							type="button"
+							class="btn btn-outline btn-block mt-2"
+							disabled={pack.simLocked}
+							onclick={() => mulaiSimulasi(sim, true)}
+						>
+							<Icon name="maximize" size={16} /> Mulai dengan Mode Fokus
+						</button>
+						<p class="mt-1 text-center text-[11px] text-[#5f6b62]">
+							Mode Fokus: layar penuh + peringatan kalau pindah tab.
+						</p>
 					{/if}
 				</div>
 			{/each}

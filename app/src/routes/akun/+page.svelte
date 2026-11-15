@@ -17,6 +17,7 @@
 		waLink,
 		type Order,
 		type ProductPublic,
+		type PredictionData,
 		type PublicQuestion,
 		type TrackerData
 	} from "$lib/api";
@@ -44,10 +45,15 @@
 		daily: false,
 		stickers: false,
 		skor: false,
+		prediksi: false,
 		laporan: false,
 		ortu: false,
 		kelas: false
 	});
+
+	// ---- Prediksi Nilai SAS ----
+	let prediction = $state<PredictionData | null>(null);
+	let predictionError = $state("");
 
 	// ---- Sertifikat simulasi ----
 	let certDownloading = $state<number | null>(null);
@@ -149,6 +155,7 @@
 			auth.setUser(user);
 			waEdit = user.whatsapp ?? "";
 			await loadTracker();
+			await loadPrediction();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
@@ -159,6 +166,14 @@
 			tracker = await api<TrackerData>("/api/tracker");
 		} catch (e) {
 			trackerError = e instanceof Error ? e.message : "Gagal memuat progres belajar.";
+		}
+	}
+
+	async function loadPrediction() {
+		try {
+			prediction = await api<PredictionData>("/api/prediction");
+		} catch (e) {
+			predictionError = e instanceof Error ? e.message : "Gagal memuat prediksi nilai SAS.";
 		}
 	}
 
@@ -756,6 +771,95 @@
 						{#if certError}
 							<p class="err mt-2">{certError}</p>
 						{/if}
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Prediksi Nilai SAS -->
+		<div class="card overflow-hidden">
+			<button
+				type="button"
+				class="flex w-full items-center gap-3 p-4 text-left"
+				onclick={() => (open.prediksi = !open.prediksi)}
+			>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={22} /></span>
+				<span class="flex-1 text-left">
+					<span class="block font-extrabold">Prediksi Nilai SAS</span>
+					<span class="text-xs text-[#5f6b62]">
+						{prediction?.hasData
+							? `Perkiraan keseluruhan: ${prediction.overall}% dari ${prediction.totalSimulations} simulasi`
+							: "Perkiraan nilai SAS dari nilai simulasimu"}
+					</span>
+				</span>
+				<span><Icon name={open.prediksi ? "chevron-down" : "chevron-right"} size={18} /></span>
+			</button>
+			{#if open.prediksi}
+				<div class="border-t border-[#e7e2d2] p-4">
+					{#if predictionError}
+						<p class="err">{predictionError}</p>
+					{:else if !prediction}
+						<p class="text-sm text-[#5f6b62]">Memuat prediksi...</p>
+					{:else if !prediction.hasData}
+						<p class="text-sm text-[#5f6b62]">
+							Belum ada simulasi yang dikerjakan. Kerjakan satu simulasi SAS dulu, lalu prediksimu muncul di sini.
+						</p>
+						<a href="/katalog" class="btn btn-primary btn-block mt-3">
+							<Icon name="rocket" size={16} /> Cari Simulasi SAS
+						</a>
+					{:else}
+						<div class="flex items-center gap-3">
+							<span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#177245] text-xl font-extrabold text-white">
+								{prediction.overall}%
+							</span>
+							<div class="min-w-0">
+								<p class="text-sm font-extrabold">Perkiraan nilai SAS keseluruhan</p>
+								<p class="text-xs text-[#5f6b62]">
+									Dari {prediction.totalSimulations} simulasi — simulasi terbaru paling menentukan.
+								</p>
+							</div>
+						</div>
+						<div class="mt-3 space-y-2">
+							{#each prediction.subjects as s (`${s.subject}-${s.grade}`)}
+								<div class="card !rounded-lg p-3">
+									<div class="flex items-baseline justify-between gap-2">
+										<p class="text-sm font-bold">{s.subject} • Kelas {s.grade}</p>
+										<p class="text-sm font-extrabold text-[#177245]">{s.prediction}%</p>
+									</div>
+									<div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
+										<div
+											class="h-full bg-[#177245] transition-all"
+											style="width: {Math.max(0, Math.min(100, s.prediction))}%"
+										></div>
+									</div>
+									<p class="mt-1 text-xs text-[#5f6b62]">
+										{s.attempts} simulasi • terakhir {s.latest_percent}% ({formatTanggal(s.latest_at)})
+									</p>
+								</div>
+							{/each}
+						</div>
+						{#if prediction.weakChapters.length > 0}
+							<p class="mt-4 text-sm font-bold">Bab yang perlu diulang</p>
+							<div class="mt-2 space-y-2">
+								{#each prediction.weakChapters as w (w.chapter_id)}
+									<a
+										href={`/belajar/${w.product_id}/${w.chapter_id}`}
+										class="card !rounded-lg flex items-center gap-3 p-3"
+									>
+										<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"><Icon name="book-open" size={17} /></span>
+										<span class="min-w-0 flex-1">
+											<span class="block truncate text-sm font-bold">{w.title}</span>
+											<span class="block text-xs text-[#5f6b62]">{w.reason}</span>
+										</span>
+										<Icon name="chevron-right" size={16} class="shrink-0 text-[#9aa096]" />
+									</a>
+								{/each}
+							</div>
+						{/if}
+						<p class="mt-3 flex items-start gap-1.5 text-[11px] text-[#5f6b62]">
+							<Icon name="info" size={13} class="mt-0.5 shrink-0" />
+							<span>Perkiraan, bukan nilai resmi — nilai SAS sebenarnya ditentukan oleh sekolah.</span>
+						</p>
 					{/if}
 				</div>
 			{/if}

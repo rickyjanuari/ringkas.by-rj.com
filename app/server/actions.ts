@@ -248,6 +248,13 @@ function asNumber(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
+/** Hitungan pindah tab Mode Ujian Fokus: bilangan bulat 0–999; selain itu 0. */
+function clampFocusSwitches(v: unknown): number {
+  const n = asNumber(v);
+  if (n === undefined) return 0;
+  return Math.max(0, Math.min(999, Math.floor(n)));
+}
+
 /** Normalisasi nomor WhatsApp ke 62xx; null bila tidak valid. */
 function normalizeWhatsapp(input: string): string | null {
   let s = input.replace(/[\s\-().]/g, "");
@@ -600,6 +607,120 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       stickers,
       scores
     });
+  });
+
+  // ------------------------- Prediksi nilai SAS -------------------------
+  // Perkiraan nilai SAS dari rata-rata BERBOBOT skor simulasi per mapel:
+  // di tiap mapel, simulasi lama berbobot 1, makin baru makin berat
+  // (bobot = urutan ke-i, jadi simulasi terbaru paling menentukan).
+  // Hanya simulasi SAS per mapel (kind = 'simulation') yang dipakai,
+  // bukan kuis bab 10 soal. Hasilnya perkiraan, bukan nilai resmi.
+
+  app.get("/api/prediction", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+
+    const attempts = await db.all<{
+      ref_id: string;
+      score: number;
+      max_score: number;
+      created_at: string;
+      subject: string;
+      grade: number;
+      product_id: string | null;
+      title: string;
+    }>(
+      `SELECT qa.ref_id, qa.score, qa.max_score, qa.created_at,
+              s.subject, s.grade, s.product_id, s.title
+       FROM quiz_attempts qa JOIN simulations s ON s.id = qa.ref_id
+       WHERE qa.user_id = ? AND qa.kind = 'simulation'
+       ORDER BY qa.created_at ASC, qa.id ASC`,
+      user.id
+    );
+    if (attempts.length === 0) {
+      return c.json({ hasData: false, overall: null, totalSimulations: 0, subjects: [], weakChapters: [] });
+    }
+
+    const groups = new Map<string, typeof attempts>();
+    for (const a of attempts) {
+      const key = `${a.subject}|||${a.grade}`;
+      const arr = groups.get(key) ?? [];
+      arr.push(a);
+      groups.set(key, arr);
+    }
+    const subjects = [...groups.values()]
+      .map((arr) => {
+        const last = arr[arr.length - 1];
+        let weighted = 0;
+        let weightSum = 0;
+        arr.forEach((a, i) => {
+          const pct = a.max_score > 0 ? (a.score / a.max_score) * 100 : 0;
+          const w = i + 1;
+          weighted += pct * w;
+          weightSum += w;
+        });
+        return {
+          subject: last.subject,
+          grade: last.grade,
+          product_id: last.product_id,
+          prediction: Math.round(weighted / weightSum),
+          attempts: arr.length,
+          latest_percent: last.max_score > 0 ? Math.round((last.score / last.max_score) * 100) : 0,
+          latest_at: last.created_at
+        };
+      })
+      .sort((a, b) => a.prediction - b.prediction || a.subject.localeCompare(b.subject));
+    const overall = Math.round(subjects.reduce((sum, s) => sum + s.prediction, 0) / subjects.length);
+
+    // Bab yang perlu diulang: dari 2 mapel terlemah, utamakan bab yang
+    // belum selesai; bila semua sudah selesai, sarankan ulang bab awal.
+    const done = new Set(
+      (await db.all<{ chapter_id: string }>("SELECT chapter_id FROM tracker WHERE user_id = ?", user.id)).map(
+        (r) => r.chapter_id
+      )
+    );
+    const weakChapters: {
+      chapter_id: string;
+      product_id: string;
+      title: string;
+      subject: string;
+      grade: number;
+      reason: string;
+    }[] = [];
+    for (const s of subjects.slice(0, 2)) {
+      if (weakChapters.length >= 3) break;
+      let chs = s.product_id
+        ? await db.all<{ id: string; product_id: string; title: string; subject: string; grade: number }>(
+            "SELECT id, product_id, title, subject, grade FROM chapters WHERE product_id = ? AND subject = ? AND grade = ? ORDER BY sort_order, id",
+            s.product_id,
+            s.subject,
+            s.grade
+          )
+        : [];
+      if (chs.length === 0) {
+        chs = await db.all<{ id: string; product_id: string; title: string; subject: string; grade: number }>(
+          "SELECT id, product_id, title, subject, grade FROM chapters WHERE subject = ? AND grade = ? ORDER BY sort_order, id",
+          s.subject,
+          s.grade
+        );
+      }
+      const notDone = chs.filter((ch) => !done.has(ch.id));
+      const picks = (notDone.length > 0 ? notDone : chs).slice(0, 3 - weakChapters.length);
+      for (const ch of picks) {
+        weakChapters.push({
+          chapter_id: ch.id,
+          product_id: ch.product_id,
+          title: ch.title,
+          subject: ch.subject,
+          grade: ch.grade,
+          reason:
+            notDone.length > 0
+              ? `${s.subject} Kelas ${s.grade} masih ${s.prediction}% — pelajari bab ini, yuk!`
+              : `${s.subject} Kelas ${s.grade} masih ${s.prediction}% — ulang lagi bab ini!`
+        });
+      }
+    }
+    return c.json({ hasData: true, overall, totalSimulations: attempts.length, subjects, weakChapters });
   });
 
   app.get("/api/stickers", async (c) => {
@@ -1740,14 +1861,18 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       review.push({ questionId: q.id, correct: result.correct, discussion: q.discussion });
     }
     const score = Math.round(totalEarned);
+    // Mode Ujian Fokus: hitungan pindah tab/jendela selama simulasi
+    // (hanya kind = simulation; jenis lain selalu 0).
+    const focusSwitches = kind === "simulation" ? clampFocusSwitches(body.focus_switches) : 0;
     const inserted = await db.run(
-      "INSERT INTO quiz_attempts (user_id, kind, ref_id, score, max_score, answers, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO quiz_attempts (user_id, kind, ref_id, score, max_score, answers, focus_switches, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       user.id,
       kind,
       refId,
       score,
       maxScore,
       JSON.stringify(answers),
+      focusSwitches,
       nowIso()
     );
     await markStudyDay(db, user.id);
@@ -1759,7 +1884,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       correct,
       review,
       attempt_id: Number(inserted.lastInsertRowid),
-      passed
+      passed,
+      focus_switches: focusSwitches
     });
   });
 

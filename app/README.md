@@ -146,7 +146,7 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 - Admin: `GET/POST/PUT/DELETE /api/admin/products`, `POST .../active`, `.../external-link`, `.../images`, `.../feature`, `DELETE /api/admin/images/:id`, `GET /api/admin/users`, `POST /api/admin/users/:id/role`, `POST /api/admin/chapters/:id/video`, `GET/POST /api/admin/vouchers`, `POST /api/admin/vouchers/:code/active`, `POST /api/admin/cron/run` (`{job: 'daily'|'weekly', date?}`)
 - Checkout KlikQRIS: `POST /api/checkout` (idempotency key, `voucher_code` opsional), `GET /api/voucher/validate?code=&total=`, `GET /api/payment/status/:order_id`, `POST /api/webhook/klikqris`
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
-- Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/study/:product_id/:chapter_id/worksheet`
+- Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed` + `focus_switches`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/prediction` (prediksi nilai SAS), `GET /api/study/:product_id/:chapter_id/worksheet`
 - Keluarga & kelas: `POST /api/parent/link|redeem`, `GET /api/parent/children`, `POST /api/parent/lock|target`, `POST /api/class`, `POST /api/class/join`, `GET /api/class/:id`, `GET /api/class/:id/recap` (CSV)
 - Admin statistik: `GET /api/admin/stats` (hanya admin) — kartu Ringkasan + 10 order terbaru
 
@@ -215,9 +215,26 @@ di Akun/tracker. Tidak ada endpoint/tabel/migrasi baru — peta memakai
 ulang `GET /api/study/:product_id` + `GET /api/tracker`. Tab bar bawah
 disembunyikan di rute ini (seperti halaman Belajar).
 
+**Mode Ujian Fokus + Prediksi Nilai SAS (2026-11-15):** tiap kartu
+Simulasi SAS di Ruang Belajar punya tombol "Mulai dengan Mode Fokus"
+(selain "Mulai Simulasi" biasa, tanpa paksaan): layar penuh (Fullscreen
+API; bila perangkat tidak mendukung, mode tetap jalan sebagai pemantau
+pindah tab) + peringatan ramah dan hitungan setiap kali anak pindah
+tab/jendela — satu episode dihitung sekali, tanpa auto-submit, tanpa
+kunci navigasi; Esc dari layar penuh tidak mematikan mode fokus.
+Hitungan terkirim sebagai `focus_switches` di `POST /api/quiz/submit`
+dan tampil di layar hasil (kolom `quiz_attempts.focus_switches`,
+migrasi `0006_mode_fokus.sql` — terapkan remote SEBELUM deploy).
+Kartu "Prediksi Nilai SAS" di Akun: perkiraan nilai (0–100) dari
+rata-rata berbobot skor simulasi per mapel (simulasi terbaru paling
+berat), plus 3 bab yang perlu diulang dari 2 mapel terlemah, dengan
+label jujur "Perkiraan, bukan nilai resmi"; tanpa simulasi sama sekali
+→ ajakan mengerjakan simulasi, bukan angka kosong. Endpoint
+`GET /api/prediction`, tanpa tabel baru.
+
 **Sudah jalan dan dites:**
 - `npm run build` hijau (vite build + `tsc -p tsconfig.server.json --noEmit`).
-- Server boot, migrasi 0001–0005 teraplikasi, seed: **57 produk**
+- Server boot, migrasi 0001–0006 teraplikasi, seed: **57 produk**
   (19 SD aktif di katalog pembeli — 13 produk + 6 bundel kelas,
   38 non-SD `active=0`), **148 bab**,
   **740 flashcard**, **3.396 soal**, **58 simulasi**.
@@ -241,7 +258,7 @@ disembunyikan di rute ini (seperti halaman Belajar).
   - `npm run build` hijau; `wrangler deploy --dry-run` hijau tanpa auth
     (konfigurasi valid, 39 file aset = 1.175 KB / 295,9 KB gzip, binding
     D1 + ASSETS + `RESEND_FROM` terbaca).
-  - `wrangler d1 migrations apply ringkas-db --local`: 5/5 migrasi ✅.
+  - `wrangler d1 migrations apply ringkas-db --local`: 6/6 migrasi ✅.
   - `wrangler d1 execute ringkas-db --local --file=server/seed/seed.sql`:
     seed masuk D1 lokal dengan jumlah sama persis seperti Node — 57 produk
     (19 aktif), 148 bab, 740 flashcard, 3.396 soal, 58 simulasi.

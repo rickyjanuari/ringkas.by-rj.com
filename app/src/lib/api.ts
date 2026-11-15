@@ -100,6 +100,33 @@ export interface QuizResult {
 	attempt_id?: number;
 	/** Lulus = skor/max >= 70% dan kind === 'simulation'. */
 	passed?: boolean;
+	/** Hitungan pindah tab/jendela saat Mode Ujian Fokus (kind === 'simulation'). */
+	focus_switches?: number;
+}
+
+export interface PredictionSubject {
+	subject: string;
+	grade: number;
+	product_id: string | null;
+	prediction: number;
+	attempts: number;
+	latest_percent: number;
+	latest_at: string;
+}
+
+export interface PredictionData {
+	hasData: boolean;
+	overall: number | null;
+	totalSimulations: number;
+	subjects: PredictionSubject[];
+	weakChapters: {
+		chapter_id: string;
+		product_id: string;
+		title: string;
+		subject: string;
+		grade: number;
+		reason: string;
+	}[];
 }
 
 export interface StudyPack {
