@@ -8,6 +8,7 @@ import { TEMPLATE_04_EXPIRED_HTML } from "./email-templates/04-expired.js";
 import { TEMPLATE_05_WEEKLY_HTML } from "./email-templates/05-weekly.js";
 import { TEMPLATE_06_REMINDER_HTML } from "./email-templates/06-reminder.js";
 import { TEMPLATE_07_STREAK_HTML } from "./email-templates/07-streak.js";
+import { TEMPLATE_08_GIFT_HTML } from "./email-templates/08-gift.js";
 
 // ---------------------------------------------------------------------------
 // Pengiriman email otomatis via Resend (gratis: 3.000/bln, maks 100/hari).
@@ -15,6 +16,9 @@ import { TEMPLATE_07_STREAK_HTML } from "./email-templates/07-streak.js";
 // Pemicu (fire-and-forget, lihat server/actions.ts):
 //   register → welcome | checkout (QRIS dibuat) → pending
 //   PAID terdeteksi (webhook / polling status) → paid
+//   PAID order hadiah terdeteksi → gift (ke PENERIMA, bukan pembeli;
+//     email paid TIDAK dikirim untuk order hadiah — salinan template
+//     03 ("materimu sudah terbuka") salah untuk pembeli hadiah).
 //   EXPIRED terdeteksi (pemeriksaan status) → expired
 //   cron harian (server/cron.ts) → reminder (anak 3 hari tidak belajar)
 //     + streak (milestone 7/14/21/28 hari)
@@ -75,6 +79,12 @@ export interface OrderForEmail {
   total_amount: number | null;
   expired_at: string | null;
   paid_at: string | null;
+  /** Kolom hadiah (migrasi 0010) — hanya terisi untuk order hadiah. */
+  gift_recipient_email?: string | null;
+  gift_recipient_name?: string | null;
+  gift_message?: string | null;
+  gift_claim_token?: string | null;
+  gift_claim_expires_at?: string | null;
 }
 
 export type EmailTemplateKey =
@@ -84,7 +94,8 @@ export type EmailTemplateKey =
   | "expired"
   | "weekly-report"
   | "reminder"
-  | "streak";
+  | "streak"
+  | "gift";
 
 export interface SendEmailResult {
   sent: boolean;
@@ -100,7 +111,8 @@ const TEMPLATES: Record<EmailTemplateKey, string> = {
   expired: TEMPLATE_04_EXPIRED_HTML,
   "weekly-report": TEMPLATE_05_WEEKLY_HTML,
   reminder: TEMPLATE_06_REMINDER_HTML,
-  streak: TEMPLATE_07_STREAK_HTML
+  streak: TEMPLATE_07_STREAK_HTML,
+  gift: TEMPLATE_08_GIFT_HTML
 };
 
 /** URL dasar situs untuk tautan di email (bisa diubah lewat var APP_URL). */
@@ -521,6 +533,44 @@ export async function sendExpiredEmail(
       total: formatRupiah(order.total_amount ?? order.total),
       batas_bayar: formatTanggal(order.expired_at),
       url_katalog: `${base}/katalog`
+    },
+    orderId: order.id,
+    force: opts?.force
+  });
+}
+
+/** Order hadiah LUNAS → template 08 ke PENERIMA (sekali per order).
+ * Bila penerima belum punya akun, email ini satu-satunya jalan klaim;
+ * bila sudah punya akun, akses sudah diberikan saat PAID dan tautan
+ * claim di email ini berfungsi sebagai cadangan. Batas klaim tampil
+ * sebagai tanggal WIB (formatTanggal). Pesan kosong diganti kalimat
+ * baku supaya placeholder {{pesan}} selalu terisi. */
+export async function sendGiftEmail(
+  db: DB,
+  order: OrderForEmail,
+  opts?: { force?: boolean }
+): Promise<SendEmailResult> {
+  if (order.status !== "PAID") return { sent: false, error: "Order belum lunas." };
+  const recipientEmail = (order.gift_recipient_email ?? "").trim().toLowerCase();
+  if (!recipientEmail || !order.gift_claim_token) {
+    return { sent: false, error: "Order ini bukan order hadiah." };
+  }
+  const buyer = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
+  const items = parseItems(order.items);
+  const produk = items.map((it) => it.title).join(", ") || "Rangkuman Ringkas";
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "gift",
+    to: recipientEmail,
+    subject: `${buyer?.name ?? "Seseorang"} membelikanmu hadiah di Ringkas!`,
+    variables: {
+      nama_penerima: (order.gift_recipient_name ?? "").trim() || "Teman Belajar",
+      nama_pemberi: buyer?.name ?? "Seseorang",
+      produk,
+      pesan: (order.gift_message ?? "").trim() || "Selamat belajar — semoga bermanfaat!",
+      url_claim: `${base}/hadiah?token=${order.gift_claim_token}`,
+      batas_claim: formatTanggal(order.gift_claim_expires_at ?? null),
+      email: recipientEmail
     },
     orderId: order.id,
     force: opts?.force

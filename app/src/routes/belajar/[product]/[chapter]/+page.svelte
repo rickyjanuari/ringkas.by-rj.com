@@ -48,6 +48,66 @@
 	let currentQ = $derived(chapter ? chapter.quiz[qIndex] : undefined);
 	let totalQ = $derived(chapter ? chapter.quiz.length : 0);
 
+	// Tanya Jawab per bab (migrasi 0011).
+	interface QaItem {
+		id: number;
+		asker_name: string;
+		question: string;
+		answer: string | null;
+		status: string;
+		status_label: string;
+		created_at: string;
+		answered_at: string | null;
+		mine: boolean;
+	}
+	let qaList = $state<QaItem[]>([]);
+	let qaLoading = $state(false);
+	let qaText = $state("");
+	let qaSending = $state(false);
+	let qaMsg = $state("");
+	let qaError = $state("");
+
+	async function muatQa() {
+		if (!chapter) return;
+		qaLoading = true;
+		qaError = "";
+		try {
+			const data = await api<{ questions: QaItem[] }>(
+				`/api/qa/questions?product=${encodeURIComponent(productId ?? "")}&chapter=${encodeURIComponent(chapterId ?? "")}`
+			);
+			qaList = data.questions ?? [];
+		} catch (e) {
+			qaError = e instanceof Error ? e.message : "Gagal memuat tanya jawab.";
+		} finally {
+			qaLoading = false;
+		}
+	}
+
+	async function kirimPertanyaan() {
+		if (!chapter || qaSending) return;
+		qaSending = true;
+		qaMsg = "";
+		try {
+			const data = await api<{ question: QaItem }>(`/api/qa/questions`, {
+				method: "POST",
+				body: JSON.stringify({ product: productId, chapter: chapterId, question: qaText })
+			});
+			qaList = [data.question, ...qaList];
+			qaText = "";
+			qaMsg = "Pertanyaan terkirim — menunggu moderasi admin.";
+		} catch (e) {
+			qaMsg = e instanceof Error ? e.message : "Gagal mengirim pertanyaan.";
+		} finally {
+			qaSending = false;
+		}
+	}
+
+	function qaBadge(status: string): string {
+		if (status === "answered") return "badge badge-leaf";
+		if (status === "pending") return "badge badge-sun";
+		return "badge badge-gray";
+	}
+
 	onMount(async () => {
 		if (!getToken()) {
 			goto("/akun");
@@ -58,6 +118,7 @@
 			const found = pack.chapters.find((c) => c.id === chapterId);
 			if (!found) throw new Error("Bab tidak ditemukan.");
 			chapter = found;
+			void muatQa();
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memuat bab.";
 		} finally {
@@ -398,5 +459,75 @@
 		{/if}
 	</div>
 		</div>
+	</div>
+
+	<!-- Tanya Jawab per Bab -->
+	<div class="card mt-4 p-4">
+		<h2 class="flex items-center gap-2 text-base font-extrabold"><Icon name="message" size={18} /> Tanya tentang Bab Ini</h2>
+		<p class="mt-1 text-xs text-[#5f6b62]">
+			Ada yang belum paham dari bab ini? Tanyakan di sini — pertanyaan yang disetujui admin tampil untuk semua pembaca bab ini.
+		</p>
+		{#if chapter.locked}
+			<p class="mt-3 rounded-lg bg-[#ece9dc] px-3 py-2 text-sm font-bold text-[#3f4a42]">
+				<Icon name="lock" size={14} class="inline-block align-[-2px]" /> Beli produk untuk bisa bertanya tentang bab ini.
+			</p>
+		{:else}
+			<form
+				class="mt-3"
+				onsubmit={(e) => {
+					e.preventDefault();
+					kirimPertanyaan();
+				}}
+			>
+				<label class="lbl" for="qa-text">Pertanyaanmu (maks. 300 karakter)</label>
+				<textarea
+					id="qa-text"
+					class="input"
+					rows="2"
+					maxlength="300"
+					bind:value={qaText}
+					placeholder="Contoh: Kenapa 7 + 5 sama dengan 12?"
+					required
+				></textarea>
+				<div class="mt-2 flex items-center gap-2">
+					<button type="submit" class="btn btn-primary text-xs" disabled={qaSending || !qaText.trim()}>
+						{#if qaSending}Mengirim...{:else}<Icon name="message" size={15} /> Kirim Pertanyaan{/if}
+					</button>
+					<span class="text-xs text-[#5f6b62]">{qaText.length}/300 karakter</span>
+					{#if qaMsg}
+						<span class="text-xs font-bold {qaMsg.startsWith('Pertanyaan terkirim') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{qaMsg}</span>
+					{/if}
+				</div>
+			</form>
+		{/if}
+		{#if qaLoading}
+			<p class="mt-3 text-center text-sm font-semibold text-[#5f6b62]">Memuat pertanyaan...</p>
+		{:else if qaError}
+			<p class="err mt-3">{qaError}</p>
+		{:else if qaList.length === 0}
+			<p class="mt-3 text-sm text-[#5f6b62]">Belum ada pertanyaan untuk bab ini. Jadilah yang pertama bertanya!</p>
+		{:else}
+			<div class="mt-3 space-y-3">
+				{#each qaList as q (q.id)}
+					<div class="card !rounded-lg p-3 text-sm">
+						<p class="flex flex-wrap items-center gap-1.5">
+							<span class="font-extrabold">{q.asker_name}</span>
+							{#if q.mine}<span class={qaBadge(q.status)}>{q.status_label}</span>{/if}
+						</p>
+						<p class="mt-1 leading-relaxed">{q.question}</p>
+						{#if q.answer}
+							<div class="mt-2 rounded-lg bg-[#ecfdf5] px-3 py-2">
+								<p class="text-xs font-extrabold text-[#065f46]">
+									<Icon name="check-circle" size={13} class="inline-block align-[-2px]" /> Jawaban Admin
+								</p>
+								<p class="mt-0.5 leading-relaxed">{q.answer}</p>
+							</div>
+						{:else if q.status === "approved"}
+							<p class="mt-2 text-xs font-bold text-[#5f6b62]">Menunggu jawaban admin.</p>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}

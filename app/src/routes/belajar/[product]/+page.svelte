@@ -364,6 +364,9 @@
 		<a href="/soal-sulitku" class="btn btn-outline">
 			<Icon name="target" size={16} /> Soal Sulitku
 		</a>
+		<a href="/rapor" class="btn btn-outline">
+			<Icon name="graduation-cap" size={16} /> Unduh Rapor Semester
+		</a>
 	</div>
 
 	{#if pack.externalUrl}

@@ -21,7 +21,18 @@
 	let whatsapp = $state("");
 	let creating = $state(false);
 	let checking = $state(false);
-	let order = $state<Order | null>(null);
+	// ---- Beli sebagai hadiah ----
+	let giftOn = $state(false);
+	let giftEmail = $state("");
+	let giftName = $state("");
+	let giftMessage = $state("");
+	let giftError = $state("");
+	type OrderGift = Order & {
+		is_gift?: boolean;
+		gift_recipient_email?: string | null;
+		gift_recipient_name?: string | null;
+	};
+	let order = $state<OrderGift | null>(null);
 	let createError = $state("");
 	let statusMsg = $state("");
 
@@ -121,17 +132,42 @@
 
 	async function buatQris() {
 		if (creating || items.length === 0) return;
+		// Validasi hadiah di sisi klien (server memvalidasi ulang):
+		// email penerima wajib + valid, bukan email sendiri, pesan <= 200.
+		giftError = "";
+		if (giftOn) {
+			const emailPenerima = giftEmail.trim().toLowerCase();
+			if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailPenerima)) {
+				giftError = "Email penerima hadiah wajib diisi dengan format yang benar.";
+				return;
+			}
+			if ($auth.user?.email && emailPenerima === $auth.user.email.toLowerCase()) {
+				giftError = "Hadiah tidak bisa dikirim ke emailmu sendiri.";
+				return;
+			}
+			if (giftMessage.length > 200) {
+				giftError = "Pesan hadiah maksimal 200 karakter.";
+				return;
+			}
+		}
 		creating = true;
 		createError = "";
 		statusMsg = "";
 		try {
-			const data = await api<{ order: Order }>("/api/checkout", {
+			const data = await api<{ order: OrderGift }>("/api/checkout", {
 				method: "POST",
 				body: JSON.stringify({
 					items: items.map((p) => p.id),
 					idempotency_key: newIdempotencyKey(),
 					whatsapp: whatsapp.trim() || undefined,
-					voucher_code: appliedVoucher?.code ?? undefined
+					voucher_code: appliedVoucher?.code ?? undefined,
+					...(giftOn
+						? {
+								gift_recipient_email: giftEmail.trim(),
+								gift_recipient_name: giftName.trim() || undefined,
+								gift_message: giftMessage.trim() || undefined
+							}
+						: {})
 				})
 			});
 			order = data.order;
@@ -216,6 +252,15 @@
 			<p class="mt-3 text-2xl font-extrabold text-[#177245]">
 				{formatRupiah(order.total_amount ?? order.total)}
 			</p>
+			{#if order.is_gift}
+				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-bold text-[#22302a]">
+					<Icon name="package" size={16} class="shrink-0" />
+					<span>
+						Hadiah untuk {order.gift_recipient_name ?? order.gift_recipient_email} — aksesnya
+						milik penerima, bukan kamu.
+					</span>
+				</p>
+			{/if}
 			{#if order.discount_amount}
 				<p class="mt-1 text-sm font-bold text-[#065f46]">
 					Diskon voucher{#if order.voucher_code} ({order.voucher_code}){/if}: -{formatRupiah(
@@ -346,6 +391,65 @@
 		<p class="mt-1 text-xs text-[#5f6b62]">
 			Bila diisi, nomor ini dipakai untuk info pesananmu.
 		</p>
+	</div>
+
+	<!-- Beli sebagai hadiah -->
+	<div class="card mt-3 p-4">
+		<label class="flex cursor-pointer items-start gap-2.5">
+			<input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-[#177245]" bind:checked={giftOn} />
+			<span>
+				<span class="flex items-center gap-1.5 font-extrabold">
+					<Icon name="package" size={17} /> Beli sebagai hadiah
+				</span>
+				<span class="mt-0.5 block text-xs text-[#5f6b62]">
+					Produk dikirim ke email penerima. Aksesnya milik penerima — bukan akunmu.
+				</span>
+			</span>
+		</label>
+		{#if giftOn}
+			<div class="mt-3 space-y-3">
+				<div>
+					<label class="lbl" for="gift-email">Email penerima (wajib)</label>
+					<input
+						id="gift-email"
+						class="input"
+						type="email"
+						placeholder="penerima@contoh.id"
+						bind:value={giftEmail}
+						required
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="gift-nama">Nama penerima (opsional)</label>
+					<input
+						id="gift-nama"
+						class="input"
+						type="text"
+						placeholder="Nama penerima hadiah"
+						maxlength={100}
+						bind:value={giftName}
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="gift-pesan">Pesan singkat (opsional)</label>
+					<textarea
+						id="gift-pesan"
+						class="input min-h-16 resize-y"
+						placeholder="Tulis pesan untuk penerima..."
+						maxlength={200}
+						bind:value={giftMessage}
+					></textarea>
+					<p class="mt-1 text-right text-xs text-[#5f6b62]">{giftMessage.length}/200</p>
+				</div>
+				<p class="text-xs text-[#5f6b62]">
+					Setelah lunas, penerima mendapat email berisi tautan klaim (berlaku 30 hari).
+					Bila email penerima sudah punya akun Ringkas, akses langsung masuk ke akunnya.
+				</p>
+			</div>
+		{/if}
+		{#if giftError}
+			<p class="err mt-2">{giftError}</p>
+		{/if}
 	</div>
 
 	{#if createError}

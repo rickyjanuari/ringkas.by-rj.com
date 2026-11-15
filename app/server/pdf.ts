@@ -33,6 +33,10 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 const BLUE = rgb(0.133, 0.451, 0.847); // #2273d8
 const GRAY = rgb(0.333, 0.333, 0.333); // #555555
 const BLACK = rgb(0.067, 0.067, 0.067); // #111111
+const EMERALD = rgb(0.09, 0.45, 0.27); // #177245
+const MARIGOLD = rgb(0.95, 0.7, 0.24); // #f2b33d
+const LIGHT_LINE = rgb(0.906, 0.886, 0.824); // #e7e2d2
+const BAR_BG = rgb(0.906, 0.886, 0.824); // #e7e2d2
 
 const CHAR_MAP: Record<string, string> = {
   "→": "->",
@@ -173,6 +177,64 @@ class Doc {
       color: BLUE
     });
     this.moveDown(1);
+  }
+
+  /** Kepala dokumen gaya Ringkas (emerald + garis marigold) — dipakai rapor. */
+  emeraldHeader(title: string): void {
+    this.boldText("Ringkas", 22, EMERALD);
+    this.text("Rangkuman Materi SD, SMP, SMA", 10, GRAY);
+    this.moveDown(0.5);
+    this.boldText(title, 16);
+    this.moveDown(0.25);
+    this.page.drawLine({
+      start: { x: MARGIN, y: PAGE_H - this.y },
+      end: { x: PAGE_W - MARGIN, y: PAGE_H - this.y },
+      thickness: 2,
+      color: MARIGOLD
+    });
+    this.moveDown(1);
+  }
+
+  /** Judul seksi rapor: tebal, emerald, dengan garis tipis di bawahnya. */
+  section(title: string): void {
+    this.moveDown(0.5);
+    this.boldText(title, 13, EMERALD);
+    this.page.drawLine({
+      start: { x: MARGIN, y: PAGE_H - this.y },
+      end: { x: PAGE_W - MARGIN, y: PAGE_H - this.y },
+      thickness: 0.5,
+      color: LIGHT_LINE
+    });
+    this.moveDown(0.75);
+  }
+
+  /** Bilah progres sederhana: label + persen, lalu batang emerald. */
+  progressBar(label: string, percent: number): void {
+    const size = 10;
+    const pct = Math.max(0, Math.min(100, Math.round(percent)));
+    this.ensureSpace(size * 1.5 + 14);
+    const labelText = sanitize(`${label}: ${pct}%`);
+    this.page.drawText(labelText, {
+      x: MARGIN,
+      y: PAGE_H - this.y - size,
+      size,
+      font: this.bold,
+      color: BLACK
+    });
+    this.y += size * 1.5;
+    const barH = 8;
+    const barY = PAGE_H - this.y - barH;
+    this.page.drawRectangle({ x: MARGIN, y: barY, width: CONTENT_W, height: barH, color: BAR_BG });
+    if (pct > 0) {
+      this.page.drawRectangle({
+        x: MARGIN,
+        y: barY,
+        width: (CONTENT_W * pct) / 100,
+        height: barH,
+        color: EMERALD
+      });
+    }
+    this.y += barH + 6;
   }
 
   addPage(): void {
@@ -387,5 +449,123 @@ export async function productPdf(product: Product, chapters: Chapter[]): Promise
     }
     doc.moveDown(0.75);
   }
+  return doc.bytes();
+}
+
+// ---------------------------------------------------------------------------
+// Rapor Digital Semester
+// ---------------------------------------------------------------------------
+
+/** Satu nilai simulasi SAS untuk daftar rincian di rapor. */
+export interface RaporAttempt {
+  title: string;
+  percent: number;
+  dateLabel: string;
+}
+
+/** Nilai per mapel: prediksi memakai rumus yang sama seperti
+ *  /api/prediction (rata-rata BERBOBOT — simulasi terbaru paling berat),
+ *  average adalah rata-rata sederhana semua simulasi mapel itu. */
+export interface RaporSubject {
+  subject: string;
+  grade: number;
+  /** Produk asal simulasi terakhir mapel ini (untuk mencari bab lemah). */
+  product_id: string | null;
+  prediction: number | null;
+  average: number;
+  attempts: number;
+  latestPercent: number;
+  latestAt: string;
+  scores: RaporAttempt[];
+}
+
+export interface RaporData {
+  studentName: string;
+  /** Nomor kelas (1-6) bila bisa diturunkan dari data belajar; null bila belum ada data. */
+  grade: number | null;
+  /** Contoh: "Semester 1 - Tahun Ajaran 2026/2027". */
+  period: string;
+  generatedLabel: string;
+  streak: number;
+  studyDaysCount: number;
+  doneChapters: number;
+  totalSimulations: number;
+  overallPrediction: number | null;
+  subjects: RaporSubject[];
+  weakChapters: { title: string; subject: string; grade: number; reason: string }[];
+}
+
+/** Tanggal saja, Indonesia, tanpa jam: "15 November 2026". */
+function formatHari(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+/** Rapor semester (A4 portrait, gaya emerald/marigold seperti sertifikat). */
+export async function raporPdf(data: RaporData): Promise<Uint8Array> {
+  const doc = await Doc.create();
+  doc.emeraldHeader("Rapor Semester");
+  doc.keyValue("Nama:", data.studentName);
+  doc.keyValue("Kelas:", data.grade ? `Kelas ${data.grade}` : "-");
+  doc.keyValue("Periode:", data.period);
+  doc.keyValue("Dibuat:", data.generatedLabel);
+
+  doc.section("Ringkasan Semester");
+  doc.keyValue("Streak belajar:", `${data.streak} hari berturut-turut`);
+  doc.keyValue("Hari belajar:", `${data.studyDaysCount} hari`);
+  doc.keyValue("Bab selesai:", `${data.doneChapters} bab`);
+  doc.keyValue("Simulasi dikerjakan:", `${data.totalSimulations} simulasi`);
+  if (data.overallPrediction !== null) {
+    doc.boldText(`Prediksi nilai SAS keseluruhan: ${data.overallPrediction}%`, 12, EMERALD);
+    doc.text("Perkiraan, bukan nilai resmi.", 10, GRAY);
+  } else {
+    doc.text("Belum ada simulasi SAS — kerjakan simulasi supaya ada prediksi nilai.", 10, GRAY);
+  }
+
+  if (data.subjects.length > 0) {
+    doc.section("Nilai per Mapel");
+    for (const s of data.subjects) {
+      doc.boldText(`${s.subject} - Kelas ${s.grade}`, 12);
+      doc.moveDown(0.25);
+      if (s.prediction !== null) {
+        doc.progressBar(`Prediksi nilai SAS ${s.subject}`, s.prediction);
+      }
+      doc.keyValue("Rata-rata simulasi:", `${s.average}% (${s.attempts} simulasi)`);
+      doc.keyValue("Simulasi terakhir:", `${s.latestPercent}% - ${formatHari(s.latestAt)}`);
+      doc.moveDown(0.5);
+    }
+  }
+
+  if (data.weakChapters.length > 0) {
+    doc.section("Bab yang Perlu Diulang");
+    for (const ch of data.weakChapters) {
+      doc.text(`-  ${ch.title} (${ch.subject} Kelas ${ch.grade})`, 11);
+      doc.text(`   ${ch.reason}`, 10, GRAY);
+      doc.moveDown(0.25);
+    }
+  }
+
+  if (data.subjects.some((s) => s.scores.length > 0)) {
+    doc.section("Semua Nilai Simulasi");
+    for (const s of data.subjects) {
+      if (s.scores.length === 0) continue;
+      doc.boldText(s.subject, 11);
+      doc.moveDown(0.25);
+      for (const sc of s.scores) {
+        doc.leftRight(sc.title, `${sc.percent}% - ${sc.dateLabel}`, 10);
+      }
+      doc.moveDown(0.5);
+    }
+  }
+
+  doc.moveDown(1);
+  doc.text("Terus belajar dan raih prestasi berikutnya bersama Ringkas.", 10, GRAY);
   return doc.bytes();
 }

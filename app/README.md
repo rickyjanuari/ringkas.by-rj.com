@@ -273,6 +273,60 @@ menampilkan judul halaman + nama admin yang login.
   database (termasuk hash kata sandi dan token sesi) — simpan di tempat
   yang aman, jangan diunggah ke repo publik.
 
+## Pertumbuhan & keterlibatan (2026-11-15, migrasi `0010_referral_gift.sql` + `0011_tryout_qa.sql`)
+
+- **Program referral:** setiap pengguna punya kode ajakan (`NAMA-XXXX`,
+  dibuat saat register / pertama buka kartu referral). Teman mendaftar
+  dengan kode itu, lalu pembelian PERTAMA yang LUNAS → pengajak dan teman
+  sama-sama dapat voucher 10% sekali pakai (`REF-XXXXXX`, kedaluwarsa +90
+  hari). Sekali per teman (klaim `referral_rewards` dulu, baru voucher
+  dibuat — webhook + polling tidak menggandakan). Kartu "Ajak Teman,
+  Dapat Diskon" di Akun: kode, tombol salin, tautan wa.me, jumlah teman
+  berhasil, voucher hadiah.
+- **Beli sebagai hadiah:** toggle di checkout (email penerima wajib,
+  nama + pesan opsional maks. 200 karakter). Saat LUNAS, akses masuk ke
+  PENERIMA, bukan pembeli: bila email penerima sudah punya akun, akses
+  langsung diberikan; bila belum, penerima mengklaim lewat tautan
+  `/hadiah?token=...` (token 64 hex, kedaluwarsa 30 hari). Pembeli tetap
+  melihat ordernya (bertanda hadiah) tapi tanpa tombol Belajar/Unduh.
+  Kepemilikan dicatat di `gift_grants`; gating LUNAS yang sudah ada
+  langsung mengenalinya.
+- **Tryout terjadwal + papan peringkat:** admin menjadwalkan tryout per
+  kelas (judul, jadwal WIB, durasi, jumlah soal — default 25 — gratis
+  atau berbayar; kebijakan: tryout pertama tiap kelas dibuat gratis).
+  Soal = 25 soal acak lintas mapel dari bank simulasi kelas itu (seeded
+  shuffle, semua peserta mengerjakan soal yang sama). Peserta = pemilik
+  produk kelas itu (atau semua akun login bila gratis). Papan peringkat
+  per tryout: skor turun, lalu waktu pengerjaan naik; nama depan +
+  inisial. Rute `/tryout` + `/tryout/[id]`; kartu "Tryout Mendatang" di
+  Beranda.
+- **PWA:** `manifest.webmanifest` (nama Ringkas, tema emerald `#177245`,
+  display standalone, ikon dari logo yang sudah ada) + service worker
+  `sw.js` (cache `ringkas-v1`: API network-only, navigasi network-first
+  → cache → `offline.html`, aset statis cache-first). **Bukan offline
+  penuh** — materi yang belum pernah dibuka tidak tersedia offline.
+  Kartu "Instal Aplikasi" di `/rapor` (tombol hanya bila browser
+  mendukung `beforeinstallprompt`).
+- **Rapor digital semester (PDF):** tombol "Unduh Rapor Semester" di
+  halaman Belajar tiap produk + halaman `/rapor` (rapor saya + rapor anak
+  untuk orang tua terhubung). Isi: nama, kelas, periode semester,
+  streak, bab selesai, nilai simulasi per mapel, prediksi SAS, 3 bab
+  lemah, daftar semua nilai simulasi. Hanya pemilik (atau orang tua
+  terhubung) yang bisa mengunduh (401/403).
+- **Tanya Jawab per bab:** form tanya di bawah tiap bab (1–300 karakter,
+  butuh login, bab terkunci tidak bisa tanya). Pertanyaan baru berstatus
+  pending dan HANYA tampil setelah admin menyetujui; jawaban admin
+  (1–1000 karakter) bisa diedit/dihapus. Tab moderasi "Tanya Jawab" di
+  `/admin`.
+- **PERBAIKAN KRITIS `server/worker.ts`:** `ctx` kini diteruskan ke
+  `app.fetch(request, env, ctx)`. Sebelumnya `fetch` tidak menerima `ctx`
+  dan Hono dipanggil tanpa execution context, sehingga `background()` tidak
+  pernah mendaftarkan `waitUntil` — semua kerja latar (email lunas /
+  selamat datang, pemenuhan hadiah, hadiah referral) diam-diam tidak
+  pernah jalan setelah respons terkirim. Ditemukan saat verifikasi batch
+  ini (webhook PAID membalik status tapi grant/voucher/email tidak
+  muncul) dan sudah terverifikasi berfungsi setelah perbaikan.
+
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
 **Peta Belajar (2026-11-15):** satu peta visual per produk kelas (`k1`–`k6`)

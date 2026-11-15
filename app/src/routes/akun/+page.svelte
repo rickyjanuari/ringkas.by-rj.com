@@ -165,7 +165,88 @@
 		twofaUseRecovery = false;
 	}
 
-	// ---- Profil ----
+	// ---- Referral: Ajak Teman, Dapat Diskon ----
+	type ReferralData = {
+		referral_code: string;
+		share_url: string;
+		referred_count: number;
+		vouchers: {
+			code: string;
+			type: string;
+			value: number;
+			expires_at: string | null;
+			uses: number;
+			max_uses: number | null;
+			active: number;
+			role: string;
+			created_at: string;
+		}[];
+	};
+	let referralCode = $state("");
+	let referral = $state<ReferralData | null>(null);
+	let referralLoading = $state(false);
+	let referralError = $state("");
+	let referralCopied = $state(false);
+	let referralCopyError = $state("");
+
+	async function loadReferral() {
+		referralLoading = true;
+		referralError = "";
+		try {
+			referral = await api<ReferralData>("/api/referral");
+		} catch (e) {
+			referralError = e instanceof Error ? e.message : "Gagal memuat data referral.";
+			referral = null;
+		} finally {
+			referralLoading = false;
+		}
+	}
+
+	async function salinKode() {
+		if (!referral) return;
+		referralCopyError = "";
+		try {
+			await navigator.clipboard.writeText(referral.referral_code);
+			referralCopied = true;
+			setTimeout(() => {
+				referralCopied = false;
+			}, 2000);
+		} catch {
+			referralCopyError = "Gagal menyalin otomatis — salin manual kodenya ya.";
+		}
+	}
+
+	function referralShareText(): string {
+		if (!referral) return "";
+		return (
+			`Belajar di Ringkas bareng aku, yuk! Daftar pakai kode ajakanku ${referral.referral_code}: ${referral.share_url} — ` +
+			`kamu dan aku sama-sama dapat voucher diskon 10% saat pembelian pertamamu lunas.`
+		);
+	}
+
+	function voucherStatus(v: ReferralData["vouchers"][number]): string {
+		if (v.max_uses !== null && v.uses >= v.max_uses) return "Sudah dipakai";
+		if (v.expires_at && new Date(v.expires_at).getTime() <= Date.now()) return "Kedaluarsa";
+		if (v.active !== 1) return "Tidak aktif";
+		return "Aktif";
+	}
+
+	// Bila pengguna datang dari tautan klaim hadiah (/hadiah) dan belum
+	// login, token disimpan di sessionStorage — setelah berhasil masuk/
+	// daftar, kembali ke halaman klaim secara otomatis.
+	function lanjutKeHadiahBilaAda(): boolean {
+		try {
+			const token = sessionStorage.getItem("ringkas_pending_gift_token");
+			if (token) {
+				sessionStorage.removeItem("ringkas_pending_gift_token");
+				goto(`/hadiah?token=${encodeURIComponent(token)}`);
+				return true;
+			}
+		} catch {
+			/* abaikan */
+		}
+		return false;
+	}
 	let tracker = $state<TrackerData | null>(null);
 	let trackerError = $state("");
 	let waEdit = $state("");
@@ -285,6 +366,14 @@
 	let isAdmin = $derived($auth.user?.role === "admin");
 
 	onMount(async () => {
+		// Kode ajakan dari tautan bagikan teman (?ref=KODE) — isi otomatis
+		// ke form daftar.
+		try {
+			const refParam = new URLSearchParams(window.location.search).get("ref");
+			if (refParam) referralCode = refParam.trim().toUpperCase();
+		} catch {
+			/* abaikan */
+		}
 		// Konfigurasi publik (Turnstile) — sekali, tanpa menunggu hasil.
 		void initTurnstile();
 		if (!getToken()) return;
@@ -295,6 +384,7 @@
 			await loadTracker();
 			await loadPrediction();
 			await loadHardBank();
+			await loadReferral();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
@@ -343,6 +433,7 @@
 							email: email.trim(),
 							password,
 							whatsapp: whatsapp.trim() || undefined,
+							referral_code: referralCode.trim() || undefined,
 							turnstile_token: turnstileToken || undefined
 						})
 					}
@@ -370,6 +461,8 @@
 			}
 			waEdit = $auth.user?.whatsapp ?? "";
 			await loadTracker();
+			await loadReferral();
+			lanjutKeHadiahBilaAda();
 		} catch (e) {
 			authError = e instanceof Error ? e.message : "Gagal masuk. Coba lagi ya.";
 			resetTurnstile();
@@ -394,6 +487,8 @@
 			waEdit = $auth.user?.whatsapp ?? "";
 			batal2fa();
 			await loadTracker();
+			await loadReferral();
+			lanjutKeHadiahBilaAda();
 		} catch (e) {
 			twofaError = e instanceof Error ? e.message : "Kode salah. Coba lagi ya.";
 		} finally {
@@ -775,6 +870,20 @@
 					placeholder="08xxxxxxxxxx"
 				/>
 			</div>
+			<div>
+				<label class="lbl" for="reg-ref">Kode ajakan (opsional)</label>
+				<input
+					id="reg-ref"
+					class="input uppercase"
+					bind:value={referralCode}
+					placeholder="Contoh: RICKY-7K2Q"
+					maxlength={24}
+				/>
+				<p class="mt-1 text-xs text-[#5f6b62]">
+					Punya kode dari teman? Masukkan di sini — kamu dan temanmu sama-sama dapat voucher
+					diskon 10% saat pembelian pertamamu lunas.
+				</p>
+			</div>
 		{/if}
 		{#if turnstileSiteKey}
 			<div bind:this={turnstileEl} class="flex justify-center"></div>
@@ -816,6 +925,79 @@
 		</div>
 		{#if waMsg}
 			<p class="mt-2 text-sm {waOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{waMsg}</p>
+		{/if}
+	</div>
+
+	<!-- Ajak Teman, Dapat Diskon (referral) -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="users" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Ajak Teman, Dapat Diskon</p>
+				<p class="text-xs text-[#5f6b62]">
+					Bagikan kodemu — saat temanmu menyelesaikan pembelian pertamanya, kamu dan dia
+					sama-sama dapat voucher diskon 10%.
+				</p>
+			</div>
+		</div>
+		{#if referralLoading}
+			<p class="mt-3 text-sm text-[#5f6b62]">Memuat kode ajakan...</p>
+		{:else if referralError}
+			<p class="err mt-3">{referralError}</p>
+			<button type="button" class="btn btn-outline mt-2 text-xs" onclick={loadReferral}>
+				Coba Lagi
+			</button>
+		{:else if referral}
+			<div class="mt-3 flex items-center gap-2">
+				<span class="min-w-0 flex-1 truncate rounded-lg bg-[#fbeecd] px-3 py-2 text-center font-extrabold tracking-widest">
+					{referral.referral_code}
+				</span>
+				<button type="button" class="btn btn-outline shrink-0 !px-3 !py-2 text-xs" onclick={salinKode}>
+					<Icon name="check" size={14} /> {referralCopied ? "Tersalin!" : "Salin Kode"}
+				</button>
+			</div>
+			{#if referralCopyError}
+				<p class="mt-1 text-xs text-[#b91c1c]">{referralCopyError}</p>
+			{/if}
+			<a
+				href={`https://wa.me/?text=${encodeURIComponent(referralShareText())}`}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="btn btn-leaf btn-block mt-2"
+			>
+				<Icon name="message" size={16} /> Bagikan via WhatsApp
+			</a>
+			<p class="mt-2 text-sm">
+				Teman yang berhasil:
+				<b class="text-[#177245]">{referral.referred_count} teman</b>
+			</p>
+			<p class="mt-3 text-sm font-bold">Voucher hadiah saya</p>
+			{#if referral.vouchers.length === 0}
+				<p class="mt-1 text-sm text-[#5f6b62]">
+					Belum ada voucher hadiah. Ajak temanmu daftar dan selesaikan pembelian pertamanya!
+				</p>
+			{:else}
+				<div class="mt-2 space-y-2">
+					{#each referral.vouchers as v (v.code)}
+						<div class="card !rounded-lg flex items-center gap-3 p-3">
+							<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"><Icon name="receipt" size={17} /></span>
+							<div class="min-w-0 flex-1">
+								<p class="text-sm font-extrabold">{v.code}</p>
+								<p class="text-xs text-[#5f6b62]">
+									Diskon {v.value}% • {v.role === "pengajak" ? "hadiah sebagai pengajak" : "hadiah sebagai teman yang diajak"}
+									{#if v.expires_at}• berlaku sampai {formatTanggal(v.expires_at)}{/if}
+								</p>
+							</div>
+							<span class="badge shrink-0 {voucherStatus(v) === 'Aktif' ? 'badge-leaf' : 'badge-sun'}">
+								{voucherStatus(v)}
+							</span>
+						</div>
+					{/each}
+				</div>
+				<p class="mt-2 text-xs text-[#5f6b62]">
+					Masukkan kode voucher di halaman Checkout untuk memakai diskonnya.
+				</p>
+			{/if}
 		{/if}
 	</div>
 

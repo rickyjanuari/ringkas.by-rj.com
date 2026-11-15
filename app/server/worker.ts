@@ -15,7 +15,7 @@
 // Kredensial dibaca dari secrets Worker via setEnv() — jangan pernah
 // menaruh nilai secret di berkas ini atau di wrangler.toml.
 
-import type { Hono } from "hono";
+import type { Hono, ExecutionContext } from "hono";
 import { createApp } from "./app.js";
 import { openD1Database, type D1DatabaseBinding } from "./d1.js";
 import { setEnv } from "./env.js";
@@ -143,10 +143,17 @@ function withSecurityHeaders(res: Response, pathname: string): Response {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  // PENTING: `ctx` WAJIB diteruskan ke `app.fetch(request, env, ctx)` —
+  // tanpa itu `c.executionCtx` di dalam handler Hono bernilai undefined
+  // dan `background()` (email.ts) tidak bisa mendaftarkan `waitUntil`,
+  // sehingga SEMUA kerja latar (email lunas/selamat datang, pemenuhan
+  // hadiah, hadiah referral) diam-diam tidak pernah jalan setelah
+  // respons terkirim. Ditemukan saat verifikasi batch pertumbuhan
+  // (webhook PAID membalik status tapi grant/voucher/email tidak muncul).
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) {
-      return withSecurityHeaders(await getApp(env).fetch(request), url.pathname);
+      return withSecurityHeaders(await getApp(env).fetch(request, env, ctx), url.pathname);
     }
     if (url.pathname.startsWith("/uploads/")) {
       return withSecurityHeaders(

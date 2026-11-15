@@ -15,7 +15,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit";
+	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit" | "tryout" | "tanya-jawab";
 	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -31,6 +31,8 @@
 		{ id: "voucher", label: "Voucher", icon: "receipt" },
 		{ id: "pengguna", label: "Pengguna", icon: "users" },
 		{ id: "video", label: "Video per Bab", icon: "video" },
+		{ id: "tryout", label: "Tryout", icon: "trophy" },
+		{ id: "tanya-jawab", label: "Tanya Jawab", icon: "message" },
 		{ id: "cron", label: "Email & Cron", icon: "clock" },
 		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" },
 		{ id: "audit", label: "Log Aktivitas", icon: "history" }
@@ -43,6 +45,8 @@
 		voucher: "Voucher",
 		pengguna: "Pengguna & Role",
 		video: "Video per Bab",
+		tryout: "Tryout Terjadwal",
+		"tanya-jawab": "Tanya Jawab per Bab",
 		cron: "Email & Cron",
 		pengumuman: "Pengumuman",
 		audit: "Log Aktivitas"
@@ -704,6 +708,193 @@
 		}
 	}
 
+	// ---- Tryout (admin) ----
+	// Soal tryout dipilih server sekali saat dibuat (dari bank simulasi
+	// kelas itu) dan disimpan di tryouts.question_ids — semua peserta
+	// mengerjakan soal yang sama. Tryout pertama tiap kelas sebaiknya
+	// dibuat gratis (centang "Gratis") agar semua akun login bisa ikut.
+	interface AdminTryout {
+		id: string;
+		grade: number;
+		title: string;
+		starts_at: string;
+		ends_at: string;
+		duration_minutes: number;
+		question_count: number;
+		question_ids_count: number;
+		is_free: number;
+		status: string;
+		phase: string;
+		participants: number;
+		submissions: number;
+		created_at: string;
+	}
+	let adminTryouts = $state<AdminTryout[]>([]);
+	let tryoutsLoading = $state(false);
+	let tryoutError = $state("");
+	let tSaving = $state(false);
+	let tDeletingId = $state<string | null>(null);
+	let tForm = $state({
+		grade: 1,
+		title: "",
+		starts_at: "",
+		ends_at: "",
+		duration_minutes: 60,
+		question_count: 25,
+		is_free: false
+	});
+
+	async function loadTryouts() {
+		tryoutsLoading = true;
+		tryoutError = "";
+		try {
+			const data = await api<{ tryouts: AdminTryout[] }>("/api/admin/tryouts");
+			adminTryouts = data.tryouts ?? [];
+		} catch (e) {
+			tryoutError = e instanceof Error ? e.message : "Gagal memuat tryout.";
+		} finally {
+			tryoutsLoading = false;
+		}
+	}
+
+	async function buatTryout() {
+		tSaving = true;
+		tryoutError = "";
+		try {
+			const data = await api<{ tryout: AdminTryout }>("/api/admin/tryouts", {
+				method: "POST",
+				body: JSON.stringify({
+					grade: Number(tForm.grade),
+					title: tForm.title.trim(),
+					starts_at: tForm.starts_at,
+					ends_at: tForm.ends_at,
+					duration_minutes: Number(tForm.duration_minutes),
+					question_count: Number(tForm.question_count),
+					is_free: tForm.is_free
+				})
+			});
+			adminTryouts = [data.tryout, ...adminTryouts].sort((a, b) =>
+				a.starts_at < b.starts_at ? 1 : -1
+			);
+			notice = `Tryout "${data.tryout.title}" dibuat (${data.tryout.question_ids_count} soal).`;
+			tForm = { grade: 1, title: "", starts_at: "", ends_at: "", duration_minutes: 60, question_count: 25, is_free: false };
+		} catch (e) {
+			tryoutError = e instanceof Error ? e.message : "Gagal membuat tryout.";
+		} finally {
+			tSaving = false;
+		}
+	}
+
+	async function hapusTryout(t: AdminTryout) {
+		if (!confirm(`Hapus tryout "${t.title}"?`)) return;
+		tDeletingId = t.id;
+		tryoutError = "";
+		try {
+			await api(`/api/admin/tryouts/${t.id}`, { method: "DELETE" });
+			adminTryouts = adminTryouts.filter((x) => x.id !== t.id);
+			notice = `Tryout "${t.title}" dihapus.`;
+		} catch (e) {
+			tryoutError = e instanceof Error ? e.message : "Gagal menghapus tryout.";
+		} finally {
+			tDeletingId = null;
+		}
+	}
+
+	// ---- Tanya Jawab (admin) ----
+	interface AdminQa {
+		id: number;
+		product_id: string;
+		chapter_id: string;
+		chapter_title: string;
+		asker_name: string;
+		question: string;
+		answer: string | null;
+		status: string;
+		status_label: string;
+		created_at: string;
+		answered_at: string | null;
+	}
+	let adminQa = $state<AdminQa[]>([]);
+	let qaLoading = $state(false);
+	let qaError = $state("");
+	let qaFilter = $state("pending");
+	let qaAnswers = $state<Record<number, string>>({});
+	let qaBusyId = $state<number | null>(null);
+
+	const QA_FILTERS: { id: string; label: string }[] = [
+		{ id: "pending", label: "Menunggu Moderasi" },
+		{ id: "approved", label: "Menunggu Jawaban" },
+		{ id: "answered", label: "Sudah Dijawab" },
+		{ id: "rejected", label: "Ditolak" },
+		{ id: "semua", label: "Semua" }
+	];
+
+	async function loadQa() {
+		qaLoading = true;
+		qaError = "";
+		try {
+			const q = qaFilter === "semua" ? "" : `?status=${qaFilter}`;
+			const data = await api<{ questions: AdminQa[] }>(`/api/admin/qa${q}`);
+			adminQa = data.questions ?? [];
+			const next: Record<number, string> = {};
+			for (const item of adminQa) next[item.id] = item.answer ?? "";
+			qaAnswers = next;
+		} catch (e) {
+			qaError = e instanceof Error ? e.message : "Gagal memuat tanya jawab.";
+		} finally {
+			qaLoading = false;
+		}
+	}
+
+	async function qaAksi(q: AdminQa, aksi: "approve" | "reject" | "delete") {
+		if (aksi === "delete" && !confirm("Hapus pertanyaan ini?")) return;
+		qaBusyId = q.id;
+		qaError = "";
+		try {
+			await api(`/api/admin/qa/${q.id}/${aksi}`, { method: "POST", body: JSON.stringify({}) });
+			notice =
+				aksi === "approve"
+					? "Pertanyaan disetujui — kini tampil di halaman bab."
+					: aksi === "reject"
+						? "Pertanyaan ditolak."
+						: "Pertanyaan dihapus.";
+			await loadQa();
+		} catch (e) {
+			qaError = e instanceof Error ? e.message : "Gagal memproses pertanyaan.";
+		} finally {
+			qaBusyId = null;
+		}
+	}
+
+	async function qaJawab(q: AdminQa) {
+		const jawaban = (qaAnswers[q.id] ?? "").trim();
+		if (!jawaban) {
+			qaError = "Jawaban tidak boleh kosong.";
+			return;
+		}
+		qaBusyId = q.id;
+		qaError = "";
+		try {
+			await api(`/api/admin/qa/${q.id}/answer`, {
+				method: "POST",
+				body: JSON.stringify({ answer: jawaban })
+			});
+			notice = q.status === "answered" ? "Jawaban diperbarui." : "Jawaban disimpan — pertanyaan kini terjawab.";
+			await loadQa();
+		} catch (e) {
+			qaError = e instanceof Error ? e.message : "Gagal menyimpan jawaban.";
+		} finally {
+			qaBusyId = null;
+		}
+	}
+
+	function qaBadgeAdmin(status: string): string {
+		if (status === "answered") return "badge badge-leaf";
+		if (status === "pending") return "badge badge-sun";
+		if (status === "approved") return "badge badge-sun";
+		return "badge badge-gray";
+	}
+
 	onMount(async () => {
 		if (!getToken()) {
 			goto("/akun");
@@ -764,6 +955,8 @@
 		if (t === "pesanan" && !ordersLoaded) loadOrders(1);
 		if (t === "pengumuman" && !settingsLoaded) loadSettings();
 		if (t === "audit" && !auditLoaded) loadAudit(1);
+		if (t === "tryout" && adminTryouts.length === 0) loadTryouts();
+		if (t === "tanya-jawab" && adminQa.length === 0) loadQa();
 	}
 
 	async function loadVouchers() {
@@ -2480,6 +2673,210 @@
 							<button type="button" class="btn btn-ghost" disabled={settingsLoading} onclick={loadSettings}>
 								<Icon name="refresh" size={16} /> Muat ulang
 							</button>
+						</div>
+					{/if}
+				</div>
+			{:else if tab === "tryout"}
+				<form
+					class="card mt-4 space-y-3 p-4"
+					onsubmit={(e) => {
+						e.preventDefault();
+						buatTryout();
+					}}
+				>
+					<p class="text-sm font-bold"><Icon name="trophy" size={16} /> Jadwalkan Tryout Baru</p>
+					<p class="text-xs text-[#5f6b62]">
+						Soal dipilih otomatis dari bank simulasi kelas itu (lintas mapel, {tForm.question_count} soal) dan
+						disimpan saat tryout dibuat — semua peserta mengerjakan soal yang sama. Tryout pertama tiap
+						kelas sebaiknya dibuat gratis agar semua akun login bisa ikut. Waktu diisi dalam WIB.
+					</p>
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="lbl" for="t-grade">Kelas</label>
+							<select id="t-grade" class="input" bind:value={tForm.grade}>
+								{#each [1, 2, 3, 4, 5, 6] as g (g)}
+									<option value={g}>Kelas {g}</option>
+								{/each}
+							</select>
+						</div>
+						<div>
+							<label class="lbl" for="t-durasi">Durasi (menit)</label>
+							<input id="t-durasi" class="input" type="number" min="10" max="180" bind:value={tForm.duration_minutes} required />
+						</div>
+						<div class="col-span-2">
+							<label class="lbl" for="t-judul">Judul tryout</label>
+							<input id="t-judul" class="input" maxlength="120" bind:value={tForm.title} placeholder="Contoh: Tryout Akbar Kelas 1 — November" required />
+						</div>
+						<div>
+							<label class="lbl" for="t-mulai">Mulai (tanggal + jam WIB)</label>
+							<input id="t-mulai" class="input" type="datetime-local" bind:value={tForm.starts_at} required />
+						</div>
+						<div>
+							<label class="lbl" for="t-selesai">Selesai (tanggal + jam WIB)</label>
+							<input id="t-selesai" class="input" type="datetime-local" bind:value={tForm.ends_at} required />
+						</div>
+						<div>
+							<label class="lbl" for="t-jumlah">Jumlah soal (5–50)</label>
+							<input id="t-jumlah" class="input" type="number" min="5" max="50" bind:value={tForm.question_count} required />
+						</div>
+						<div class="flex items-end pb-2">
+							<label class="flex cursor-pointer items-center gap-2 text-sm font-bold text-[#3f4a42]">
+								<input type="checkbox" class="h-4 w-4 accent-[#177245]" bind:checked={tForm.is_free} />
+								Gratis — semua akun login boleh ikut
+							</label>
+						</div>
+					</div>
+					{#if tryoutError}
+						<p class="err">{tryoutError}</p>
+					{/if}
+					<button type="submit" class="btn btn-primary" disabled={tSaving}>
+						{#if tSaving}Membuat...{:else}<Icon name="plus" size={16} /> Buat Tryout{/if}
+					</button>
+				</form>
+				<div class="card mt-4 p-4">
+					<div class="flex items-center justify-between gap-2">
+						<p class="text-sm font-bold">Daftar Tryout</p>
+						<button type="button" class="btn btn-ghost !px-2.5 !py-1.5 text-xs" disabled={tryoutsLoading} onclick={loadTryouts}>
+							<Icon name="refresh" size={14} /> Muat ulang
+						</button>
+					</div>
+					{#if tryoutsLoading && adminTryouts.length === 0}
+						<p class="mt-2 text-sm text-[#5f6b62]">Memuat...</p>
+					{:else if adminTryouts.length === 0}
+						<p class="mt-2 text-sm text-[#5f6b62]">Belum ada tryout.</p>
+					{:else}
+						<div class="mt-3 space-y-2">
+							{#each adminTryouts as t (t.id)}
+								<div class="card !rounded-lg p-3 text-sm">
+									<p class="flex flex-wrap items-center gap-1.5">
+										<span class="badge {t.phase === 'live' ? 'badge-leaf' : t.phase === 'upcoming' ? 'badge-sun' : 'badge-gray'}">
+											{t.phase === "live" ? "Berlangsung" : t.phase === "upcoming" ? "Mendatang" : "Selesai"}
+										</span>
+										{#if t.is_free}<span class="badge badge-leaf">Gratis</span>{/if}
+										<span class="font-extrabold">{t.title}</span>
+									</p>
+									<p class="mt-1 text-xs text-[#5f6b62]">
+										Kelas {t.grade} • {t.question_ids_count} soal • {t.duration_minutes} menit • {t.participants} peserta • {t.submissions} sudah mengerjakan
+									</p>
+									<p class="mt-0.5 text-xs text-[#5f6b62]">
+										{formatTanggal(t.starts_at)} — {formatTanggal(t.ends_at)}
+									</p>
+									<div class="mt-2 flex gap-2">
+										<a href="/tryout/{t.id}" class="btn btn-outline text-xs">Lihat Halaman</a>
+										{#if t.phase === "upcoming"}
+											<button
+												type="button"
+												class="btn btn-ghost text-xs !text-[#b91c1c]"
+												disabled={tDeletingId === t.id}
+												onclick={() => hapusTryout(t)}
+											>
+												<Icon name="trash" size={14} /> Hapus
+											</button>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{:else if tab === "tanya-jawab"}
+				<div class="card mt-4 p-4">
+					<p class="text-sm font-bold"><Icon name="message" size={16} /> Moderasi Tanya Jawab per Bab</p>
+					<p class="mt-1 text-xs text-[#5f6b62]">
+						Pertanyaan baru masuk sebagai "Menunggu Moderasi" dan tidak tampil ke anak lain sampai disetujui.
+						Setujui dulu, lalu isi jawaban — jawaban tampil di halaman bab bersama pertanyaan.
+					</p>
+					<div class="mt-3 flex flex-wrap gap-2">
+						{#each QA_FILTERS as f (f.id)}
+							<button
+								type="button"
+								class="chip"
+								class:active={qaFilter === f.id}
+								onclick={() => {
+									qaFilter = f.id;
+									loadQa();
+								}}
+							>
+								{f.label}
+							</button>
+						{/each}
+						<button type="button" class="btn btn-ghost !px-2.5 !py-1.5 text-xs" disabled={qaLoading} onclick={loadQa}>
+							<Icon name="refresh" size={14} /> Muat ulang
+						</button>
+					</div>
+					{#if qaError}
+						<p class="err mt-3">{qaError}</p>
+					{/if}
+					{#if qaLoading && adminQa.length === 0}
+						<p class="mt-3 text-sm text-[#5f6b62]">Memuat...</p>
+					{:else if adminQa.length === 0}
+						<p class="mt-3 text-sm text-[#5f6b62]">Tidak ada pertanyaan untuk filter ini.</p>
+					{:else}
+						<div class="mt-3 space-y-3">
+							{#each adminQa as q (q.id)}
+								<div class="card !rounded-lg p-3 text-sm">
+									<p class="flex flex-wrap items-center gap-1.5 text-xs">
+										<span class={qaBadgeAdmin(q.status)}>{q.status_label}</span>
+										<span class="font-bold text-[#5f6b62]">{q.chapter_title}</span>
+										<span class="text-[#5f6b62]">• {q.asker_name} • {formatTanggal(q.created_at)}</span>
+									</p>
+									<p class="mt-1.5 font-bold leading-relaxed">{q.question}</p>
+									<div class="mt-2">
+										<label class="lbl" for={`qa-jawab-${q.id}`}>Jawaban admin (maks. 1000 karakter)</label>
+										<textarea
+											id={`qa-jawab-${q.id}`}
+											class="input"
+											rows="2"
+											maxlength="1000"
+											value={qaAnswers[q.id] ?? ""}
+											oninput={(e) => {
+												qaAnswers = { ...qaAnswers, [q.id]: e.currentTarget.value };
+											}}
+											placeholder="Tulis jawaban yang jelas dan ramah anak..."
+										></textarea>
+									</div>
+									<div class="mt-2 flex flex-wrap gap-2">
+										{#if q.status === "pending"}
+											<button
+												type="button"
+												class="btn btn-leaf text-xs"
+												disabled={qaBusyId === q.id}
+												onclick={() => qaAksi(q, "approve")}
+											>
+												<Icon name="check" size={14} /> Setujui
+											</button>
+										{/if}
+										{#if q.status === "pending" || q.status === "approved"}
+											<button
+												type="button"
+												class="btn btn-ghost text-xs"
+												disabled={qaBusyId === q.id}
+												onclick={() => qaAksi(q, "reject")}
+											>
+												<Icon name="x" size={14} /> Tolak
+											</button>
+										{/if}
+										{#if q.status !== "rejected"}
+											<button
+												type="button"
+												class="btn btn-primary text-xs"
+												disabled={qaBusyId === q.id || !(qaAnswers[q.id] ?? "").trim()}
+												onclick={() => qaJawab(q)}
+											>
+												<Icon name="save" size={14} /> {q.status === "answered" ? "Perbarui Jawaban" : "Simpan Jawaban"}
+											</button>
+										{/if}
+										<button
+											type="button"
+											class="btn btn-ghost text-xs !text-[#b91c1c]"
+											disabled={qaBusyId === q.id}
+											onclick={() => qaAksi(q, "delete")}
+										>
+											<Icon name="trash" size={14} /> Hapus
+										</button>
+									</div>
+								</div>
+							{/each}
 						</div>
 					{/if}
 				</div>

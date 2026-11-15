@@ -31,10 +31,12 @@ import type { ImageStorage } from "./storage.js";
 import { createQris, checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
 import { certificatePdf, receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
 import {
+  appUrl,
   background,
   formatTanggal,
   getOrderEmailData,
   sendExpiredEmail,
+  sendGiftEmail,
   sendPaidEmail,
   sendPendingEmail,
   sendWelcomeEmail
@@ -53,7 +55,17 @@ import { storyQuestions, storyRefId, parseStoryRef } from "./seed/story.js";
 // Helper umum
 // ---------------------------------------------------------------------------
 
-type OrderRow = Order & { expired_at: string | null };
+type OrderRow = Order & {
+  expired_at: string | null;
+  /** Kolom hadiah (migrasi 0010) — null untuk order biasa. */
+  gift_recipient_email?: string | null;
+  gift_recipient_name?: string | null;
+  gift_message?: string | null;
+  gift_claim_token?: string | null;
+  gift_claim_expires_at?: string | null;
+  gift_claimed_at?: string | null;
+  gift_claimed_by?: string | null;
+};
 
 interface OrderItem {
   product_id: string;
@@ -297,6 +309,233 @@ function newToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+// ------------------------- Referral & hadiah (migrasi 0010) -------------------------
+// Kode ajakan: NAMA-XXXX — nama depan dinormalisasi (tanpa diakritik,
+// huruf A-Z saja, maks. 12 huruf) + 4 karakter acak alfanumerik.
+// Nama yang tidak menghasilkan huruf (mis. hanya angka/simbol) memakai
+// awalan TEMAN. Keunikan dicek ke database; tabrakan diatasi dengan
+// mencoba lagi (akhirnya dengan akhiran 6 karakter).
+
+const REFERRAL_REWARD_PERCENT = 10;
+const REFERRAL_REWARD_DAYS = 90;
+const GIFT_CLAIM_DAYS = 30;
+
+function normalizeReferralBase(name: string): string {
+  const cleaned = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z]+/g, " ")
+    .trim();
+  const first = cleaned.split(/\s+/)[0] ?? "";
+  return (first.slice(0, 12) || "TEMAN");
+}
+
+async function generateReferralCode(db: Database, name: string): Promise<string | null> {
+  const base = normalizeReferralBase(name);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = `${base}-${randomAlphaNum(attempt < 8 ? 4 : 6)}`;
+    try {
+      const existing = await db.get<{ referral_code: string | null }>(
+        "SELECT referral_code FROM users WHERE referral_code = ?",
+        code
+      );
+      if (!existing) return code;
+    } catch {
+      // Kolom belum ada (migrasi 0010 belum diterapkan) — jangan
+      // gagalkan alur pemanggil; kode dibuat nanti saat GET /api/referral.
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Kode ajakan pengguna; dibuat + disimpan bila belum ada (pengguna lama). */
+async function ensureReferralCode(
+  db: Database,
+  userId: string,
+  name: string
+): Promise<string | null> {
+  try {
+    const row = await db.get<{ referral_code: string | null }>(
+      "SELECT referral_code FROM users WHERE id = ?",
+      userId
+    );
+    if (row?.referral_code) return row.referral_code;
+    const code = await generateReferralCode(db, name);
+    if (!code) return null;
+    const res = await db.run(
+      "UPDATE users SET referral_code = ? WHERE id = ? AND referral_code IS NULL",
+      code,
+      userId
+    );
+    if (res.changes === 1) return code;
+    const fresh = await db.get<{ referral_code: string | null }>(
+      "SELECT referral_code FROM users WHERE id = ?",
+      userId
+    );
+    return fresh?.referral_code ?? null;
+  } catch (err) {
+    console.error("[referral] kode ajakan gagal dibuat:", err);
+    return null;
+  }
+}
+
+/**
+ * Hadiah referral saat pembelian PERTAMA yang LUNAS dari teman yang
+ * diajak: voucher 10% sekali pakai untuk pengajak DAN teman.
+ * Idempotensi: klaim baris referral_rewards dulu (UNIQUE
+ * referred_user_id + order_id) — baru setelah klaim berhasil voucher
+ * dibuat. Webhook + polling yang sama-sama melihat PAID hanya
+ * menghasilkan satu hadiah; pemenang klaim yang kedua tidak membuat
+ * voucher apa pun. Tidak pernah melempar — kegagalan dicatat di log
+ * supaya alur PAID tidak terganggu.
+ */
+async function grantReferralRewards(db: Database, order: OrderRow): Promise<void> {
+  try {
+    const buyer = await db.get<UserWithReferral>("SELECT * FROM users WHERE id = ?", order.user_id);
+    const refCode = (buyer?.referred_by ?? "").trim().toUpperCase();
+    if (!buyer || !refCode) return;
+    // Hanya pembelian pertama yang lunas: order PAID lain sudah ada
+    // (mis. pembelian kedua) -> bukan hadiah pertama lagi.
+    const paidCount = await db.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM orders WHERE user_id = ? AND status = 'PAID'",
+      buyer.id
+    );
+    if ((paidCount?.n ?? 0) !== 1) return;
+    const referrer = await db.get<UserWithReferral>(
+      "SELECT * FROM users WHERE referral_code = ?",
+      refCode
+    );
+    if (!referrer || referrer.id === buyer.id) return;
+    let referrerCode = `REF-${randomAlphaNum(6)}`;
+    let referredCode = `REF-${randomAlphaNum(6)}`;
+    // Kode voucher hadiah tidak boleh menabrak voucher yang sudah ada.
+    const clash = await db
+      .get<{ code: string }>("SELECT code FROM vouchers WHERE code IN (?, ?)", referrerCode, referredCode)
+      .catch(() => undefined);
+    if (clash) {
+      referrerCode = `REF-${randomAlphaNum(6)}`;
+      referredCode = `REF-${randomAlphaNum(6)}`;
+    }
+    const claim = await db.run(
+      `INSERT OR IGNORE INTO referral_rewards
+         (id, referrer_user_id, referred_user_id, order_id, referrer_voucher_code, referred_voucher_code, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      newId("ref"),
+      referrer.id,
+      buyer.id,
+      order.id,
+      referrerCode,
+      referredCode,
+      nowIso()
+    );
+    if (claim.changes !== 1) return; // Sudah diberi hadiah untuk order ini.
+    // Klaim berhasil -> baru buat vouchernya (bila gagal, jejak hadiah
+    // tetap ada; voucher yang hilang tidak dibuat ulang otomatis —
+    // admin bisa membuatkan voucher pengganti dari panel admin).
+    const ok1 = await createReferralVoucherWithCode(db, referrerCode);
+    const ok2 = await createReferralVoucherWithCode(db, referredCode);
+    if (!ok1 || !ok2) {
+      console.error(
+        `[referral] hadiah order ${order.id} tercatat tapi voucher gagal dibuat (pengajak: ${ok1}, teman: ${ok2}).`
+      );
+    }
+  } catch (err) {
+    console.error("[referral] hadiah gagal:", err);
+  }
+}
+
+/** Sisipkan voucher hadiah referral dengan kode yang sudah ditentukan. */
+async function createReferralVoucherWithCode(db: Database, code: string): Promise<boolean> {
+  try {
+    const expiresAt = new Date(Date.now() + REFERRAL_REWARD_DAYS * 24 * 3600 * 1000).toISOString();
+    await db.run(
+      "INSERT OR IGNORE INTO vouchers (code, type, value, max_uses, uses, min_total, expires_at, active, created_at) VALUES (?, 'percent', ?, 1, 0, 0, ?, 1, ?)",
+      code,
+      REFERRAL_REWARD_PERCENT,
+      expiresAt,
+      nowIso()
+    );
+    const row = await db.get<{ code: string }>("SELECT code FROM vouchers WHERE code = ?", code);
+    return !!row;
+  } catch (err) {
+    console.error("[referral] voucher hadiah gagal dibuat:", err);
+    return false;
+  }
+}
+
+/** Beri akses produk (bukan anggota bundel) ke penerima hadiah. Idempotent. */
+async function grantGiftAccess(db: Database, order: OrderRow, userId: string): Promise<void> {
+  for (const it of parseItems(order.items)) {
+    if (it.included_in_bundle) continue;
+    await db
+      .run(
+        `INSERT OR IGNORE INTO gift_grants (id, order_id, product_id, user_id, granted_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        newId("gft"),
+        order.id,
+        it.product_id,
+        userId,
+        nowIso()
+      )
+      .catch((err) => console.error("[gift] grant gagal:", err));
+  }
+}
+
+/**
+ * Pemenuhan order hadiah saat LUNAS: bila email penerima SUDAH punya
+ * akun, akses langsung diberikan saat itu juga (dan order ditandai
+ * diklaim oleh akun itu); bila belum, akses menunggu claim. Email
+ * hadiah (template 08) selalu dikirim ke penerima — idempotensi
+ * sent_emails menjaganya sekali per order.
+ */
+async function fulfillGiftOrder(db: Database, order: OrderRow): Promise<void> {
+  const recipientEmail = (order.gift_recipient_email ?? "").trim().toLowerCase();
+  if (!recipientEmail || !order.gift_claim_token) return;
+  try {
+    const recipient = await db
+      .get<User>("SELECT * FROM users WHERE email = ?", recipientEmail)
+      .catch(() => undefined);
+    if (recipient) {
+      await grantGiftAccess(db, order, recipient.id);
+      await db
+        .run(
+          "UPDATE orders SET gift_claimed_at = ?, gift_claimed_by = ? WHERE id = ? AND gift_claimed_by IS NULL",
+          nowIso(),
+          recipient.id,
+          order.id
+        )
+        .catch((err) => console.error("[gift] penanda klaim gagal:", err));
+    }
+  } catch (err) {
+    console.error("[gift] pemberian akses gagal:", err);
+  }
+  await sendGiftEmail(db, order);
+}
+
+/**
+ * Tindak lanjut SATU order yang baru menjadi PAID — dipakai webhook
+ * DAN polling status, jadi harus idempotent: email lunas/hadiah
+ * dijaga sent_emails, hadiah referral dijaga referral_rewards,
+ * akses hadiah dijaga gift_grants. Tidak pernah melempar.
+ */
+async function handlePaidOrder(db: Database, order: OrderRow): Promise<void> {
+  try {
+    if (order.gift_recipient_email) {
+      // Order hadiah: JANGAN kirim email lunas (template 03) ke
+      // pembeli — salinannya ("materimu sudah terbuka") salah, karena
+      // akses milik penerima, bukan pembeli.
+      await fulfillGiftOrder(db, order);
+    } else {
+      await sendPaidEmail(db, order);
+    }
+  } catch (err) {
+    console.error("[paid] tindak lanjut order gagal:", err);
+  }
+  await grantReferralRewards(db, order);
+}
+
 async function readJson(c: Context): Promise<Record<string, unknown>> {
   try {
     const v: unknown = await c.req.json();
@@ -351,6 +590,12 @@ function publicUser(u: User): Record<string, unknown> {
 
 /** User + kolom 2FA (migrasi 0009). */
 type UserWithTotp = User & { totp_secret?: string | null; totp_enabled?: number | null };
+
+/** User + kolom referral (migrasi 0010). */
+type UserWithReferral = User & {
+  referral_code?: string | null;
+  referred_by?: string | null;
+};
 
 /** IP klien: CF-Connecting-IP, lalu entri pertama X-Forwarded-For. */
 function clientIp(c: Context): string {
@@ -518,6 +763,9 @@ async function authUser(c: Context, db: Database): Promise<User | null> {
 async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unknown>> {
   const items = parseItems(o.items);
   const paid = o.status === "PAID";
+  // Order hadiah: akses (externalUrl) milik PENERIMA, bukan pembeli —
+  // pembeli tidak boleh mendapat tautan produk dari order ini.
+  const isGift = Boolean(o.gift_recipient_email);
   // Baris anggota bundel (harga 0) disembunyikan dari klien — mereka
   // hanya ada di items tersimpan untuk kepemilikan/unduhan; yang dibayar
   // (baris bundel) tetap tampil.
@@ -526,7 +774,7 @@ async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unkno
       .filter((it) => !it.included_in_bundle)
       .map(async (it) => {
         let externalUrl: string | null = null;
-        if (paid) {
+        if (paid && !isGift) {
           const p = await db.get<Product>(
             "SELECT external_url FROM products WHERE id = ?",
             it.product_id
@@ -552,13 +800,31 @@ async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unkno
     voucher_code: o.voucher_code ?? null,
     discount_amount: o.discount_amount ?? 0,
     created_at: o.created_at,
-    paid_at: o.paid_at
+    paid_at: o.paid_at,
+    is_gift: isGift,
+    gift_recipient_email: o.gift_recipient_email ?? null,
+    gift_recipient_name: o.gift_recipient_name ?? null,
+    gift_message: o.gift_message ?? null,
+    gift_claimed: Boolean(o.gift_claimed_at)
   };
 }
 
 async function userHasPaidProduct(db: Database, userId: string, productId: string): Promise<boolean> {
   const orders = await db.all<OrderRow>("SELECT * FROM orders WHERE user_id = ? AND status = 'PAID'", userId);
-  return orders.some((o) => parseItems(o.items).some((it) => it.product_id === productId));
+  if (orders.some((o) => parseItems(o.items).some((it) => it.product_id === productId))) return true;
+  // Akses dari hadiah yang diterima (migrasi 0010, tabel gift_grants):
+  // penerima hadiah memakai jalur gating LUNAS yang sama seperti pembeli.
+  try {
+    const grant = await db.get<{ x: number }>(
+      "SELECT 1 AS x FROM gift_grants WHERE user_id = ? AND product_id = ? LIMIT 1",
+      userId,
+      productId
+    );
+    return !!grant;
+  } catch {
+    // Tabel belum ada (migrasi belum diterapkan) — bukan pemilik.
+    return false;
+  }
 }
 
 async function isSimLocked(db: Database, userId: string): Promise<boolean> {
@@ -878,6 +1144,29 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       whatsapp = normalizeWhatsapp(whatsappRaw);
       if (!whatsapp) return c.json({ error: "Nomor WhatsApp tidak valid." }, 400);
     }
+    // Kode ajakan (opsional): kode yang tidak ada DITOLAK — pendaftaran
+    // tidak dibuat — supaya pengguna tahu kodenya salah dan bisa
+    // memperbaikinya, bukan diam-diam kehilangan hadiah referral.
+    // referred_by hanya bisa diisi sekali, di sini, saat register.
+    const referralCodeRaw = asString(body.referral_code).trim().toUpperCase();
+    let referrer: UserWithReferral | undefined;
+    if (referralCodeRaw) {
+      if (!/^[A-Z0-9-]{3,24}$/.test(referralCodeRaw)) {
+        return c.json({ error: "Kode ajakan tidak valid. Periksa lagi kodenya ya." }, 400);
+      }
+      referrer = await db
+        .get<UserWithReferral>("SELECT * FROM users WHERE referral_code = ?", referralCodeRaw)
+        .catch(() => undefined);
+      if (!referrer) {
+        return c.json(
+          { error: "Kode ajakan tidak ditemukan. Periksa lagi kodenya, atau lanjutkan daftar tanpa kode." },
+          400
+        );
+      }
+      if (referrer.email === email) {
+        return c.json({ error: "Kode ajakan itu milikmu sendiri — pakai kode teman lain ya." }, 400);
+      }
+    }
     const existing = await db.get<User>("SELECT id FROM users WHERE email = ?", email);
     if (existing) return c.json({ error: "Email sudah terdaftar." }, 409);
     const id = newId("usr");
@@ -891,6 +1180,20 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       whatsapp,
       nowIso()
     );
+    // Kode ajakan sendiri + pengajak dicatat di sini (best-effort:
+    // bila kolom referral belum ada, akun tetap jadi dan kodenya
+    // dibuat nanti saat GET /api/referral).
+    try {
+      const myCode = await generateReferralCode(db, name);
+      await db.run(
+        "UPDATE users SET referral_code = ?, referred_by = ? WHERE id = ?",
+        myCode,
+        referrer ? referralCodeRaw : null,
+        id
+      );
+    } catch (err) {
+      console.error("[register] referral gagal disimpan:", err);
+    }
     const user = await db.get<User>("SELECT * FROM users WHERE id = ?", id);
     if (!user) return c.json({ error: "Gagal membuat akun." }, 500);
     const token = newToken();
@@ -2232,6 +2535,162 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     });
   });
 
+  // ------------------------- Referral -------------------------
+  // GET /api/referral: kode ajakan saya (dibuat bila belum ada),
+  // tautan bagikan, jumlah teman yang berhasil (referred_by = kode
+  // saya DAN sudah pernah punya order PAID), dan daftar voucher
+  // hadiah saya (sebagai pengajak maupun sebagai teman yang diajak).
+
+  app.get("/api/referral", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const code = await ensureReferralCode(db, user.id, user.name);
+    if (!code) {
+      return c.json({ error: "Kode ajakan belum tersedia. Coba lagi sebentar lagi." }, 500);
+    }
+    const countRow = await db
+      .get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM users u
+         WHERE u.referred_by = ?
+           AND EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.status = 'PAID')`,
+        code
+      )
+      .catch(() => ({ n: 0 }));
+    const rewards = await db
+      .all<{
+        referrer_user_id: string;
+        referred_user_id: string;
+        order_id: string;
+        referrer_voucher_code: string;
+        referred_voucher_code: string;
+        created_at: string;
+      }>(
+        `SELECT * FROM referral_rewards
+         WHERE referrer_user_id = ? OR referred_user_id = ?
+         ORDER BY created_at DESC`,
+        user.id,
+        user.id
+      )
+      .catch(() => []);
+    const vouchers: Record<string, unknown>[] = [];
+    for (const r of rewards) {
+      const isReferrer = r.referrer_user_id === user.id;
+      const vcode = isReferrer ? r.referrer_voucher_code : r.referred_voucher_code;
+      const v = await db
+        .get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", vcode)
+        .catch(() => undefined);
+      if (!v) continue;
+      vouchers.push({
+        code: v.code,
+        type: v.type,
+        value: v.value,
+        expires_at: v.expires_at,
+        uses: v.uses,
+        max_uses: v.max_uses,
+        active: v.active,
+        role: isReferrer ? "pengajak" : "teman",
+        created_at: r.created_at
+      });
+    }
+    return c.json({
+      referral_code: code,
+      share_url: `${appUrl()}/akun?ref=${code}`,
+      referred_count: countRow?.n ?? 0,
+      vouchers
+    });
+  });
+
+  // ------------------------- Hadiah: klaim -------------------------
+  // GET /api/gift/claim?token=... : info hadiah untuk halaman /hadiah.
+  // Token adalah rahasianya — tapi endpoint ini TIDAK membocorkan
+  // email pembeli maupun email penerima; hanya nama pemberi, nama
+  // penerima (bila diisi), pesan, judul produk, dan status token.
+  // POST /api/gift/claim: klaim butuh login, dan email akun HARUS sama
+  // dengan email penerima hadiah. Akses dicatat di gift_grants
+  // (lihat grantGiftAccess) sehingga gating LUNAS yang sudah ada
+  // langsung mengenalinya.
+
+  app.get("/api/gift/claim", async (c) => {
+    const token = (c.req.query("token") ?? "").trim();
+    if (!token) return c.json({ error: "Token klaim tidak ditemukan." }, 400);
+    const order = await db
+      .get<OrderRow>("SELECT * FROM orders WHERE gift_claim_token = ?", token)
+      .catch(() => undefined);
+    if (!order) {
+      return c.json({ error: "Tautan hadiah tidak ditemukan. Periksa lagi tautan dari email hadiahmu." }, 404);
+    }
+    const buyer = await db
+      .get<{ name: string }>("SELECT name FROM users WHERE id = ?", order.user_id)
+      .catch(() => undefined);
+    const items = parseItems(order.items).filter((it) => !it.included_in_bundle);
+    const expired = order.gift_claim_expires_at
+      ? new Date(order.gift_claim_expires_at).getTime() <= Date.now()
+      : false;
+    return c.json({
+      valid: order.status === "PAID" && !expired && !order.gift_claimed_at,
+      paid: order.status === "PAID",
+      claimed: Boolean(order.gift_claimed_at),
+      expired,
+      products: items.map((it) => ({ product_id: it.product_id, title: it.title })),
+      giver_name: buyer?.name ?? "Seseorang",
+      recipient_name: order.gift_recipient_name ?? null,
+      message: order.gift_message ?? null,
+      expires_at: order.gift_claim_expires_at ?? null
+    });
+  });
+
+  app.post("/api/gift/claim", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const token = asString((await readJson(c)).token).trim();
+    if (!token) return c.json({ error: "Token klaim tidak ditemukan." }, 400);
+    const order = await db
+      .get<OrderRow>("SELECT * FROM orders WHERE gift_claim_token = ?", token)
+      .catch(() => undefined);
+    if (!order) {
+      return c.json({ error: "Tautan hadiah tidak ditemukan. Periksa lagi tautan dari email hadiahmu." }, 404);
+    }
+    if (order.status !== "PAID") {
+      return c.json({ error: "Hadiah ini belum lunas — tunggu sampai pembeli menyelesaikan pembayaran ya." }, 400);
+    }
+    if (order.gift_claim_expires_at && new Date(order.gift_claim_expires_at).getTime() <= Date.now()) {
+      return c.json({ error: "Tautan klaim hadiah ini sudah kedaluwarsa. Minta pembeli untuk menghubungi admin Ringkas ya." }, 400);
+    }
+    if (
+      (order.gift_recipient_email ?? "").trim().toLowerCase() !== user.email.toLowerCase()
+    ) {
+      return c.json(
+        { error: "Hadiah ini dikirim ke alamat email lain. Masuk dengan email penerima hadiah untuk mengklaimnya." },
+        403
+      );
+    }
+    const items = parseItems(order.items).filter((it) => !it.included_in_bundle);
+    const products = items.map((it) => ({ product_id: it.product_id, title: it.title }));
+    if (order.gift_claimed_by && order.gift_claimed_by !== user.id) {
+      return c.json({ error: "Hadiah ini sudah diklaim orang lain." }, 400);
+    }
+    // Sudah diklaim oleh akun ini (mis. akses otomatis saat PAID karena
+    // email sudah punya akun) -> kembalikan sukses tanpa duplikasi grant.
+    const already = await db
+      .get<{ x: number }>(
+        "SELECT 1 AS x FROM gift_grants WHERE order_id = ? AND user_id = ? LIMIT 1",
+        order.id,
+        user.id
+      )
+      .catch(() => undefined);
+    if (already || order.gift_claimed_by === user.id) {
+      return c.json({ ok: true, already: true, products });
+    }
+    await grantGiftAccess(db, order, user.id);
+    await db.run(
+      "UPDATE orders SET gift_claimed_at = ?, gift_claimed_by = ? WHERE id = ? AND gift_claimed_by IS NULL",
+      nowIso(),
+      user.id,
+      order.id
+    );
+    return c.json({ ok: true, already: false, products });
+  });
+
   // ------------------------- Checkout & order -------------------------
 
   app.post("/api/checkout", async (c) => {
@@ -2288,6 +2747,43 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     // gagal karena kuotanya sudah terpakai oleh order itu sendiri).
     const voucherCode = asString(body.voucher_code).trim().toUpperCase() || null;
 
+    // Beli sebagai hadiah (opsional): bila salah satu field hadiah
+    // dikirim, email penerima wajib + valid dan bukan email sendiri;
+    // nama penerima opsional; pesan maks. 200 karakter. Token klaim
+    // dibuat di sini (32 byte acak, heksadesimal) dan kedaluwarsa
+    // 30 hari — akses pembeli TIDAK berubah: order hadiah tetap
+    // dibayar pembeli, tapi aksesnya milik penerima (lihat orderOut
+    // + fulfillGiftOrder).
+    const giftEmailRaw = asString(body.gift_recipient_email).trim().toLowerCase();
+    const giftNameRaw = asString(body.gift_recipient_name).trim();
+    const giftMessageRaw = asString(body.gift_message);
+    const isGiftCheckout =
+      giftEmailRaw !== "" || giftNameRaw !== "" || giftMessageRaw !== "";
+    let giftEmail: string | null = null;
+    let giftName: string | null = null;
+    let giftMessage: string | null = null;
+    let giftToken: string | null = null;
+    let giftExpiresAt: string | null = null;
+    if (isGiftCheckout) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(giftEmailRaw)) {
+        return c.json({ error: "Email penerima hadiah wajib diisi dengan format yang benar." }, 400);
+      }
+      if (giftEmailRaw === user.email.toLowerCase()) {
+        return c.json(
+          { error: "Hadiah tidak bisa dikirim ke emailmu sendiri — alamat itu sudah punyamu." },
+          400
+        );
+      }
+      if (giftMessageRaw.length > 200) {
+        return c.json({ error: "Pesan hadiah maksimal 200 karakter." }, 400);
+      }
+      giftEmail = giftEmailRaw;
+      giftName = giftNameRaw.slice(0, 100) || null;
+      giftMessage = giftMessageRaw.trim() || null;
+      giftToken = newToken();
+      giftExpiresAt = new Date(Date.now() + GIFT_CLAIM_DAYS * 24 * 3600 * 1000).toISOString();
+    }
+
     // Idempotensi: item + kode voucher sama dan masih PENDING.
     // Baris anggota bundel (harga 0) tidak dihitung sebagai item inti.
     const pending = await db.all<OrderRow>(
@@ -2301,7 +2797,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         .sort()
         .join(",");
       const notExpired = !o.expired_at || new Date(o.expired_at).getTime() > Date.now();
-      if (oKey === itemsKey && (o.voucher_code ?? null) === voucherCode && notExpired) {
+      // Order hadiah hanya cocok dengan order hadiah ke penerima yang sama.
+      const sameGift = (o.gift_recipient_email ?? null) === giftEmail;
+      if (oKey === itemsKey && (o.voucher_code ?? null) === voucherCode && sameGift && notExpired) {
         return c.json({ order: await orderOut(db, o) });
       }
     }
@@ -2352,6 +2850,23 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (voucherCode) {
       await db.run("UPDATE vouchers SET uses = uses + 1 WHERE code = ?", voucherCode);
     }
+    // Detail hadiah disimpan terpisah dari INSERT utama (best-effort):
+    // bila kolom hadiah belum ada (migrasi 0010 belum diterapkan),
+    // order tetap jadi sebagai order biasa, bukan gagal checkout.
+    if (giftEmail && giftToken) {
+      await db
+        .run(
+          `UPDATE orders SET gift_recipient_email = ?, gift_recipient_name = ?, gift_message = ?,
+             gift_claim_token = ?, gift_claim_expires_at = ? WHERE id = ?`,
+          giftEmail,
+          giftName,
+          giftMessage,
+          giftToken,
+          giftExpiresAt,
+          orderId
+        )
+        .catch((err) => console.error("[checkout] hadiah gagal disimpan:", err));
+    }
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
     if (!order) return c.json({ error: "Gagal membuat order." }, 500);
     // Email menunggu bayar (template 02) — hanya untuk order BARU (jalur
@@ -2383,9 +2898,12 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     // Email lunas / kedaluwarsa — dipicu setiap kali endpoint ini melihat
     // order berstatus terminal; pemeriksaan idempotensi di pengirim
     // memastikan email yang sama tidak terkirim dua kali (juga bila
-    // status sudah berubah sebelum kunci Resend disetel).
+    // status sudah berubah sebelum kunci Resend disetel). Untuk order
+    // PAID, handlePaidOrder juga memenuhi hadiah (email + akses
+    // penerima) dan hadiah referral — semuanya idempotent, jadi
+    // pemanggilan berulang dari polling aman.
     if (current.status === "PAID") {
-      background(c, sendPaidEmail(db, current));
+      background(c, handlePaidOrder(db, current));
     } else if (current.status === "EXPIRED") {
       background(c, sendExpiredEmail(db, current));
     }
@@ -2417,9 +2935,10 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (!order) return c.json({ received: true, applied: false }, 200);
     if (order.status === "PAID") return c.json({ received: true, applied: false }, 200);
     await db.run("UPDATE orders SET status = 'PAID', paid_at = ? WHERE id = ?", nowIso(), order.id);
-    // Email lunas (template 03) — fire-and-forget, idempotensi per order.
+    // Tindak lanjut PAID (email lunas / pemenuhan hadiah / hadiah
+    // referral) — fire-and-forget, idempotent per order.
     const paid = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id);
-    if (paid) background(c, sendPaidEmail(db, paid));
+    if (paid) background(c, handlePaidOrder(db, paid));
     return c.json({ received: true, applied: true }, 200);
   });
 
@@ -2430,7 +2949,84 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
       user.id
     );
-    return c.json({ orders: await Promise.all(orders.map((o) => orderOut(db, o))) });
+    const mine = await Promise.all(orders.map((o) => orderOut(db, o)));
+    // Hadiah yang diterima (migrasi 0010): tampil sebagai order LUNAS
+    // milik penerima — item + tombol Belajar/Unduh normal, tanpa struk
+    // (struk milik pembeli). Gagal baca gift_grants (migrasi belum
+    // diterapkan) -> daftar order sendiri tetap dikembalikan.
+    const received: Record<string, unknown>[] = [];
+    try {
+      const grants = await db.all<{
+        order_id: string;
+        product_id: string;
+        granted_at: string;
+      }>(
+        "SELECT order_id, product_id, granted_at FROM gift_grants WHERE user_id = ? ORDER BY granted_at DESC",
+        user.id
+      );
+      if (grants.length > 0) {
+        const byOrder = new Map<string, { product_id: string; granted_at: string }[]>();
+        for (const g of grants) {
+          const list = byOrder.get(g.order_id) ?? [];
+          list.push({ product_id: g.product_id, granted_at: g.granted_at });
+          byOrder.set(g.order_id, list);
+        }
+        for (const [orderId, granted] of byOrder) {
+          const src = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
+          if (!src || src.status !== "PAID") continue;
+          const giver = await db.get<{ name: string }>(
+            "SELECT name FROM users WHERE id = ?",
+            src.user_id
+          );
+          const grantedIds = new Set(granted.map((g) => g.product_id));
+          const itemsOut = await Promise.all(
+            parseItems(src.items)
+              .filter((it) => !it.included_in_bundle && grantedIds.has(it.product_id))
+              .map(async (it) => {
+                const p = await db.get<Product>(
+                  "SELECT external_url FROM products WHERE id = ?",
+                  it.product_id
+                );
+                return {
+                  product_id: it.product_id,
+                  title: it.title,
+                  price: it.price,
+                  externalUrl: p?.external_url ?? null
+                };
+              })
+          );
+          if (itemsOut.length === 0) continue;
+          received.push({
+            id: src.id,
+            user_id: user.id,
+            items: itemsOut,
+            total: src.total,
+            status: "PAID",
+            klikqris_order_id: null,
+            qris_url: null,
+            direct_url: null,
+            total_amount: src.total_amount ?? src.total,
+            expired_at: null,
+            idempotency_key: null,
+            whatsapp: null,
+            voucher_code: null,
+            discount_amount: 0,
+            created_at: granted[0]?.granted_at ?? src.paid_at ?? src.created_at,
+            paid_at: src.paid_at,
+            is_gift: false,
+            is_gift_received: true,
+            gift_from_name: giver?.name ?? null,
+            gift_claimed: true
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[orders] hadiah diterima gagal dimuat:", err);
+    }
+    const all = [...mine, ...received].sort((a, b) =>
+      String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+    );
+    return c.json({ orders: all });
   });
 
   app.get("/api/orders/:id/receipt", async (c) => {
@@ -2455,9 +3051,26 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", c.req.param("id"));
     if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
-    if (order.user_id !== user.id) return c.json({ error: "Order ini bukan milikmu." }, 403);
-    if (order.status !== "PAID") return c.json({ error: "Unduhan hanya tersedia untuk order yang sudah lunas." }, 400);
     const productId = c.req.param("product_id");
+    // Pemilik order boleh mengunduh; penerima hadiah juga boleh bila
+    // produk itu sudah diberikan kepadanya (gift_grants). Struk tetap
+    // pemilik saja (endpoint receipt tidak diubah).
+    let viaGift = false;
+    if (order.user_id !== user.id) {
+      const grant = await db
+        .get<{ x: number }>(
+          "SELECT 1 AS x FROM gift_grants WHERE order_id = ? AND product_id = ? AND user_id = ? LIMIT 1",
+          order.id,
+          productId,
+          user.id
+        )
+        .catch(() => undefined);
+      viaGift = !!grant;
+    }
+    if (order.user_id !== user.id && !viaGift) {
+      return c.json({ error: "Order ini bukan milikmu." }, 403);
+    }
+    if (order.status !== "PAID") return c.json({ error: "Unduhan hanya tersedia untuk order yang sudah lunas." }, 400);
     if (!parseItems(order.items).some((it) => it.product_id === productId)) {
       return c.json({ error: "Produk ini tidak ada di order tersebut." }, 403);
     }

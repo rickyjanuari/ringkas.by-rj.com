@@ -14,7 +14,19 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	let orders = $state<Order[]>([]);
+	// Field hadiah (migrasi 0010) — ditambahkan server di orderOut /
+	// entri hadiah diterima; tidak ada di tipe Order bersama.
+	type OrderGift = Order & {
+		is_gift?: boolean;
+		gift_recipient_email?: string | null;
+		gift_recipient_name?: string | null;
+		gift_message?: string | null;
+		gift_claimed?: boolean;
+		is_gift_received?: boolean;
+		gift_from_name?: string | null;
+	};
+
+	let orders = $state<OrderGift[]>([]);
 	let loading = $state(true);
 	let error = $state("");
 	let checkingId = $state<string | null>(null);
@@ -40,7 +52,7 @@
 		loading = true;
 		error = "";
 		try {
-			const data = await api<{ orders: Order[] }>("/api/orders");
+			const data = await api<{ orders: OrderGift[] }>("/api/orders");
 			orders = data.orders ?? [];
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memuat pesanan.";
@@ -146,6 +158,20 @@
 				<p class="mt-2 text-sm">
 					Total: <b class="text-[#177245]">{formatRupiah(o.total_amount ?? o.total)}</b>
 				</p>
+				{#if o.is_gift}
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-bold text-[#22302a]">
+						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
+						<span>
+							Hadiah untuk {o.gift_recipient_name ?? o.gift_recipient_email}
+							{#if o.gift_claimed}— sudah diklaim oleh penerima{:else}— menunggu diklaim penerima{/if}
+						</span>
+					</p>
+				{:else if o.is_gift_received}
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
+						<span>Hadiah dari {o.gift_from_name ?? "seseorang"} — selamat belajar!</span>
+					</p>
+				{/if}
 
 				{#if o.status === "PENDING"}
 					<button
@@ -159,7 +185,24 @@
 				{/if}
 
 				{#if o.status === "PAID"}
+					{#if o.is_gift}
+						<!-- Order hadiah (pembeli): akses milik penerima — hanya struk yang tampil. -->
+						<div class="mt-3">
+							<button
+								type="button"
+								class="btn btn-outline w-full text-xs"
+								disabled={downloadingId === `struk-${o.id}`}
+								onclick={() => unduhStruk(o.id)}
+							>
+								<Icon name="receipt" size={15} /> Unduh Struk
+							</button>
+						</div>
+						<p class="mt-2 text-xs text-[#5f6b62]">
+							Tombol belajar dan unduh ada di akun penerima setelah hadiah diklaim.
+						</p>
+					{:else}
 					<div class="mt-3 grid grid-cols-2 gap-2">
+						{#if !o.is_gift_received}
 						<button
 							type="button"
 							class="btn btn-outline text-xs"
@@ -168,6 +211,7 @@
 						>
 							<Icon name="receipt" size={15} /> Unduh Struk
 						</button>
+						{/if}
 						{#each o.items as it (it.product_id)}
 							<button
 								type="button"
@@ -206,6 +250,7 @@
 					<a href={`/belajar/${o.items[0]?.product_id}`} class="btn btn-primary btn-block mt-2">
 						<Icon name="book-open" size={15} /> Buka Ruang Belajar
 					</a>
+					{/if}
 				{/if}
 			</article>
 		{/each}

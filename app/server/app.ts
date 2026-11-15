@@ -8,6 +8,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { registerRoutes } from "./actions.js";
+import { registerTryoutRoutes } from "./tryout.js";
+import { registerQaRoutes } from "./qa.js";
+import { registerRaporRoutes } from "./rapor.js";
 import type { Database } from "./database.js";
 import type { ImageStorage } from "./storage.js";
 
@@ -32,6 +35,9 @@ export function createApp(db: Database, opts: AppOptions): Hono {
   );
 
   registerRoutes(app, db, opts.storage);
+  registerTryoutRoutes(app, db);
+  registerQaRoutes(app, db);
+  registerRaporRoutes(app, db);
 
   return app;
 }

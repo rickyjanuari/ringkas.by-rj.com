@@ -10,6 +10,44 @@
 	let error = $state("");
 	let jenjang = $state("Semua");
 
+	// ---- Tryout mendatang (dari /api/tryouts, gagal diam-diam) ----
+	interface TryoutRingkas {
+		id: string;
+		grade: number;
+		title: string;
+		starts_at: string;
+		ends_at: string;
+		duration_minutes: number;
+		question_count: number;
+		is_free: number;
+		phase: "upcoming" | "live" | "ended";
+		participants: number;
+		registered?: boolean;
+	}
+	let tryouts = $state<TryoutRingkas[]>([]);
+	let nowMs = $state(Date.now());
+
+	function hitungMundurTryout(t: TryoutRingkas): string {
+		const start = new Date(t.starts_at).getTime();
+		const end = new Date(t.ends_at).getTime();
+		if (nowMs >= start && nowMs <= end) return "Sedang berlangsung";
+		const sisa = start - nowMs;
+		if (sisa <= 0) return "Sudah berakhir";
+		const h = Math.floor(sisa / 3600000);
+		const d = Math.floor(h / 24);
+		const m = Math.floor((sisa % 3600000) / 60000);
+		if (d > 0) return `Mulai dalam ${d} hari ${h % 24} jam`;
+		if (h > 0) return `Mulai dalam ${h} jam ${m} mnt`;
+		return `Mulai dalam ${m} mnt`;
+	}
+
+	/** Tryout berikutnya per kelas (mendatang/berlangsung), maks. 6 kartu. */
+	let tryoutBerikut = $derived(
+		[1, 2, 3, 4, 5, 6]
+			.map((g) => tryouts.filter((t) => t.grade === g && t.phase !== "ended").sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at))[0])
+			.filter((t): t is TryoutRingkas => !!t)
+	);
+
 	// ---- Pengumuman & promo (dari /api/announcement, gagal diam-diam) ----
 	let announcementText = $state("");
 	let announcementShown = $state(false);
@@ -83,6 +121,7 @@
 	onMount(() => {
 		timer = setInterval(() => {
 			if (!paused) nextSlide();
+			nowMs = Date.now();
 		}, 5000);
 		return () => clearInterval(timer);
 	});
@@ -93,6 +132,14 @@
 	);
 
 	onMount(async () => {
+		// Tryout mendatang: gagal diam-diam, tidak boleh memperlambat katalog.
+		api<{ tryouts: TryoutRingkas[] }>("/api/tryouts")
+			.then((d) => {
+				tryouts = d.tryouts ?? [];
+			})
+			.catch(() => {
+				/* kartu tryout diam-diam tidak tampil */
+			});
 		// Pengumuman tidak boleh memperlambat katalog: muat paralel, gagal diam-diam.
 		api<{
 			announcement_text: string | null;
@@ -248,6 +295,39 @@
 		<a href="/soal-cerita" class="btn btn-leaf shrink-0">Mulai Latihan</a>
 	</div>
 </section>
+
+<!-- Tryout Mendatang -->
+{#if tryoutBerikut.length > 0}
+	<section class="card mt-4 p-4 lg:p-5" aria-label="Tryout Mendatang">
+		<div class="flex items-center gap-3">
+			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="trophy" size={24} /></span>
+			<div class="min-w-0 flex-1">
+				<h2 class="text-base font-extrabold">Tryout Mendatang</h2>
+				<p class="text-sm text-[#5f6b62]">Ujian bersama per kelas — daftar, kerjakan saat waktunya tiba, dan lihat peringkatmu.</p>
+			</div>
+			<a href="/tryout" class="btn btn-outline shrink-0 text-xs">Semua Tryout</a>
+		</div>
+		<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+			{#each tryoutBerikut as t (t.id)}
+				<a href="/tryout/{t.id}" class="card !rounded-lg p-3">
+					<p class="flex flex-wrap items-center gap-1.5">
+						<span class="badge {t.phase === 'live' ? 'badge-leaf' : 'badge-sun'}">
+							{t.phase === "live" ? "Berlangsung" : "Mendatang"}
+						</span>
+						{#if t.is_free}<span class="badge badge-leaf">Gratis</span>{/if}
+					</p>
+					<p class="mt-1.5 text-sm font-extrabold leading-snug">{t.title}</p>
+					<p class="mt-0.5 text-xs font-bold text-[#5f6b62]">
+						Kelas {t.grade} • {t.question_count} soal • {t.duration_minutes} menit • {t.participants} peserta
+					</p>
+					<p class="mt-1 text-xs font-bold text-[#177245]">
+						<Icon name="clock" size={13} class="inline-block align-[-2px]" /> {hitungMundurTryout(t)}
+					</p>
+				</a>
+			{/each}
+		</div>
+	</section>
+{/if}
 
 <!-- Chip jenjang -->
 <div class="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-6">
