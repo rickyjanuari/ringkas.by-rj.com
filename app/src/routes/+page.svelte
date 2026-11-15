@@ -617,7 +617,7 @@
 						</div>
 						<button
 							type="button"
-							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#177245] text-white"
+							class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#177245] text-white"
 							aria-label="Tambah {p.title} ke keranjang"
 							onclick={(e) => tambah(p.id, e)}
 						>

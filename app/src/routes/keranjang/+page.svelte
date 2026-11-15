@@ -66,7 +66,7 @@
 				</div>
 				<button
 					type="button"
-					class="btn btn-danger h-8 self-start !px-2.5 !py-1 text-xs"
+					class="btn btn-danger h-11 self-start !px-3 text-xs"
 					onclick={() => cart.remove(p.id)}
 					aria-label="Hapus {p.title}"
 				>
