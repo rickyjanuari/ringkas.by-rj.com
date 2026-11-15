@@ -3,6 +3,7 @@
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, type ProductPublic } from "$lib/api";
 	import { cart } from "$lib/store";
+	import Icon from "$lib/Icon.svelte";
 
 	let products = $state<ProductPublic[]>([]);
 	let loading = $state(true);
@@ -12,28 +13,34 @@
 	// ---- Carousel promo ----
 	const slides = [
 		{
-			kicker: "📘 Belajar jadi ringan",
+			icon: "book-open",
+			kicker: "Belajar jadi ringan",
 			title: "Rangkuman Materi SD, SMP, SMA",
 			text: "Teman belajar kamu: rangkuman kilat, kuis seru, dan simulasi SAS — semuanya ringkas dan mudah dipahami.",
-			cta: "🔍 Cari Materi",
+			cta: "Cari Materi",
+			ctaIcon: "search",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #2273d8, #159a68)"
+			bg: "linear-gradient(135deg, #177245, #115c39)"
 		},
 		{
-			kicker: "🏅 Simulasi SAS per mapel",
+			icon: "trophy",
+			kicker: "Simulasi SAS per mapel",
 			title: "Latihan SAS sesuai struktur baku",
 			text: "Kelas 1–2: 25 soal • Kelas 3: 35 soal • Kelas 4: 38 soal • Kelas 5: 39 soal • Kelas 6: 40 soal. Ada pilihan ganda, benar/salah, menjodohkan, isian, dan uraian.",
-			cta: "🎯 Coba Simulasi",
+			cta: "Coba Simulasi",
+			ctaIcon: "target",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #1a5cb0, #2273d8)"
+			bg: "linear-gradient(135deg, #115c39, #177245)"
 		},
 		{
-			kicker: "🧾 Paket SAS Kelas 1–6",
+			icon: "receipt",
+			kicker: "Paket SAS Kelas 1–6",
 			title: "Paket SAS Rp17–21 ribu",
 			text: "Satu paket per kelas, beli sekali lewat KlikQRIS, langsung bisa dipakai latihan di Ruang Belajar.",
-			cta: "🛒 Lihat Paket SAS",
+			cta: "Lihat Paket SAS",
+			ctaIcon: "shopping-cart",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #159a68, #2273d8)"
+			bg: "linear-gradient(135deg, #177245, #f2b33d)"
 		}
 	];
 	let slideIdx = $state(0);
@@ -117,34 +124,36 @@
 		>
 			{#each slides as s (s.title)}
 				<div class="w-full shrink-0 px-5 py-6 text-white" style="background: {s.bg}">
-					<p class="text-xs font-bold uppercase tracking-widest text-[#ffc531]">{s.kicker}</p>
+					<p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#f2b33d]">
+						<Icon name={s.icon} size={14} /> {s.kicker}
+					</p>
 					<h1 class="mt-1 text-2xl font-extrabold leading-snug">{s.title}</h1>
 					<p class="mt-1 text-sm text-white/90">{s.text}</p>
-					<a href={s.href} class="btn btn-sun mt-4">{s.cta}</a>
+					<a href={s.href} class="btn btn-sun mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
 				</div>
 			{/each}
 		</div>
 		<button
 			type="button"
-			class="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-lg font-extrabold text-white"
+			class="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-white"
 			aria-label="Slide sebelumnya"
 			onclick={() => {
 				prevSlide();
 				pauseAuto(8000);
 			}}
 		>
-			‹
+			<Icon name="chevron-left" size={18} />
 		</button>
 		<button
 			type="button"
-			class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-lg font-extrabold text-white"
+			class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-white"
 			aria-label="Slide berikutnya"
 			onclick={() => {
 				nextSlide();
 				pauseAuto(8000);
 			}}
 		>
-			›
+			<Icon name="chevron-right" size={18} />
 		</button>
 		<div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
 			{#each slides as _, i (i)}
@@ -160,10 +169,16 @@
 			{/each}
 		</div>
 	</div>
-	<div class="flex divide-x divide-[#e6eefb] text-center text-xs font-bold text-[#475569]">
-		<div class="flex-1 px-2 py-3">✅ Rangkuman kilat</div>
-		<div class="flex-1 px-2 py-3">🎮 Kuis interaktif</div>
-		<div class="flex-1 px-2 py-3">🏅 Simulasi SAS</div>
+	<div class="flex divide-x divide-[#e7e2d2] text-center text-xs font-bold text-[#3f4a42]">
+		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
+			<Icon name="check" size={14} class="text-[#177245]" /> Rangkuman kilat
+		</div>
+		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
+			<Icon name="gamepad-2" size={14} class="text-[#177245]" /> Kuis interaktif
+		</div>
+		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
+			<Icon name="trophy" size={14} class="text-[#177245]" /> Simulasi SAS
+		</div>
 	</div>
 </section>
 
@@ -171,17 +186,21 @@
 <div class="mt-5 flex gap-2 overflow-x-auto pb-1">
 	{#each jenjangList as j (j)}
 		<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
-			{j === "Semua" ? "✨ Semua" : `🎒 ${j}`}
+			{#if j === "Semua"}
+				<Icon name="sparkles" size={14} /> Semua
+			{:else}
+				<Icon name="backpack" size={14} /> {j}
+			{/if}
 		</button>
 	{/each}
 </div>
 
 {#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error}
 	<p class="err mt-6">{error}</p>
 {:else if shown.length === 0}
-	<p class="mt-6 text-center text-sm text-[#64748b]">Belum ada produk untuk jenjang ini.</p>
+	<p class="mt-6 text-center text-sm text-[#5f6b62]">Belum ada produk untuk jenjang ini.</p>
 {:else}
 	<div class="mt-3 grid grid-cols-2 gap-3">
 		{#each shown as p (p.id)}
@@ -203,25 +222,25 @@
 						<span class="badge badge-sun">{p.badge}</span>
 					{/if}
 					<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-bold leading-snug">{p.title}</h2>
-					<p class="mt-0.5 text-[11px] font-semibold text-[#64748b]">
+					<p class="mt-0.5 text-[11px] font-semibold text-[#5f6b62]">
 						{p.jenjang} • {p.mapel} • {p.pages} hlm
 					</p>
 					<div class="mt-2 flex items-end justify-between gap-1">
 						<div>
 							{#if p.strikethrough_price}
-								<p class="text-[11px] font-semibold text-[#94a3b8] line-through">
+								<p class="text-[11px] font-semibold text-[#9aa096] line-through">
 									{formatRupiah(p.strikethrough_price)}
 								</p>
 							{/if}
-							<p class="text-sm font-extrabold text-[#2273d8]">{formatRupiah(p.price)}</p>
+							<p class="text-sm font-extrabold text-[#177245]">{formatRupiah(p.price)}</p>
 						</div>
 						<button
 							type="button"
-							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2273d8] text-base font-extrabold text-white"
+							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#177245] text-white"
 							aria-label="Tambah {p.title} ke keranjang"
 							onclick={(e) => tambah(p.id, e)}
 						>
-							+
+							<Icon name="plus" size={18} />
 						</button>
 					</div>
 				</div>

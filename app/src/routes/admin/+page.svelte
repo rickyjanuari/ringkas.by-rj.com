@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import {
@@ -30,7 +31,7 @@
 		strikethrough_price: null as number | null,
 		pages: 0,
 		cover_label: "",
-		cover_color: "#2273d8",
+		cover_color: "#177245",
 		badge: "",
 		category: "Kelas",
 		description: "",
@@ -120,7 +121,7 @@
 			strikethrough_price: null,
 			pages: 0,
 			cover_label: "",
-			cover_color: "#2273d8",
+			cover_color: "#177245",
 			badge: "",
 			category: "Kelas",
 			description: "",
@@ -172,14 +173,14 @@
 					body: JSON.stringify(body)
 				});
 				products = [data.product, ...products];
-				notice = "✅ Produk baru ditambahkan.";
+				notice = "Produk baru ditambahkan.";
 			} else {
 				const data = await api<{ product: Product }>(`/api/admin/products/${editId}`, {
 					method: "PUT",
 					body: JSON.stringify(body)
 				});
 				products = products.map((p) => (p.id === editId ? data.product : p));
-				notice = "✅ Produk diperbarui.";
+				notice = "Produk diperbarui.";
 			}
 			editId = null;
 		} catch (e) {
@@ -220,7 +221,7 @@
 				{ method: "POST", body: JSON.stringify({ url }) }
 			);
 			products = products.map((x) => (x.id === p.id ? data.product : x));
-			notice = url ? "✅ Link eksternal disimpan." : "Link eksternal dihapus.";
+			notice = url ? "Link eksternal disimpan." : "Link eksternal dihapus.";
 			externalUrlDraft = "";
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal menyimpan link eksternal.";
@@ -248,7 +249,7 @@
 				method: "POST",
 				body: JSON.stringify({ filename: uploadFile.name, dataUrl, kind: uploadKind })
 			});
-			notice = `✅ Gambar (${uploadKind}) berhasil diunggah untuk "${p.title}".`;
+			notice = `Gambar (${uploadKind}) berhasil diunggah untuk "${p.title}".`;
 			uploadFile = null;
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal mengunggah gambar.";
@@ -265,7 +266,7 @@
 				body: JSON.stringify({ role })
 			});
 			users = users.map((x) => (x.id === u.id ? { ...x, role: data.user.role } : x));
-			notice = `✅ ${u.name} sekarang ${role === "admin" ? "Admin" : "Pelanggan"}.`;
+			notice = `${u.name} sekarang ${role === "admin" ? "Admin" : "Pelanggan"}.`;
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal mengubah role.";
 		}
@@ -310,7 +311,7 @@
 			);
 			videoChapters = videoChapters.map((c) => (c.id === videoChapterId ? data.chapter : c));
 			notice = videoUrl.trim()
-				? "✅ Video bab tersimpan."
+				? "Video bab tersimpan."
 				: "Video bab dihapus.";
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal menyimpan video.";
@@ -320,11 +321,11 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>← Kembali ke Akun</button>
-<h1 class="mt-3 text-xl font-extrabold">👑 Admin — Kelola Produk</h1>
+<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}><Icon name="chevron-left" size={18} /> Kembali ke Akun</button>
+<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold"><Icon name="crown" size={22} /> Admin — Kelola Produk</h1>
 
 {#if checking}
-	<p class="mt-6 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if !isAdmin}
 	<p class="err mt-6">{error || "Halaman ini hanya untuk admin."}</p>
 	<a href="/" class="btn btn-primary mt-4">Kembali ke Beranda</a>
@@ -338,19 +339,19 @@
 
 	<div class="mt-4 flex gap-2">
 		<button type="button" class="chip" class:active={tab === "produk"} onclick={() => switchTab("produk")}>
-			📦 Produk ({products.length})
+			<Icon name="package" size={16} /> Produk ({products.length})
 		</button>
 		<button type="button" class="chip" class:active={tab === "pengguna"} onclick={() => switchTab("pengguna")}>
-			👥 Pengguna & Role
+			<Icon name="users" size={16} /> Pengguna & Role
 		</button>
 		<button type="button" class="chip" class:active={tab === "video"} onclick={() => switchTab("video")}>
-			🎥 Video per Bab
+			<Icon name="video" size={16} /> Video per Bab
 		</button>
 	</div>
 
 	{#if tab === "produk"}
 		<div class="mt-4 flex items-center justify-between">
-			<p class="text-sm font-bold text-[#475569]">Total {products.length} produk</p>
+			<p class="text-sm font-bold text-[#3f4a42]">Total {products.length} produk</p>
 			<button type="button" class="btn btn-primary text-xs" onclick={mulaiTambah}>+ Tambah Produk</button>
 		</div>
 
@@ -362,7 +363,7 @@
 					simpanProduk();
 				}}
 			>
-				<p class="font-extrabold">{editId === "baru" ? "➕ Produk Baru" : "✏️ Edit Produk"}</p>
+				<p class="flex items-center gap-2 font-extrabold">{editId === "baru" ? "Produk Baru" : "Edit Produk"}</p>
 				<div>
 					<label class="lbl" for="f-title">Judul</label>
 					<input id="f-title" class="input" bind:value={form.title} required />
@@ -420,7 +421,7 @@
 				{/if}
 				<div class="flex gap-2">
 					<button type="submit" class="btn btn-primary flex-1" disabled={formSaving}>
-						{formSaving ? "Menyimpan..." : "💾 Simpan"}
+						{#if formSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan{/if}
 					</button>
 					<button type="button" class="btn btn-ghost" onclick={() => (editId = null)}>Batal</button>
 				</div>
@@ -428,7 +429,7 @@
 		{/if}
 
 		{#if productsLoading}
-			<p class="mt-4 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 		{:else}
 			<div class="mt-3 space-y-3">
 				{#each products as p (p.id)}
@@ -442,7 +443,7 @@
 							</div>
 							<div class="min-w-0 flex-1">
 								<p class="text-sm font-bold leading-snug">{p.title}</p>
-								<p class="text-xs text-[#64748b]">
+								<p class="text-xs text-[#5f6b62]">
 									{p.jenjang} • {p.mapel} • {formatRupiah(p.price)}
 								</p>
 								<div class="mt-1 flex flex-wrap gap-1">
@@ -452,7 +453,7 @@
 										<span class="badge badge-gray">TERSEMBUNYI</span>
 									{/if}
 									{#if p.external_url}
-										<span class="badge badge-brand">🔗 Link eksternal</span>
+										<span class="badge badge-brand"><Icon name="link" size={12} /> Link eksternal</span>
 									{/if}
 								</div>
 							</div>
@@ -466,14 +467,14 @@
 						</div>
 						<div class="mt-2 flex flex-wrap gap-2">
 							<button type="button" class="btn btn-outline !px-2.5 !py-1.5 text-xs" onclick={() => mulaiEdit(p)}>
-								✏️ Edit
+								<Icon name="edit" size={14} /> Edit
 							</button>
 							<button
 								type="button"
 								class="btn btn-danger !px-2.5 !py-1.5 text-xs"
 								onclick={() => hapusProduk(p.id, p.title)}
 							>
-								🗑️ Hapus
+								<Icon name="trash" size={14} /> Hapus
 							</button>
 							<input
 								class="input !w-44 !px-2 !py-1.5 text-xs"
@@ -489,7 +490,7 @@
 								Simpan Link
 							</button>
 						</div>
-						<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-dashed border-[#dbe7f7] pt-2">
+						<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-dashed border-[#e7e2d2] pt-2">
 							<input
 								type="file"
 								accept="image/*"
@@ -508,7 +509,7 @@
 								disabled={uploading || !uploadFile}
 								onclick={() => uploadGambar(p)}
 							>
-								{uploading ? "Mengunggah..." : "⬆️ Upload Gambar"}
+								{#if uploading}Mengunggah...{:else}<Icon name="upload" size={15} /> Upload Gambar{/if}
 							</button>
 						</div>
 					</article>
@@ -517,18 +518,18 @@
 		{/if}
 	{:else if tab === "pengguna"}
 		{#if usersLoading}
-			<p class="mt-4 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 		{:else if users.length === 0}
-			<p class="mt-4 text-sm text-[#64748b]">Belum ada pengguna.</p>
+			<p class="mt-4 text-sm text-[#5f6b62]">Belum ada pengguna.</p>
 		{:else}
 			<div class="mt-3 space-y-2">
 				{#each users as u (u.id)}
 					<div class="card flex items-center gap-3 p-3">
-						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef4fd] text-base">👤</span>
+						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ece9dc] text-[#177245]"><Icon name="user" size={18} /></span>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-bold">{u.name}</p>
-							<p class="truncate text-xs text-[#64748b]">
-								{u.email} • {u.order_count} order • {u.role === "admin" ? "👑 Admin" : "🎒 Pelanggan"}
+							<p class="truncate text-xs text-[#5f6b62]">
+								{u.email} • {u.order_count} order • {#if u.role === "admin"}<Icon name="crown" size={13} class="inline-block align-[-2px]" /> Admin{:else}<Icon name="backpack" size={13} class="inline-block align-[-2px]" /> Pelanggan{/if}
 							</p>
 						</div>
 						{#if u.role === "admin"}
@@ -554,8 +555,8 @@
 		{/if}
 	{:else}
 		<div class="card mt-4 space-y-3 p-4">
-			<p class="text-sm font-bold">🎥 Video per Bab</p>
-			<p class="text-xs text-[#64748b]">
+			<p class="text-sm font-bold"><Icon name="video" size={16} /> Video per Bab</p>
+			<p class="text-xs text-[#5f6b62]">
 				Video tampil di Ruang Belajar sebagai kartu "Tonton Video Pembelajaran". Kosongkan URL untuk
 				menghapus video.
 			</p>
@@ -569,7 +570,7 @@
 				</select>
 			</div>
 			{#if videoLoading}
-				<p class="text-sm text-[#64748b]">Memuat bab...</p>
+				<p class="text-sm text-[#5f6b62]">Memuat bab...</p>
 			{:else if videoChapters.length > 0}
 				<div>
 					<label class="lbl" for="v-bab">Pilih bab</label>
@@ -577,7 +578,7 @@
 						<option value="">— Pilih bab —</option>
 						{#each videoChapters as c (c.id)}
 							<option value={c.id}>
-								{c.title}{c.video_url ? " 🎥" : ""}
+								{c.title}{c.video_url ? " (ada video)" : ""}
 							</option>
 						{/each}
 					</select>
@@ -604,7 +605,7 @@
 					disabled={videoSaving}
 					onclick={simpanVideo}
 				>
-					{videoSaving ? "Menyimpan..." : "💾 Simpan Video"}
+					{#if videoSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Video{/if}
 				</button>
 			{/if}
 		</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -27,6 +28,7 @@
 	let note = $state("");
 	let noteSaving = $state(false);
 	let noteMsg = $state("");
+	let noteOk = $state(false);
 	let marking = $state(false);
 	let downloadingWs = $state(false);
 
@@ -72,8 +74,8 @@
 				body: JSON.stringify({ product_id: productId, chapter_id: chapterId })
 			});
 			notice = data.sticker
-				? "🎉 Bab selesai — kamu dapat 1 stiker baru!"
-				: "✅ Bab ditandai selesai. Hebat!";
+				? "Bab selesai — kamu dapat 1 stiker baru!"
+				: "Bab ditandai selesai. Hebat!";
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal menandai bab selesai.";
 		} finally {
@@ -103,7 +105,8 @@
 				method: "POST",
 				body: JSON.stringify({ product_id: productId, chapter_id: chapterId, note })
 			});
-			noteMsg = note.trim() ? "✅ Catatan tersimpan." : "Catatan dihapus.";
+			noteMsg = note.trim() ? "Catatan tersimpan." : "Catatan dihapus.";
+			noteOk = note.trim() !== "";
 		} catch (e) {
 			noteMsg = e instanceof Error ? e.message : "Gagal menyimpan catatan.";
 		} finally {
@@ -159,16 +162,16 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto(`/belajar/${productId}`)}>
-	← Kembali ke Ruang Belajar
+	<Icon name="chevron-left" size={18} /> Kembali ke Ruang Belajar
 </button>
 
 {#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error || !chapter}
 	<p class="err mt-6">{error || "Bab tidak ditemukan."}</p>
 {:else}
 	<h1 class="mt-3 text-xl font-extrabold leading-snug">{chapter.title}</h1>
-	<p class="text-sm text-[#64748b]">
+	<p class="text-sm text-[#5f6b62]">
 		{chapter.subject} • Kelas {chapter.grade} • Semester {chapter.semester}
 	</p>
 
@@ -178,7 +181,7 @@
 
 	<div class="mt-3 flex flex-wrap gap-2">
 		<button type="button" class="btn {bookmarked ? 'btn-sun' : 'btn-ghost'} text-xs" onclick={toggleBookmark}>
-			{bookmarked ? "🔖 Dibookmark" : "🔖 Bookmark"}
+			{#if bookmarked}<Icon name="bookmark" size={15} /> Dibookmark{:else}<Icon name="bookmark" size={15} /> Bookmark{/if}
 		</button>
 		<button
 			type="button"
@@ -186,20 +189,20 @@
 			disabled={downloadingWs}
 			onclick={unduhWorksheet}
 		>
-			{downloadingWs ? "Mengunduh..." : "🖨️ Worksheet Printable (PDF)"}
+			{#if downloadingWs}Mengunduh...{:else}<Icon name="printer" size={15} /> Worksheet Printable (PDF){/if}
 		</button>
 		<button type="button" class="btn btn-leaf text-xs" disabled={marking} onclick={tandaiSelesai}>
-			{marking ? "..." : "✅ Tandai Selesai"}
+			{#if marking}...{:else}<Icon name="check" size={15} /> Tandai Selesai{/if}
 		</button>
 	</div>
 
 	<!-- Poin inti -->
 	<div class="card mt-4 p-4">
-		<h2 class="text-sm font-extrabold text-[#2273d8]">🎯 Poin Inti</h2>
+		<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="target" size={16} /> Poin Inti</h2>
 		<ul class="mt-2 space-y-1.5">
 			{#each chapter.points as p, i (i)}
 				<li class="flex gap-2 text-sm leading-relaxed">
-					<span class="text-[#159a68]">✓</span><span>{p}</span>
+					<Icon name="check" size={15} class="mt-0.5 shrink-0 text-[#177245]" /><span>{p}</span>
 				</li>
 			{/each}
 		</ul>
@@ -207,8 +210,8 @@
 
 	<!-- Rangkuman kilat -->
 	{#if chapter.summary}
-		<div class="card mt-3 border-2 !border-[#ffc531] p-4">
-			<h2 class="text-sm font-extrabold">⚡ Rangkuman Kilat</h2>
+		<div class="card mt-3 border-2 !border-[#f2b33d] p-4">
+			<h2 class="flex items-center gap-1.5 text-sm font-extrabold"><Icon name="zap" size={16} /> Rangkuman Kilat</h2>
 			<p class="mt-1 text-sm leading-relaxed">{chapter.summary}</p>
 		</div>
 	{/if}
@@ -216,7 +219,7 @@
 	<!-- Teks fokus -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center justify-between gap-2">
-			<h2 class="text-sm font-extrabold text-[#2273d8]">📖 Teks Fokus</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="book-open" size={16} /> Teks Fokus</h2>
 			<div class="flex items-center gap-1">
 				<button
 					type="button"
@@ -244,7 +247,7 @@
 
 	<!-- Catatan pribadi -->
 	<div class="card mt-3 p-4">
-		<label class="lbl" for="catatan">📝 Catatan Pribadi</label>
+		<label class="lbl flex items-center gap-1.5" for="catatan"><Icon name="file-text" size={14} /> Catatan Pribadi</label>
 		<textarea
 			id="catatan"
 			class="input"
@@ -257,16 +260,16 @@
 				{noteSaving ? "Menyimpan..." : "Simpan Catatan"}
 			</button>
 			{#if noteMsg}
-				<span class="text-xs {noteMsg.startsWith('✅') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{noteMsg}</span>
+				<span class="text-xs {noteOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{noteMsg}</span>
 			{/if}
 		</div>
 	</div>
 
 	<!-- Kuis -->
 	<div class="card mt-4 p-4">
-		<h2 class="text-base font-extrabold">🎮 Kuis Bab ({totalQ} soal)</h2>
+		<h2 class="flex items-center gap-2 text-base font-extrabold"><Icon name="gamepad-2" size={18} /> Kuis Bab ({totalQ} soal)</h2>
 		{#if !quizStarted}
-			<p class="mt-1 text-sm text-[#64748b]">
+			<p class="mt-1 text-sm text-[#5f6b62]">
 				Jawab satu per satu. Nilai dan pembahasan muncul setelah kamu mengirim semua jawaban.
 			</p>
 			<button
@@ -275,13 +278,13 @@
 				disabled={totalQ === 0}
 				onclick={() => (quizStarted = true)}
 			>
-				{totalQ === 0 ? "Kuis belum tersedia" : "🚀 Mulai Kuis"}
+				{#if totalQ === 0}Kuis belum tersedia{:else}<Icon name="rocket" size={16} /> Mulai Kuis{/if}
 			</button>
 		{:else if !result && currentQ}
-			<p class="mt-2 text-xs font-bold text-[#64748b]">Soal {qIndex + 1} dari {totalQ}</p>
-			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e6eefb]">
+			<p class="mt-2 text-xs font-bold text-[#5f6b62]">Soal {qIndex + 1} dari {totalQ}</p>
+			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#2273d8] transition-all"
+					class="h-full bg-[#177245] transition-all"
 					style="width: {((qIndex + 1) / Math.max(totalQ, 1)) * 100}%"
 				></div>
 			</div>
@@ -293,7 +296,7 @@
 							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
 								String(currentQ.id)
 							] === opt
-								? '!border-[#2273d8] bg-[#eef4fd]'
+								? '!border-[#177245] bg-[#ece9dc]'
 								: ''}"
 						>
 							<input
@@ -335,11 +338,11 @@
 					disabled={qIndex === 0}
 					onclick={() => (qIndex -= 1)}
 				>
-					← Sebelumnya
+					<Icon name="chevron-left" size={16} /> Sebelumnya
 				</button>
 				{#if qIndex < totalQ - 1}
 					<button type="button" class="btn btn-primary flex-1" onclick={() => (qIndex += 1)}>
-						Berikutnya →
+						Berikutnya <Icon name="chevron-right" size={16} />
 					</button>
 				{:else}
 					<button
@@ -348,7 +351,7 @@
 						disabled={submitting}
 						onclick={kirimKuis}
 					>
-						{submitting ? "Memeriksa..." : "✅ Kirim Jawaban"}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -358,15 +361,21 @@
 		{:else if result}
 			<p class="mt-3 text-center text-xl font-extrabold">
 				Skor: {result.score} / {result.max_score}
-				{result.score === result.max_score ? "🎉 Nilai Sempurna!" : result.score >= result.max_score * 0.7 ? "👏 Hebat!" : "💪 Terus berlatih ya!"}
+				{#if result.score === result.max_score}
+					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+				{:else if result.score >= result.max_score * 0.7}
+					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+				{:else}
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+				{/if}
 			</p>
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
 					<div class="card !rounded-lg p-3 text-sm">
 						<p class="font-bold">
-							{r.correct ? "✅ Benar" : "❌ Belum tepat"} — {qText(r.questionId)}
+							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
 						</p>
-						<p class="mt-1 text-[#475569]">{r.discussion}</p>
+						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>
 				{/each}
 			</div>
@@ -379,7 +388,7 @@
 					qIndex = 0;
 				}}
 			>
-				🔄 Ulangi Kuis
+				<Icon name="refresh" size={16} /> Ulangi Kuis
 			</button>
 		{/if}
 	</div>

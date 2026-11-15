@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, type ProductPublic } from "$lib/api";
@@ -28,18 +29,18 @@
 	});
 </script>
 
-<h1 class="text-xl font-extrabold">Keranjang 🛒</h1>
+<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="shopping-cart" size={22} /> Keranjang</h1>
 
 {#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error}
 	<p class="err mt-6">{error}</p>
 {:else if $cart.length === 0}
 	<div class="card mt-4 p-6 text-center">
-		<p class="text-4xl">🛒</p>
+		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Keranjangmu masih kosong</p>
-		<p class="mt-1 text-sm text-[#64748b]">Yuk, cari rangkuman favoritmu di katalog.</p>
-		<a href="/katalog" class="btn btn-primary mt-4">🔍 Lihat Katalog</a>
+		<p class="mt-1 text-sm text-[#5f6b62]">Yuk, cari rangkuman favoritmu di katalog.</p>
+		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
 	</div>
 {:else}
 	{#if missing > 0}
@@ -58,8 +59,8 @@
 				</div>
 				<div class="min-w-0 flex-1">
 					<p class="line-clamp-2 text-sm font-bold leading-snug">{p.title}</p>
-					<p class="text-xs text-[#64748b]">{p.jenjang} • {p.mapel}</p>
-					<p class="mt-1 text-sm font-extrabold text-[#2273d8]">{formatRupiah(p.price)}</p>
+					<p class="text-xs text-[#5f6b62]">{p.jenjang} • {p.mapel}</p>
+					<p class="mt-1 text-sm font-extrabold text-[#177245]">{formatRupiah(p.price)}</p>
 				</div>
 				<button
 					type="button"
@@ -75,12 +76,12 @@
 
 	<div class="card mt-4 p-4">
 		<div class="flex justify-between text-sm">
-			<span class="text-[#64748b]">{items.length} produk</span>
+			<span class="text-[#5f6b62]">{items.length} produk</span>
 			<span class="font-bold">{formatRupiah(total)}</span>
 		</div>
-		<div class="mt-2 flex justify-between border-t border-dashed border-[#dbe7f7] pt-2">
+		<div class="mt-2 flex justify-between border-t border-dashed border-[#e7e2d2] pt-2">
 			<span class="font-extrabold">Total Bayar</span>
-			<span class="text-lg font-extrabold text-[#2273d8]">{formatRupiah(total)}</span>
+			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(total)}</span>
 		</div>
 		<button
 			type="button"
@@ -88,7 +89,7 @@
 			disabled={items.length === 0}
 			onclick={() => goto("/checkout")}
 		>
-			💳 Checkout
+			<Icon name="credit-card" size={16} /> Checkout
 		</button>
 		<button type="button" class="btn btn-ghost btn-block mt-2" onclick={() => cart.clear()}>
 			Kosongkan Keranjang

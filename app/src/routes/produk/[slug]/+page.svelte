@@ -4,6 +4,7 @@
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, getToken, type ProductPublic, type ChapterMeta } from "$lib/api";
 	import { cart, auth } from "$lib/store";
+	import Icon from "$lib/Icon.svelte";
 
 	let slug = $derived($page.params.slug);
 	let product = $state<ProductPublic | null>(null);
@@ -58,7 +59,7 @@
 	function tambahKeranjang() {
 		if (!product) return;
 		cart.add(product.id);
-		addedMsg = "Ditambahkan ke keranjang ✓";
+		addedMsg = "Ditambahkan ke keranjang";
 		setTimeout(() => (addedMsg = ""), 2000);
 	}
 
@@ -69,10 +70,26 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => history.back()}>← Kembali</button>
+<!-- Bar atas layar dorong: kembali + judul di tengah -->
+<div
+	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur"
+>
+	<button
+		type="button"
+		class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#177245]"
+		aria-label="Kembali"
+		onclick={() => history.back()}
+	>
+		<Icon name="chevron-left" size={24} />
+	</button>
+	<h1 class="min-w-0 flex-1 truncate text-center text-base font-bold">
+		{loading ? "Detail Produk" : (product?.title ?? "Detail Produk")}
+	</h1>
+	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
+</div>
 
 {#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error || !product}
 	<p class="err mt-6">{error || "Produk tidak ditemukan."}</p>
 	<a href="/katalog" class="btn btn-primary mt-4">Lihat Katalog</a>
@@ -97,21 +114,22 @@
 					<span class="badge badge-sun">{product.badge}</span>
 				{/if}
 			</div>
-			<h1 class="mt-2 text-xl font-extrabold leading-snug">{product.title}</h1>
-			<p class="mt-1 text-sm text-[#64748b]">{product.pages} halaman • {product.category}</p>
+			<p class="mt-2 text-sm text-[#5f6b62]">{product.pages} halaman • {product.category}</p>
 			{#if product.description}
 				<p class="mt-2 text-sm leading-relaxed">{product.description}</p>
 			{/if}
 			<div class="mt-3 flex items-baseline gap-2">
-				<p class="text-2xl font-extrabold text-[#2273d8]">{formatRupiah(product.price)}</p>
+				<p class="text-2xl font-extrabold text-[#177245]">{formatRupiah(product.price)}</p>
 				{#if product.strikethrough_price}
-					<p class="text-sm font-semibold text-[#94a3b8] line-through">
+					<p class="text-sm font-semibold text-[#9aa096] line-through">
 						{formatRupiah(product.strikethrough_price)}
 					</p>
 				{/if}
 			</div>
 			{#if addedMsg}
-				<p class="ok-msg mt-3">{addedMsg}</p>
+				<p class="ok-msg mt-3 flex items-center gap-1.5">
+					<Icon name="check-circle" size={16} /> {addedMsg}
+				</p>
 			{/if}
 		</div>
 	</div>
@@ -123,7 +141,7 @@
 				<img
 					src={img.url}
 					alt=""
-					class="h-20 w-28 shrink-0 rounded-xl border border-[#e6eefb] object-cover"
+					class="h-20 w-28 shrink-0 rounded-xl border border-[#e7e2d2] object-cover"
 				/>
 			{/each}
 		</div>
@@ -131,34 +149,43 @@
 
 	<!-- Kartu Ruang Belajar bila sudah LUNAS -->
 	{#if owned}
-		<div class="card mt-4 border-2 !border-[#159a68] p-4">
-			<p class="text-sm font-extrabold text-[#065f46]">🎉 Produk ini sudah milikmu!</p>
-			<p class="mt-0.5 text-sm text-[#475569]">
+		<div class="card mt-4 border-2 !border-[#177245] p-4">
+			<p class="flex items-center gap-1.5 text-sm font-extrabold text-[#065f46]">
+				<Icon name="party-popper" size={16} /> Produk ini sudah milikmu!
+			</p>
+			<p class="mt-0.5 text-sm text-[#3f4a42]">
 				Lanjutkan belajar, kerjakan kuis, dan coba simulasi SAS-nya.
 			</p>
-			<a href={`/belajar/${product.id}`} class="btn btn-leaf mt-3 w-full">📖 Buka Ruang Belajar</a>
+			<a href={`/belajar/${product.id}`} class="btn btn-leaf mt-3 w-full">
+				<Icon name="book-open" size={16} /> Buka Ruang Belajar
+			</a>
 		</div>
 	{/if}
 
 	<!-- Isi Materi -->
-	<h2 class="mt-6 text-base font-extrabold">📖 Isi Materi</h2>
+	<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold">
+		<Icon name="book-open" size={18} /> Isi Materi
+	</h2>
 	{#if chapters.length === 0}
-		<p class="mt-2 text-sm text-[#64748b]">Daftar bab akan segera hadir.</p>
+		<p class="mt-2 text-sm text-[#5f6b62]">Daftar bab akan segera hadir.</p>
 	{:else}
 		{#each bySubject as [subject, list] (subject)}
-			<h3 class="mt-4 text-sm font-extrabold text-[#2273d8]">{subject}</h3>
+			<h3 class="mt-4 text-sm font-extrabold text-[#177245]">{subject}</h3>
 			<div class="mt-2 space-y-2">
 				{#each list as c (c.id)}
 					<div class="card flex items-center gap-3 p-3">
 						<span
-							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef4fd] text-base"
-							>📄</span
+							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"
 						>
+							<Icon name="file-text" size={17} />
+						</span>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-bold">{c.title}</p>
-							<p class="text-xs text-[#64748b]">
+							<p class="text-xs text-[#5f6b62]">
 								Kelas {c.grade} • Semester {c.semester}
-								{#if c.video_url}• 🎥 Ada video{/if}
+								{#if c.video_url}
+									• <Icon name="video" size={13} class="inline-block align-[-2px]" /> Ada video
+								{/if}
 							</p>
 						</div>
 					</div>
@@ -169,13 +196,13 @@
 
 	<!-- Bar beli bawah -->
 	<div
-		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e6eefb] bg-white px-4 py-3 pb-[env(safe-area-inset-bottom)]"
+		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)]"
 	>
 		<button type="button" class="btn btn-outline flex-1" onclick={tambahKeranjang}>
-			🛒 Tambah ke Keranjang
+			<Icon name="shopping-cart" size={16} /> Tambah ke Keranjang
 		</button>
 		<button type="button" class="btn btn-primary flex-1" onclick={beliSekarang}>
-			⚡ Beli Sekarang
+			<Icon name="zap" size={16} /> Beli Sekarang
 		</button>
 	</div>
 	<div class="h-16"></div>

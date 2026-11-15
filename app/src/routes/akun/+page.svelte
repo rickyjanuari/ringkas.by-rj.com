@@ -1,4 +1,11 @@
 <script lang="ts">
+	import Icon from "$lib/Icon.svelte";
+	import BottomSheet from "$lib/BottomSheet.svelte";
+	import BlogContent from "$lib/info/BlogContent.svelte";
+	import FaqContent from "$lib/info/FaqContent.svelte";
+	import UpdateContent from "$lib/info/UpdateContent.svelte";
+	import PrivasiContent from "$lib/info/PrivasiContent.svelte";
+	import SyaratContent from "$lib/info/SyaratContent.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import {
@@ -30,6 +37,7 @@
 	let waEdit = $state("");
 	let waSaving = $state(false);
 	let waMsg = $state("");
+	let waOk = $state(false);
 
 	// ---- Bagian yang bisa dibuka-tutup ----
 	let open = $state({
@@ -39,6 +47,23 @@
 		ortu: false,
 		kelas: false
 	});
+
+	// ---- Bottom sheet Bantuan & Info ----
+	type SheetKind = "blog" | "faq" | "update" | "privasi" | "syarat";
+	let sheet = $state<SheetKind | null>(null);
+	let sheetTitle = $derived(
+		sheet === "blog"
+			? "Blog"
+			: sheet === "faq"
+				? "FAQ"
+				: sheet === "update"
+					? "Update"
+					: sheet === "privasi"
+						? "Kebijakan Privasi"
+						: sheet === "syarat"
+							? "Syarat & Ketentuan"
+							: ""
+	);
 
 	// ---- Latihan Harian ----
 	let dailyDate = $state("");
@@ -58,6 +83,7 @@
 	let parentCodeMsg = $state("");
 	let redeemCode = $state("");
 	let redeemMsg = $state("");
+	let redeemOk = $state(false);
 	let children = $state<
 		{
 			id: string;
@@ -78,8 +104,10 @@
 	let classProductId = $state("");
 	let className = $state("");
 	let classMsg = $state("");
+	let classOk = $state(false);
 	let joinCode = $state("");
 	let joinMsg = $state("");
+	let joinOk = $state(false);
 	let classDetail = $state<{
 		class: { id: string; code: string; name: string };
 		members: { id: string; name: string; done_chapters: number; scores: unknown[] }[];
@@ -165,9 +193,11 @@
 				{ method: "POST", body: JSON.stringify({ whatsapp: waEdit.trim() }) }
 			);
 			auth.setUser(data.user);
-			waMsg = "✅ Nomor WhatsApp tersimpan.";
+			waMsg = "Nomor WhatsApp tersimpan.";
+			waOk = true;;
 		} catch (e) {
 			waMsg = e instanceof Error ? e.message : "Gagal menyimpan nomor.";
+			waOk = false;
 		} finally {
 			waSaving = false;
 		}
@@ -242,7 +272,7 @@
 			`Minggu ini: belajar ${laporan.days} hari, menyelesaikan ${laporan.done} bab, ` +
 			`${laporan.totalScores} kuis/simulasi dikerjakan` +
 			(laporan.avg !== null ? `, rata-rata nilai ${laporan.avg}%.` : `.`) +
-			`\nStreak belajar: ${tracker?.streak ?? 0} hari. Semangat terus ya! 💪`
+			`\nStreak belajar: ${tracker?.streak ?? 0} hari. Semangat terus ya!`
 		);
 	}
 
@@ -283,10 +313,12 @@
 				method: "POST",
 				body: JSON.stringify({ code: redeemCode.trim() })
 			});
-			redeemMsg = "✅ Kode berhasil ditebus. Akun ini sekarang terhubung sebagai anak.";
+			redeemMsg = "Kode berhasil ditebus. Akun ini sekarang terhubung sebagai anak.";
+			redeemOk = true;
 			redeemCode = "";
 		} catch (e) {
 			redeemMsg = e instanceof Error ? e.message : "Gagal menebus kode.";
+			redeemOk = false;
 		}
 	}
 
@@ -342,11 +374,13 @@
 				method: "POST",
 				body: JSON.stringify({ product_id: classProductId, name: className.trim() })
 			});
-			classMsg = `✅ Kelas "${data.class.name}" dibuat! Kode kelas: ${data.class.code} — bagikan ke siswa.`;
+			classMsg = `Kelas "${data.class.name}" dibuat! Kode kelas: ${data.class.code} — bagikan ke siswa.`;
+			classOk = true;
 			className = "";
 			await bukaKelas(data.class.id);
 		} catch (e) {
 			classMsg = e instanceof Error ? e.message : "Gagal membuat kelas.";
+			classOk = false;
 		}
 	}
 
@@ -357,11 +391,13 @@
 				"/api/class/join",
 				{ method: "POST", body: JSON.stringify({ code: joinCode.trim() }) }
 			);
-			joinMsg = `✅ Berhasil bergabung dengan kelas "${data.class.name}".`;
+			joinMsg = `Berhasil bergabung dengan kelas "${data.class.name}".`;
+			joinOk = true;
 			joinCode = "";
 			await bukaKelas(data.class.id);
 		} catch (e) {
 			joinMsg = e instanceof Error ? e.message : "Gagal bergabung ke kelas.";
+			joinOk = false;
 		}
 	}
 
@@ -390,8 +426,8 @@
 </script>
 
 {#if !loggedIn}
-	<h1 class="text-xl font-extrabold">Akun 👤</h1>
-	<p class="text-sm text-[#64748b]">Masuk untuk menyimpan progres belajarmu.</p>
+	<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="user" size={22} /> Akun</h1>
+	<p class="text-sm text-[#5f6b62]">Masuk untuk menyimpan progres belajarmu.</p>
 
 	<div class="mt-4 flex gap-2">
 		<button type="button" class="chip flex-1 justify-center" class:active={mode === "login"} onclick={() => (mode = "login")}>
@@ -454,19 +490,19 @@
 			<p class="err">{authError}</p>
 		{/if}
 		<button type="submit" class="btn btn-primary btn-block" disabled={authLoading}>
-			{authLoading ? "Memproses..." : mode === "register" ? "✨ Daftar Sekarang" : "🚀 Masuk"}
+			{#if authLoading}Memproses...{:else if mode === "register"}<Icon name="sparkles" size={16} /> Daftar Sekarang{:else}<Icon name="rocket" size={16} /> Masuk{/if}
 		</button>
 	</form>
 {:else}
 	<!-- Profil -->
 	<div class="card flex items-center gap-3 p-4">
-		<span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#2273d8] text-xl text-white">👤</span>
+		<span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#177245] text-white"><Icon name="user" size={24} /></span>
 		<div class="min-w-0 flex-1">
 			<p class="truncate font-extrabold">{$auth.user?.name}</p>
-			<p class="truncate text-sm text-[#64748b]">{$auth.user?.email}</p>
-			<p class="text-xs font-bold text-[#2273d8]">
-				{isAdmin ? "👑 Admin" : "🎒 Pelanggan"}
-				{#if tracker}• 🔥 Streak {tracker.streak} hari{/if}
+			<p class="truncate text-sm text-[#5f6b62]">{$auth.user?.email}</p>
+			<p class="text-xs font-bold text-[#177245]">
+				{#if isAdmin}<span class="inline-flex items-center gap-1"><Icon name="crown" size={14} /> Admin</span>{:else}<span class="inline-flex items-center gap-1"><Icon name="backpack" size={14} /> Pelanggan</span>{/if}
+				{#if tracker}• <Icon name="flame" size={14} class="inline-block align-[-2px]" /> Streak {tracker.streak} hari{/if}
 			</p>
 		</div>
 	</div>
@@ -485,7 +521,7 @@
 			</button>
 		</div>
 		{#if waMsg}
-			<p class="mt-2 text-sm {waMsg.startsWith('✅') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{waMsg}</p>
+			<p class="mt-2 text-sm {waOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{waMsg}</p>
 		{/if}
 	</div>
 
@@ -494,21 +530,21 @@
 		<!-- Latihan Harian -->
 		<div class="card overflow-hidden">
 			<button type="button" class="flex w-full items-center gap-3 p-4 text-left" onclick={toggleDaily}>
-				<span class="text-2xl">⏰</span>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="alarm-clock" size={22} /></span>
 				<span class="flex-1 text-left">
 					<span class="block font-extrabold">Latihan Harian 5 Menit</span>
-					<span class="text-xs text-[#64748b]">5 soal cepat setiap hari, jaga streak belajarmu</span>
+					<span class="text-xs text-[#5f6b62]">5 soal cepat setiap hari, jaga streak belajarmu</span>
 				</span>
-				<span>{open.daily ? "▾" : "▸"}</span>
+				<span><Icon name={open.daily ? "chevron-down" : "chevron-right"} size={18} /></span>
 			</button>
 			{#if open.daily}
-				<div class="border-t border-[#e6eefb] p-4">
+				<div class="border-t border-[#e7e2d2] p-4">
 					{#if dailyLoading}
-						<p class="text-center text-sm font-semibold text-[#64748b]">Memuat...</p>
+						<p class="text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 					{:else if dailyError}
 						<p class="err">{dailyError}</p>
 					{:else if dailyQs.length === 0}
-						<p class="text-sm text-[#64748b]">Belum ada soal hari ini.</p>
+						<p class="text-sm text-[#5f6b62]">Belum ada soal hari ini.</p>
 					{:else if !dailyResult}
 						<p class="text-sm font-bold">Latihan {dailyDate} — jawab semua soal ya!</p>
 						<div class="mt-3 space-y-4">
@@ -563,19 +599,19 @@
 							disabled={dailySubmitting}
 							onclick={submitDaily}
 						>
-							{dailySubmitting ? "Memeriksa..." : "✅ Kirim Jawaban"}
+							{#if dailySubmitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
 						</button>
 					{:else}
 						<p class="text-center text-lg font-extrabold">
-							Skor: {dailyResult.score} / {dailyResult.max_score} 🎉
+							Skor: {dailyResult.score} / {dailyResult.max_score} <Icon name="party-popper" size={18} class="inline-block align-[-2px]" />
 						</p>
 						<div class="mt-3 space-y-2">
 							{#each dailyResult.review as r (r.questionId)}
 								<div class="card !rounded-lg p-3 text-sm">
 									<p class="font-bold">
-										{r.correct ? "✅ Benar" : "❌ Belum tepat"} — {dailyQText(r.questionId)}
+										{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {dailyQText(r.questionId)}
 									</p>
-									<p class="mt-1 text-[#475569]">{r.discussion}</p>
+									<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 								</div>
 							{/each}
 						</div>
@@ -591,32 +627,32 @@
 				class="flex w-full items-center gap-3 p-4 text-left"
 				onclick={() => (open.stickers = !open.stickers)}
 			>
-				<span class="text-2xl">🏅</span>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="trophy" size={22} /></span>
 				<span class="flex-1 text-left">
 					<span class="block font-extrabold">Stiker & Lencana</span>
-					<span class="text-xs text-[#64748b]">
+					<span class="text-xs text-[#5f6b62]">
 						{tracker ? `${tracker.stickers.length} stiker • ${tracker.badges.length} lencana` : "Lihat koleksimu"}
 					</span>
 				</span>
-				<span>{open.stickers ? "▾" : "▸"}</span>
+				<span><Icon name={open.stickers ? "chevron-down" : "chevron-right"} size={18} /></span>
 			</button>
 			{#if open.stickers && tracker}
-				<div class="border-t border-[#e6eefb] p-4">
+				<div class="border-t border-[#e7e2d2] p-4">
 					<p class="text-sm font-bold">Lencana</p>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						{#if tracker.badges.length === 0}
-							<p class="text-sm text-[#64748b]">Belum ada lencana. Selesaikan satu bab untuk mulai!</p>
+							<p class="text-sm text-[#5f6b62]">Belum ada lencana. Selesaikan satu bab untuk mulai!</p>
 						{:else}
 							{#each tracker.badges as b (b)}
-								<span class="badge badge-sun">🏅 {b}</span>
+								<span class="badge badge-sun"><Icon name="award" size={13} /> {b}</span>
 							{/each}
 						{/if}
 					</div>
 					<p class="mt-4 text-sm font-bold">Stiker ({tracker.stickers.length})</p>
-					<p class="mt-1 text-sm text-[#64748b]">
+					<p class="mt-1 text-sm text-[#5f6b62]">
 						{tracker.stickers.length === 0
 							? "Belum ada stiker. Tandai bab selesai untuk dapat stiker!"
-							: "Kumpulkan 7 stiker untuk lencana Kolektor 7! 🎉"}
+							: "Kumpulkan 7 stiker untuk lencana Kolektor 7!"}
 					</p>
 				</div>
 			{/if}
@@ -629,30 +665,30 @@
 				class="flex w-full items-center gap-3 p-4 text-left"
 				onclick={() => (open.laporan = !open.laporan)}
 			>
-				<span class="text-2xl">📊</span>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="chart" size={22} /></span>
 				<span class="flex-1 text-left">
 					<span class="block font-extrabold">Laporan Mingguan Orang Tua</span>
-					<span class="text-xs text-[#64748b]">Ringkasan belajar 7 hari terakhir, bisa dibagikan</span>
+					<span class="text-xs text-[#5f6b62]">Ringkasan belajar 7 hari terakhir, bisa dibagikan</span>
 				</span>
-				<span>{open.laporan ? "▾" : "▸"}</span>
+				<span><Icon name={open.laporan ? "chevron-down" : "chevron-right"} size={18} /></span>
 			</button>
 			{#if open.laporan}
-				<div class="border-t border-[#e6eefb] p-4">
+				<div class="border-t border-[#e7e2d2] p-4">
 					{#if laporan}
 						<div class="grid grid-cols-3 gap-2 text-center">
 							<div class="card !rounded-lg p-2">
-								<p class="text-lg font-extrabold text-[#2273d8]">{laporan.days}</p>
-								<p class="text-[11px] font-bold text-[#64748b]">hari belajar</p>
+								<p class="text-lg font-extrabold text-[#177245]">{laporan.days}</p>
+								<p class="text-[11px] font-bold text-[#5f6b62]">hari belajar</p>
 							</div>
 							<div class="card !rounded-lg p-2">
-								<p class="text-lg font-extrabold text-[#2273d8]">{laporan.done}</p>
-								<p class="text-[11px] font-bold text-[#64748b]">bab selesai</p>
+								<p class="text-lg font-extrabold text-[#177245]">{laporan.done}</p>
+								<p class="text-[11px] font-bold text-[#5f6b62]">bab selesai</p>
 							</div>
 							<div class="card !rounded-lg p-2">
-								<p class="text-lg font-extrabold text-[#2273d8]">
+								<p class="text-lg font-extrabold text-[#177245]">
 									{laporan.avg === null ? "—" : `${laporan.avg}%`}
 								</p>
-								<p class="text-[11px] font-bold text-[#64748b]">nilai rata-rata</p>
+								<p class="text-[11px] font-bold text-[#5f6b62]">nilai rata-rata</p>
 							</div>
 						</div>
 						<a
@@ -661,13 +697,13 @@
 							rel="noopener noreferrer"
 							class="btn btn-leaf btn-block mt-3"
 						>
-							💬 Bagikan via WhatsApp
+							<Icon name="message" size={16} /> Bagikan via WhatsApp
 						</a>
-						<p class="mt-2 text-[11px] text-[#64748b]">
+						<p class="mt-2 text-[11px] text-[#5f6b62]">
 							Membuka WhatsApp dengan laporan siap kirim — bukan pengiriman otomatis dari server.
 						</p>
 					{:else}
-						<p class="text-sm text-[#64748b]">Memuat laporan...</p>
+						<p class="text-sm text-[#5f6b62]">Memuat laporan...</p>
 					{/if}
 				</div>
 			{/if}
@@ -676,28 +712,28 @@
 		<!-- Mode Orang Tua -->
 		<div class="card overflow-hidden">
 			<button type="button" class="flex w-full items-center gap-3 p-4 text-left" onclick={toggleOrtu}>
-				<span class="text-2xl">👨‍👩‍👧</span>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="users" size={22} /></span>
 				<span class="flex-1 text-left">
 					<span class="block font-extrabold">Mode Orang Tua</span>
-					<span class="text-xs text-[#64748b]">Hubungkan akun anak, kunci simulasi, atur target harian</span>
+					<span class="text-xs text-[#5f6b62]">Hubungkan akun anak, kunci simulasi, atur target harian</span>
 				</span>
-				<span>{open.ortu ? "▾" : "▸"}</span>
+				<span><Icon name={open.ortu ? "chevron-down" : "chevron-right"} size={18} /></span>
 			</button>
 			{#if open.ortu}
-				<div class="border-t border-[#e6eefb] space-y-4 p-4">
+				<div class="border-t border-[#e7e2d2] space-y-4 p-4">
 					<div>
 						<p class="text-sm font-bold">Kode untuk anakmu</p>
-						<p class="text-xs text-[#64748b]">Anak menebus kode ini dari akunnya sendiri.</p>
+						<p class="text-xs text-[#5f6b62]">Anak menebus kode ini dari akunnya sendiri.</p>
 						<div class="mt-2 flex gap-2">
 							<button type="button" class="btn btn-outline" onclick={buatKode}>Buat Kode</button>
 							{#if parentCode}
-								<span class="flex items-center rounded-lg bg-[#fff3c4] px-3 font-extrabold tracking-widest">
+								<span class="flex items-center rounded-lg bg-[#fbeecd] px-3 font-extrabold tracking-widest">
 									{parentCode}
 								</span>
 							{/if}
 						</div>
 						{#if parentCodeMsg}
-							<p class="mt-1 text-xs text-[#64748b]">{parentCodeMsg}</p>
+							<p class="mt-1 text-xs text-[#5f6b62]">{parentCodeMsg}</p>
 						{/if}
 					</div>
 					<div>
@@ -707,24 +743,24 @@
 							<button type="button" class="btn btn-primary shrink-0" onclick={tebusKode}>Tebus</button>
 						</div>
 						{#if redeemMsg}
-							<p class="mt-1 text-xs {redeemMsg.startsWith('✅') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{redeemMsg}</p>
+							<p class="mt-1 text-xs {redeemOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{redeemMsg}</p>
 						{/if}
 					</div>
 					<div>
 						<p class="text-sm font-bold">Anak terhubung</p>
 						{#if childrenLoading}
-							<p class="mt-1 text-sm text-[#64748b]">Memuat...</p>
+							<p class="mt-1 text-sm text-[#5f6b62]">Memuat...</p>
 						{:else if childrenError}
 							<p class="err mt-1">{childrenError}</p>
 						{:else if children.length === 0}
-							<p class="mt-1 text-sm text-[#64748b]">Belum ada anak terhubung.</p>
+							<p class="mt-1 text-sm text-[#5f6b62]">Belum ada anak terhubung.</p>
 						{:else}
 							<div class="mt-2 space-y-2">
 								{#each children as c (c.id)}
 									<div class="card !rounded-lg p-3">
 										<p class="text-sm font-extrabold">{c.name}</p>
-										<p class="text-xs text-[#64748b]">
-											{c.email} • 🔥 {c.streak} hari • {c.done_chapters} bab selesai
+										<p class="text-xs text-[#5f6b62]">
+											{c.email} • <Icon name="flame" size={13} class="inline-block align-[-2px]" /> {c.streak} hari • {c.done_chapters} bab selesai
 										</p>
 										<div class="mt-2 flex flex-wrap items-center gap-2">
 											<button
@@ -732,7 +768,7 @@
 												class="btn {c.sas_locked ? 'btn-sun' : 'btn-ghost'} !px-2.5 !py-1.5 text-xs"
 												onclick={() => setLock(c.id, !c.sas_locked)}
 											>
-												{c.sas_locked ? "🔒 Simulasi terkunci" : "🔓 Simulasi terbuka"}
+												{#if c.sas_locked}<Icon name="lock" size={14} /> Simulasi terkunci{:else}<Icon name="unlock" size={14} /> Simulasi terbuka{/if}
 											</button>
 											<label class="flex items-center gap-1 text-xs font-bold">
 												Target/hari
@@ -758,19 +794,19 @@
 		<!-- Paket Guru / Kelas -->
 		<div class="card overflow-hidden">
 			<button type="button" class="flex w-full items-center gap-3 p-4 text-left" onclick={toggleKelas}>
-				<span class="text-2xl">🏫</span>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="school" size={22} /></span>
 				<span class="flex-1 text-left">
 					<span class="block font-extrabold">Paket Guru / Kelas</span>
-					<span class="text-xs text-[#64748b]">Buat kelas dari produk yang kamu miliki, pantau siswa</span>
+					<span class="text-xs text-[#5f6b62]">Buat kelas dari produk yang kamu miliki, pantau siswa</span>
 				</span>
-				<span>{open.kelas ? "▾" : "▸"}</span>
+				<span><Icon name={open.kelas ? "chevron-down" : "chevron-right"} size={18} /></span>
 			</button>
 			{#if open.kelas}
-				<div class="border-t border-[#e6eefb] space-y-4 p-4">
+				<div class="border-t border-[#e7e2d2] space-y-4 p-4">
 					<div>
 						<p class="text-sm font-bold">Buat kelas baru</p>
 						{#if myProducts.length === 0}
-							<p class="mt-1 text-sm text-[#64748b]">
+							<p class="mt-1 text-sm text-[#5f6b62]">
 								Kamu belum punya produk berbayar. Beli produk dulu untuk membuat kelas.
 							</p>
 						{:else}
@@ -785,7 +821,7 @@
 							<button type="button" class="btn btn-primary mt-2" onclick={buatKelas}>Buat Kelas</button>
 						{/if}
 						{#if classMsg}
-							<p class="mt-2 text-sm {classMsg.startsWith('✅') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{classMsg}</p>
+							<p class="mt-2 text-sm {classOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{classMsg}</p>
 						{/if}
 					</div>
 					<div>
@@ -795,25 +831,25 @@
 							<button type="button" class="btn btn-outline shrink-0" onclick={gabungKelas}>Gabung</button>
 						</div>
 						{#if joinMsg}
-							<p class="mt-1 text-xs {joinMsg.startsWith('✅') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{joinMsg}</p>
+							<p class="mt-1 text-xs {joinOk ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{joinMsg}</p>
 						{/if}
 					</div>
 					{#if classDetailLoading}
-						<p class="text-sm text-[#64748b]">Memuat kelas...</p>
+						<p class="text-sm text-[#5f6b62]">Memuat kelas...</p>
 					{:else if classDetail}
 						<div>
 							<p class="text-sm font-extrabold">
-								🏫 {classDetail.class.name} <span class="text-[#64748b]">(kode: {classDetail.class.code})</span>
+								<Icon name="school" size={16} class="inline-block align-[-2px]" /> {classDetail.class.name} <span class="text-[#5f6b62]">(kode: {classDetail.class.code})</span>
 							</p>
 							<div class="mt-2 space-y-1.5">
 								{#each classDetail.members as m (m.id)}
 									<div class="card !rounded-lg flex justify-between p-2.5 text-sm">
 										<span class="font-bold">{m.name}</span>
-										<span class="text-[#64748b]">{m.done_chapters} bab selesai</span>
+										<span class="text-[#5f6b62]">{m.done_chapters} bab selesai</span>
 									</div>
 								{/each}
 								{#if classDetail.members.length === 0}
-									<p class="text-sm text-[#64748b]">Belum ada siswa.</p>
+									<p class="text-sm text-[#5f6b62]">Belum ada siswa.</p>
 								{/if}
 							</div>
 							<button
@@ -821,7 +857,7 @@
 								class="btn btn-ghost mt-2 text-xs"
 								onclick={() => classDetail && unduhRekap(classDetail.class.id)}
 							>
-								⬇️ Unduh Rekap (CSV)
+								<Icon name="download" size={15} /> Unduh Rekap (CSV)
 							</button>
 						</div>
 					{/if}
@@ -830,10 +866,10 @@
 		</div>
 
 		{#if isAdmin}
-			<a href="/admin" class="btn btn-sun btn-block">👑 Admin — Kelola Produk</a>
+			<a href="/admin" class="btn btn-sun btn-block"><Icon name="crown" size={16} /> Admin — Kelola Produk</a>
 		{/if}
-		<button type="button" class="btn btn-danger btn-block" onclick={keluar}>🚪 Keluar</button>
-		<p class="text-center text-xs text-[#94a3b8]">Terakhir diperbarui {formatTanggal($auth.user?.created_at)}</p>
+		<button type="button" class="btn btn-danger btn-block" onclick={keluar}><Icon name="logout" size={16} /> Keluar</button>
+		<p class="text-center text-xs text-[#9aa096]">Terakhir diperbarui {formatTanggal($auth.user?.created_at)}</p>
 	</div>
 {/if}
 
@@ -841,10 +877,37 @@
 <div class="card mt-4 p-4">
 	<p class="text-sm font-extrabold">Bantuan &amp; Info</p>
 	<div class="mt-2 flex flex-wrap gap-2">
-		<a href="/blog" class="chip">📝 Blog</a>
-		<a href="/faq" class="chip">❓ FAQ</a>
-		<a href="/update" class="chip">✨ Update</a>
-		<a href="/privasi" class="chip">🔒 Privasi</a>
-		<a href="/syarat" class="chip">📜 Syarat</a>
+		<button type="button" class="chip" onclick={() => (sheet = "blog")}>
+			<Icon name="file-text" size={15} /> Blog
+		</button>
+		<button type="button" class="chip" onclick={() => (sheet = "faq")}>
+			<Icon name="help-circle" size={15} /> FAQ
+		</button>
+		<button type="button" class="chip" onclick={() => (sheet = "update")}>
+			<Icon name="sparkles" size={15} /> Update
+		</button>
+		<button type="button" class="chip" onclick={() => (sheet = "privasi")}>
+			<Icon name="lock" size={15} /> Privasi
+		</button>
+		<button type="button" class="chip" onclick={() => (sheet = "syarat")}>
+			<Icon name="scroll" size={15} /> Syarat
+		</button>
 	</div>
+	<p class="mt-2 text-[11px] text-[#5f6b62]">
+		Ketuk untuk membaca di sini, atau buka halaman penuh dari menu bawah situs.
+	</p>
 </div>
+
+<BottomSheet open={sheet !== null} title={sheetTitle} onClose={() => (sheet = null)}>
+	{#if sheet === "blog"}
+		<BlogContent />
+	{:else if sheet === "faq"}
+		<FaqContent />
+	{:else if sheet === "update"}
+		<UpdateContent />
+	{:else if sheet === "privasi"}
+		<PrivasiContent />
+	{:else if sheet === "syarat"}
+		<SyaratContent />
+	{/if}
+</BottomSheet>
