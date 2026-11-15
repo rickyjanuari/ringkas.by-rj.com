@@ -11,6 +11,7 @@
 	} from "$lib/settings";
 	import Avatar from "$lib/Avatar.svelte";
 	import Icon from "$lib/Icon.svelte";
+	import { gradeLabel, gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 
 	let products = $state<ProductPublic[]>([]);
 	let loading = $state(true);
@@ -367,7 +368,14 @@
 	</div>
 	<div class="mt-3 flex flex-wrap gap-2">
 		{#each [1, 2, 3, 4, 5, 6] as g (g)}
-			<a href="/peta-belajar/k{g}" class="chip">Kelas {g}</a>
+			{@const gtChip = gradeTheme(g)}
+			<a
+				href="/peta-belajar/k{g}"
+				class="chip"
+				style="background: {gtChip.soft}; border-color: {gtChip.accent}; color: {gtChip.text}"
+			>
+				Kelas {g}
+			</a>
 		{/each}
 	</div>
 </section>
@@ -585,6 +593,7 @@
 {:else}
 	<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:mt-4 lg:grid-cols-4 lg:gap-4">
 		{#each shown as p (p.id)}
+			{@const gt = gradeTheme(gradeOfProduct(p.id))}
 			<div
 				class="card cursor-pointer overflow-hidden"
 				onclick={() => buka(p.id)}
@@ -592,6 +601,7 @@
 				role="button"
 				tabindex="0"
 			>
+				<div class="h-1.5 shrink-0" style="background: {gt.accent}" aria-hidden="true"></div>
 				<div
 					class="flex h-24 items-center justify-center px-3 text-center text-sm font-extrabold text-white lg:h-36 lg:text-base"
 					style="background: {p.cover_color}"
@@ -599,8 +609,17 @@
 					<span class="leading-tight">{p.cover_label}</span>
 				</div>
 				<div class="p-3">
-					{#if p.badge}
-						<span class="badge badge-sun">{p.badge}</span>
+					{#if p.badge || gradeLabel(p.id)}
+						<p class="flex flex-wrap items-center gap-1.5">
+							{#if p.badge}
+								<span class="badge badge-sun">{p.badge}</span>
+							{/if}
+							{#if gradeLabel(p.id)}
+								<span class="badge" style="background: {gt.soft}; color: {gt.text}">
+									{gradeLabel(p.id)}
+								</span>
+							{/if}
+						</p>
 					{/if}
 					<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-bold leading-snug">{p.title}</h2>
 					<p class="mt-0.5 text-[11px] font-semibold text-[#5f6b62]">

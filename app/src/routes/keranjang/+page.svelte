@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import Mascot from "$lib/Mascot.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, type ProductPublic } from "$lib/api";
@@ -37,6 +38,7 @@
 	<p class="err mt-6">{error}</p>
 {:else if $cart.length === 0}
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
+		<p class="flex justify-center"><Mascot expression="berpikir" /></p>
 		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Keranjangmu masih kosong</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Yuk, cari rangkuman favoritmu di katalog.</p>

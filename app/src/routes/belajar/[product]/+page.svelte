@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import Confetti from "$lib/Confetti.svelte";
+	import { gradeLabel, gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -353,6 +355,15 @@
 	<p class="text-sm text-[#5f6b62]">
 		{pack.product.jenjang} • {pack.product.mapel} • {pack.chapters.length} bab
 	</p>
+	{@const gtBelajar = gradeTheme(gradeOfProduct(productId))}
+	{#if gradeLabel(productId)}
+		<p class="mt-2">
+			<span class="badge" style="background: {gtBelajar.soft}; color: {gtBelajar.text}">
+				{gradeLabel(productId)}
+			</span>
+		</p>
+	{/if}
+	<div class="mt-3 h-1.5 rounded-full" style="background: {gtBelajar.accent}" aria-hidden="true"></div>
 
 	<a href="/peta-belajar/{productId}" class="btn btn-outline mt-3">
 		<Icon name="map" size={16} /> Lihat Peta Belajar
@@ -541,7 +552,7 @@
 											type="button"
 											class="min-h-20 rounded-xl border p-2 text-center text-xs font-bold {flipped[key]
 												? 'border-[#177245] bg-[#ecfdf5] text-[#065f46]'
-												: 'border-[#e7e2d2] bg-white text-[#22302a]'}"
+												: 'border-[#e7e2d2] bg-[#fffdf7] text-[#22302a]'}"
 											onclick={() => (flipped = { ...flipped, [key]: !flipped[key] })}
 										>
 											{flipped[key] ? fc.back : fc.front}
@@ -602,7 +613,7 @@
 				{#if focusOn}
 					<div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-[#ecfdf5] px-3 py-2 text-xs font-bold text-[#065f46]">
 						<Icon name="eye" size={14} /> Mode Ujian Fokus aktif
-						<span class="rounded-full bg-white px-2 py-0.5">Pindah tab: {focusSwitches}×</span>
+						<span class="rounded-full bg-[#fffdf7] px-2 py-0.5">Pindah tab: {focusSwitches}×</span>
 						<button type="button" class="ml-auto underline" onclick={keluarModeFokus}>
 							<Icon name="minimize" size={13} class="inline-block align-[-2px]" /> Keluar dari Mode Fokus
 						</button>
@@ -754,6 +765,9 @@
 						<p class="err mt-3">{simError}</p>
 					{/if}
 				{:else if simResult}
+					{#if simResult.score === simResult.max_score && simResult.max_score > 0}
+						<Confetti fire={true} />
+					{/if}
 					<p class="mt-3 text-center text-xl font-extrabold">
 						Skor: {simResult.score} / {simResult.max_score}
 						{#if simResult.score === simResult.max_score}

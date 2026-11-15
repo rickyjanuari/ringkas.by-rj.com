@@ -4,6 +4,7 @@
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, type ProductPublic } from "$lib/api";
 	import { cart } from "$lib/store";
+	import { gradeLabel, gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 	import Icon from "$lib/Icon.svelte";
 
 	let q = $state("");
@@ -209,8 +210,10 @@
 	{:else}
 		<div class="mt-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
 			{#each filtered as p (p.id)}
+				{@const gt = gradeTheme(gradeOfProduct(p.id))}
 				<div
 					class="card flex cursor-pointer gap-3 overflow-hidden lg:flex-col lg:gap-0"
+					style="border-left: 4px solid {gt.accent}"
 					role="button"
 					tabindex="0"
 					onclick={() => goto(`/produk/${p.id}`)}
@@ -223,8 +226,17 @@
 						{p.cover_label}
 					</div>
 					<div class="min-w-0 flex-1 py-3 pr-3 lg:p-3">
-						{#if p.badge}
-							<span class="badge badge-sun">{p.badge}</span>
+						{#if p.badge || gradeLabel(p.id)}
+							<p class="flex flex-wrap items-center gap-1.5">
+								{#if p.badge}
+									<span class="badge badge-sun">{p.badge}</span>
+								{/if}
+								{#if gradeLabel(p.id)}
+									<span class="badge" style="background: {gt.soft}; color: {gt.text}">
+										{gradeLabel(p.id)}
+									</span>
+								{/if}
+							</p>
 						{/if}
 						<h2 class="mt-0.5 line-clamp-2 text-sm font-bold leading-snug lg:min-h-10">{p.title}</h2>
 						<p class="text-xs text-[#5f6b62]">{p.jenjang} • {p.mapel} • {p.pages} hlm</p>

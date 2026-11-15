@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import Mascot from "$lib/Mascot.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import {
@@ -132,6 +133,7 @@
 	<button type="button" class="btn btn-primary mt-3" onclick={loadOrders}>Coba Lagi</button>
 {:else if orders.length === 0}
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
+		<p class="flex justify-center"><Mascot expression="semangat" /></p>
 		<p class="flex justify-center"><Icon name="receipt" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Belum ada pesanan</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Pesananmu setelah checkout akan muncul di sini.</p>

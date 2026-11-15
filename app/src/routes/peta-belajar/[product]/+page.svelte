@@ -1,11 +1,14 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import { gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
 	import { api, getToken, type StudyPack, type FullChapter } from "$lib/api";
 
 	let productId = $derived($page.params.product);
+	/** Warna kelas produk ini — dipakai cincin node "saat ini" + legenda. */
+	let gtPeta = $derived(gradeTheme(gradeOfProduct(productId)));
 	let pack = $state<StudyPack | null>(null);
 	let doneSet = $state<Set<string>>(new Set());
 	let loading = $state(true);
@@ -295,15 +298,18 @@
 						<a
 							href="/belajar/{productId}/{n.ch.id}"
 							aria-label="Bab {n.i + 1}: {n.ch.title}"
+							style={n.state === "current"
+								? `border-color: ${gtPeta.accent}; background: ${gtPeta.soft}; color: ${gtPeta.text}`
+								: undefined}
 							class="relative flex h-full w-full items-center justify-center rounded-full border-2 shadow-sm {n.state ===
 							'done'
 								? 'border-[#115c39] bg-[#177245] text-white'
 								: n.state === 'current'
-									? 'border-[#b45309] bg-[#f2b33d] text-[#22302a]'
+									? ''
 									: 'border-[#e7e2d2] bg-[#fffdf7] text-[#5f6b62]'}"
 						>
 							{#if n.state === "current"}
-								<span class="map-ping absolute inset-0 rounded-full bg-[#f2b33d]" aria-hidden="true"></span>
+								<span class="map-ping absolute inset-0 rounded-full" style="background: {gtPeta.accent}" aria-hidden="true"></span>
 							{/if}
 							{#if n.state === "done"}
 								<Icon name="check" size={nodeR >= 30 ? 24 : 20} class="relative" />
@@ -335,7 +341,7 @@
 									<Icon name="lock" size={12} /> Terkunci
 								</span>
 							{:else if n.state === "current"}
-								<span class="text-[#92400e]">Lanjutkan di sini</span>
+								<span style="color: {gtPeta.text}">Lanjutkan di sini</span>
 							{/if}
 						</p>
 					{/if}
@@ -350,7 +356,12 @@
 				Selesai
 			</span>
 			<span class="inline-flex items-center gap-1.5">
-				<span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#f2b33d] text-[#22302a]">1</span>
+				<span
+					class="flex h-5 w-5 items-center justify-center rounded-full border-2"
+					style="background: {gtPeta.soft}; border-color: {gtPeta.accent}; color: {gtPeta.text}"
+				>
+					1
+				</span>
 				Lanjutkan di sini
 			</span>
 			<span class="inline-flex items-center gap-1.5">

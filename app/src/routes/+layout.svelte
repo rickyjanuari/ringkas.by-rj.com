@@ -8,6 +8,7 @@
 	import { api, getToken, type User } from "$lib/api";
 	import { applyCachedSettings, loadSettings, applySettings, settingsStore } from "$lib/settings";
 	import Icon from "$lib/Icon.svelte";
+	import PageFade from "$lib/PageFade.svelte";
 
 	let { children }: { children?: Snippet } = $props();
 
@@ -153,7 +154,9 @@
 	</header>
 
 	<main class="flex-1 px-4 pb-24 pt-4 lg:px-8 lg:pb-12 lg:pt-6">
-		{@render children?.()}
+		<PageFade key={$page.url.pathname}>
+			{@render children?.()}
+		</PageFade>
 
 		<footer class="mt-8 rounded-2xl bg-[#145c39] p-5 text-center text-white lg:mt-12 lg:flex lg:items-center lg:justify-between lg:gap-6 lg:px-8 lg:py-6 lg:text-left">
 			<div>

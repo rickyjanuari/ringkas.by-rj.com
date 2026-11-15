@@ -13,6 +13,7 @@
 	} from "$lib/api";
 	import { cart } from "$lib/store";
 	import Icon from "$lib/Icon.svelte";
+	import Mascot from "$lib/Mascot.svelte";
 
 	const LAST_ORDER_KEY = "ringkas_last_order";
 
@@ -165,6 +166,7 @@
 	</div>
 {:else if order.status === "PAID"}
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
+		<p class="flex justify-center"><Mascot expression="senang" size={88} /></p>
 		<p class="flex justify-center">
 			<Icon name="check-circle" size={56} class="text-[#177245]" />
 		</p>

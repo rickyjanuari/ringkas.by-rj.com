@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import Mascot from "$lib/Mascot.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import {
@@ -154,6 +155,7 @@
 {:else if !practicing}
 	{#if !bank || bank.total === 0}
 		<div class="card mt-4 p-5 text-center">
+			<p class="flex justify-center"><Mascot expression="senang" /></p>
 			<p class="text-2xl font-extrabold">Belum ada soal sulit!</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Soal yang kamu jawab salah akan muncul di sini. Terus kerjakan kuis dan simulasi, ya!

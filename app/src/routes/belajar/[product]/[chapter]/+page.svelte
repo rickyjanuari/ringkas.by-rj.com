@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import BottomSheet from "$lib/BottomSheet.svelte";
+	import Confetti from "$lib/Confetti.svelte";
+	import { feedbackBenar } from "$lib/feedback";
 	import NumberLine from "$lib/tools/NumberLine.svelte";
 	import MultiplicationTable from "$lib/tools/MultiplicationTable.svelte";
 	import FractionCalculator from "$lib/tools/FractionCalculator.svelte";
@@ -52,6 +54,193 @@
 
 	let currentQ = $derived(chapter ? chapter.quiz[qIndex] : undefined);
 	let totalQ = $derived(chapter ? chapter.quiz.length : 0);
+
+	// Konfeti skor sempurna + umpan balik jawaban benar.
+	let confettiFire = $state(false);
+	// Bukan $state: penanda hasil kuis yang sudah diproses (sekali per submit).
+	let hasilDiproses: { score: number; max_score: number } | null = null;
+	$effect(() => {
+		if (result) {
+			if (hasilDiproses !== result) {
+				hasilDiproses = result;
+				const adaBenar = Object.values(result.correct ?? {}).some(Boolean);
+				// Hanya jawaban benar yang berbunyi/bergetar; jawaban salah diam.
+				if (adaBenar) feedbackBenar();
+				// Konfeti hanya untuk skor sempurna, sekali per hasil.
+				if (result.max_score > 0 && result.score === result.max_score) {
+					confettiFire = true;
+					window.setTimeout(() => {
+						confettiFire = false;
+					}, 600);
+				}
+			}
+		} else {
+			hasilDiproses = null;
+		}
+	});
+
+	// Flashcard geser (swipe): ketuk membalik, geser kanan = sudah hafal,
+	// geser kiri = lanjut tanpa menandai. Status hafal disimpan lokal per
+	// perangkat (localStorage per produk+bab) — belum ada endpoint server
+	// untuk menandai hafal, jadi belum tersimpan per akun di server.
+	let fcIndex = $state(0);
+	let fcFlipped = $state(false);
+	let hafalSet = $state<Set<number>>(new Set());
+	let fcDragX = $state(0);
+	let fcDragging = $state(false);
+	let fcKeluar: "kanan" | "kiri" | null = $state(null);
+	let fcCardEl: HTMLDivElement | null = $state(null);
+	let reducedMotion = $state(false);
+	let dragAwal = { x: 0, y: 0, aktif: false, horizontal: false, bergerak: false };
+
+	let fcTransform = $derived.by(() => {
+		if (fcKeluar === "kanan") return "translateX(120%) rotate(8deg)";
+		if (fcKeluar === "kiri") return "translateX(-120%) rotate(-8deg)";
+		if (fcDragX === 0) return "none";
+		return `translateX(${fcDragX}px) rotate(${fcDragX * 0.05}deg)`;
+	});
+
+	function hafalKey(): string {
+		return `ringkas_hafal_${productId ?? ""}_${chapterId ?? ""}`;
+	}
+
+	function muatHafal(): void {
+		try {
+			const raw = localStorage.getItem(hafalKey());
+			if (!raw) {
+				hafalSet = new Set();
+				return;
+			}
+			const arr = JSON.parse(raw) as unknown;
+			hafalSet = new Set(
+				(Array.isArray(arr) ? arr : []).filter((n): n is number => Number.isInteger(n))
+			);
+		} catch {
+			hafalSet = new Set();
+		}
+	}
+
+	function simpanHafal(): void {
+		try {
+			localStorage.setItem(hafalKey(), JSON.stringify([...hafalSet]));
+		} catch {
+			/* Abaikan. */
+		}
+	}
+
+	// Reset state flashcard setiap kali bab berganti (komponen dipakai ulang
+	// saat navigasi antar-bab), dan muat status hafal bab tersebut.
+	let babTerakhir = "";
+	$effect(() => {
+		if (chapterId && chapterId !== babTerakhir) {
+			babTerakhir = chapterId;
+			fcIndex = 0;
+			fcFlipped = false;
+			fcDragX = 0;
+			fcDragging = false;
+			fcKeluar = null;
+			muatHafal();
+		}
+	});
+
+	function lanjutKartu(arah: "kanan" | "kiri"): void {
+		if (!chapter || fcKeluar) return;
+		const total = chapter.flashcards.length;
+		if (total === 0) return;
+		if (reducedMotion) {
+			fcIndex = (fcIndex + 1) % total;
+			fcFlipped = false;
+			return;
+		}
+		fcKeluar = arah;
+		window.setTimeout(() => {
+			fcIndex = (fcIndex + 1) % total;
+			fcFlipped = false;
+			fcKeluar = null;
+			fcDragX = 0;
+			fcDragging = false;
+		}, 200);
+	}
+
+	// Aksi hafal TUNGGAL: dipakai tombol "Sudah Hafal" DAN geser kanan.
+	function tandaiHafal(): void {
+		if (!chapter || chapter.flashcards.length === 0 || fcKeluar) return;
+		hafalSet = new Set(hafalSet).add(fcIndex);
+		simpanHafal();
+		lanjutKartu("kanan");
+	}
+
+	function resetHafal(): void {
+		hafalSet = new Set();
+		simpanHafal();
+		fcIndex = 0;
+		fcFlipped = false;
+	}
+
+	function fcPointerDown(e: PointerEvent): void {
+		dragAwal = { x: e.clientX, y: e.clientY, aktif: true, horizontal: false, bergerak: false };
+		if (reducedMotion) return; // Tanpa animasi geser; ketuk tetap dicatat untuk membalik.
+		try {
+			fcCardEl?.setPointerCapture(e.pointerId);
+		} catch {
+			/* Abaikan. */
+		}
+	}
+
+	function fcPointerMove(e: PointerEvent): void {
+		if (!dragAwal.aktif || reducedMotion) return;
+		const dx = e.clientX - dragAwal.x;
+		const dy = e.clientY - dragAwal.y;
+		if (!dragAwal.horizontal) {
+			if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+			// Hanya tangkap gerakan horizontal yang jelas; bila vertikal
+			// lebih dominan, lepas supaya scroll halaman tetap jalan.
+			if (Math.abs(dy) > Math.abs(dx)) {
+				dragAwal.aktif = false;
+				return;
+			}
+			dragAwal.horizontal = true;
+		}
+		dragAwal.bergerak = true;
+		fcDragging = true;
+		fcDragX = dx;
+	}
+
+	function fcPointerUp(): void {
+		if (!dragAwal.aktif) {
+			fcDragging = false;
+			return;
+		}
+		dragAwal.aktif = false;
+		if (reducedMotion) {
+			// Tanpa animasi geser: ketuk biasa tetap membalik kartu.
+			if (!dragAwal.bergerak) fcFlipped = !fcFlipped;
+			fcDragX = 0;
+			fcDragging = false;
+			return;
+		}
+		const dx = fcDragX;
+		const ambang = Math.max(80, (fcCardEl?.clientWidth ?? 320) * 0.25);
+		fcDragging = false;
+		if (dragAwal.horizontal && Math.abs(dx) >= ambang) {
+			fcDragX = 0;
+			if (dx > 0) tandaiHafal();
+			else lanjutKartu("kiri");
+			return;
+		}
+		// Ketuk biasa (tanpa geser) tetap membalik kartu; geser pendek
+		// kembali ke tengah lewat transisi (fcDragX = 0).
+		if (!dragAwal.bergerak) fcFlipped = !fcFlipped;
+		fcDragX = 0;
+	}
+
+	function fcPointerCancel(): void {
+		dragAwal.aktif = false;
+		dragAwal.horizontal = false;
+		dragAwal.bergerak = false;
+		fcDragging = false;
+		fcDragX = 0;
+	}
 
 	// Alat interaktif Matematika: garis bilangan (Kelas 1–2), tabel perkalian
 	// (Kelas 3–4), kalkulator pecahan (Kelas 5–6). Mapel lain tidak menampilkan.
@@ -183,6 +372,11 @@
 	});
 
 	onMount(async () => {
+		try {
+			reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		} catch {
+			reducedMotion = false;
+		}
 		if (!getToken()) {
 			goto("/akun");
 			return;
@@ -321,6 +515,7 @@
 {:else if error || !chapter}
 	<p class="err mt-6">{error || "Bab tidak ditemukan."}</p>
 {:else}
+	<Confetti fire={confettiFire} />
 	<h1 class="mt-3 text-xl font-extrabold leading-snug">{chapter.title}</h1>
 	<p class="text-sm text-[#5f6b62]">
 		{chapter.subject} • Kelas {chapter.grade} • Semester {chapter.semester}
@@ -429,6 +624,80 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- Flashcard: ketuk untuk membalik, geser untuk menandai -->
+	{#if chapter.flashcards.length > 0}
+		<div class="card mt-3 p-4">
+			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="layers" size={16} /> Flashcard</h2>
+			<p class="mt-1 text-xs text-[#5f6b62]">
+				Ketuk kartu untuk membalik. Geser ke kanan bila sudah hafal, geser ke kiri untuk lanjut tanpa menandai.
+			</p>
+			<p class="mt-2 text-xs font-bold text-[#5f6b62]">
+				Kartu {fcIndex + 1} dari {chapter.flashcards.length} • {hafalSet.size} sudah hafal
+			</p>
+			<div class="fc-wrap">
+				<div
+					bind:this={fcCardEl}
+					class="fc-card"
+					class:fc-flipped={fcFlipped}
+					class:fc-dragging={fcDragging}
+					role="button"
+					tabindex="0"
+					aria-label="Flashcard {fcIndex + 1} dari {chapter.flashcards.length}. {fcFlipped
+						? 'Jawaban'
+						: 'Pertanyaan'} — ketuk untuk membalik."
+					style="transform: {fcTransform}; opacity: {fcKeluar ? 0 : 1};"
+					onpointerdown={fcPointerDown}
+					onpointermove={fcPointerMove}
+					onpointerup={fcPointerUp}
+					onpointercancel={fcPointerCancel}
+					onkeydown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault();
+							fcFlipped = !fcFlipped;
+						}
+					}}
+				>
+					{#if fcDragging}
+						<span
+							class="fc-label fc-label-kanan"
+							style="opacity: {Math.min(1, Math.max(0, fcDragX) / 80)}">Hafal</span
+						>
+						<span
+							class="fc-label fc-label-kiri"
+							style="opacity: {Math.min(1, Math.max(0, -fcDragX) / 80)}">Belum</span
+						>
+					{/if}
+					<span class="fc-teks"
+						>{fcFlipped ? chapter.flashcards[fcIndex].back : chapter.flashcards[fcIndex].front}</span
+					>
+					<span class="fc-petunjuk"
+						>{fcFlipped ? "Jawaban — ketuk untuk membalik" : "Ketuk untuk membalik"}</span
+					>
+				</div>
+			</div>
+			<div class="mt-3 flex gap-2">
+				<button type="button" class="btn btn-leaf flex-1 text-xs" onclick={tandaiHafal}>
+					<Icon name="check" size={15} /> Sudah Hafal
+				</button>
+				<button
+					type="button"
+					class="btn btn-outline flex-1 text-xs"
+					onclick={() => lanjutKartu("kiri")}
+				>
+					Belum Hafal <Icon name="arrow-right" size={15} />
+				</button>
+			</div>
+			{#if hafalSet.size === chapter.flashcards.length}
+				<p class="mt-2 text-center text-xs font-extrabold text-[#065f46]">
+					Semua kartu sudah hafal — hebat!
+				</p>
+				<button type="button" class="btn btn-ghost btn-block mt-2 text-xs" onclick={resetHafal}>
+					<Icon name="refresh" size={15} /> Ulangi dari Awal
+				</button>
+			{/if}
+		</div>
+	{/if}
 		</div>
 
 		<div class="min-w-0">
@@ -667,3 +936,82 @@
 		{/if}
 	</BottomSheet>
 {/if}
+
+<style>
+	/* Flashcard geser: kartu mengikuti jari, label muncul sesuai jarak. */
+	.fc-wrap {
+		margin-top: 0.75rem;
+		overflow: hidden;
+		padding: 0.25rem;
+	}
+	.fc-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		min-height: 11rem;
+		padding: 1rem;
+		border-radius: 1rem;
+		border: 2px solid #e7e2d2;
+		background: #ffffff;
+		color: #22302a;
+		text-align: center;
+		cursor: grab;
+		user-select: none;
+		-webkit-user-select: none;
+		/* Izinkan scroll vertikal halaman; gerakan horizontal ditangani pointer. */
+		touch-action: pan-y;
+		transition:
+			transform 0.2s ease-out,
+			opacity 0.2s ease-out,
+			background-color 0.2s ease-out,
+			border-color 0.2s ease-out;
+		will-change: transform;
+	}
+	.fc-card.fc-dragging {
+		transition: none;
+		cursor: grabbing;
+	}
+	.fc-card.fc-flipped {
+		border-color: #177245;
+		background: #ecfdf5;
+		color: #065f46;
+	}
+	.fc-teks {
+		font-size: 1rem;
+		font-weight: 800;
+		line-height: 1.5;
+	}
+	.fc-petunjuk {
+		font-size: 0.65rem;
+		font-weight: 700;
+		color: #9aa096;
+	}
+	.fc-label {
+		position: absolute;
+		top: 0.75rem;
+		padding: 0.25rem 0.75rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 800;
+		pointer-events: none;
+	}
+	.fc-label-kanan {
+		right: 0.75rem;
+		background: #177245;
+		color: #ffffff;
+	}
+	.fc-label-kiri {
+		left: 0.75rem;
+		background: #22302a;
+		color: #f7f5ef;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.fc-card {
+			transition: none;
+		}
+	}
+</style>

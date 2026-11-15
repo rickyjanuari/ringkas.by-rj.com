@@ -1,6 +1,9 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import Avatar from "$lib/Avatar.svelte";
+	import ThemeToggle from "$lib/ThemeToggle.svelte";
+	import SoundToggle from "$lib/SoundToggle.svelte";
+	import { getOnboardingDone } from "$lib/onboarding";
 	import BottomSheet from "$lib/BottomSheet.svelte";
 	import BlogContent from "$lib/info/BlogContent.svelte";
 	import FaqContent from "$lib/info/FaqContent.svelte";
@@ -253,6 +256,23 @@
 		}
 		return false;
 	}
+
+	/**
+	 * Arahkan akun BARU yang belum onboarding ke /onboarding (sekali saja).
+	 * Hanya akun yang dibuat setelah fitur ini rilis (16 Nov 2026) —
+	 * pengguna lama tidak diganggu. Tidak pernah memblokir halaman Akun.
+	 */
+	async function cekOnboarding() {
+		try {
+			if (!$auth.user) return;
+			const { user } = await api<{ user: { created_at: string } }>("/api/auth/me");
+			if (new Date(user.created_at).getTime() < Date.parse("2026-11-16T00:00:00+07:00")) return;
+			if (await getOnboardingDone()) return;
+			goto("/onboarding");
+		} catch {
+			/* abaikan */
+		}
+	}
 	let tracker = $state<TrackerData | null>(null);
 	let trackerError = $state("");
 	let waEdit = $state("");
@@ -396,6 +416,7 @@
 			await loadExamDates();
 			await loadAccSettings();
 			await loadPortfolioCount();
+			await cekOnboarding();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
@@ -675,7 +696,7 @@
 			waEdit = $auth.user?.whatsapp ?? "";
 			await loadTracker();
 			await loadReferral();
-			lanjutKeHadiahBilaAda();
+			if (!lanjutKeHadiahBilaAda()) await cekOnboarding();
 		} catch (e) {
 			authError = e instanceof Error ? e.message : "Gagal masuk. Coba lagi ya.";
 			resetTurnstile();
@@ -701,7 +722,7 @@
 			batal2fa();
 			await loadTracker();
 			await loadReferral();
-			lanjutKeHadiahBilaAda();
+			if (!lanjutKeHadiahBilaAda()) await cekOnboarding();
 		} catch (e) {
 			twofaError = e instanceof Error ? e.message : "Kode salah. Coba lagi ya.";
 		} finally {
@@ -1248,6 +1269,23 @@
 		{#if accError}
 			<p class="err mt-3">{accError}</p>
 		{/if}
+	</div>
+
+	<!-- Mode Tampilan & Suara -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="moon" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Mode Tampilan &amp; Suara</p>
+				<p class="text-xs text-[#5f6b62]">Mode gelap dan bunyi jawaban benar. Tersimpan di akunmu.</p>
+			</div>
+		</div>
+		<div class="mt-3">
+			<ThemeToggle />
+		</div>
+		<div class="mt-3 border-t border-[#e7e2d2] pt-3">
+			<SoundToggle />
+		</div>
 	</div>
 
 	<!-- Portofolioku -->
