@@ -836,3 +836,15 @@
 		<p class="text-center text-xs text-[#94a3b8]">Terakhir diperbarui {formatTanggal($auth.user?.created_at)}</p>
 	</div>
 {/if}
+
+<!-- Bantuan & Info -->
+<div class="card mt-4 p-4">
+	<p class="text-sm font-extrabold">Bantuan &amp; Info</p>
+	<div class="mt-2 flex flex-wrap gap-2">
+		<a href="/blog" class="chip">📝 Blog</a>
+		<a href="/faq" class="chip">❓ FAQ</a>
+		<a href="/update" class="chip">✨ Update</a>
+		<a href="/privasi" class="chip">🔒 Privasi</a>
+		<a href="/syarat" class="chip">📜 Syarat</a>
+	</div>
+</div>

@@ -41,10 +41,13 @@
 	<header class="sticky top-0 z-40 border-b border-[#e6eefb] bg-white/95 backdrop-blur">
 		<div class="flex items-center gap-2 px-4 py-3">
 			<a href="/" class="flex items-center gap-2" aria-label="Ringkas — Beranda">
-				<span
-					class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2273d8] text-lg text-white"
-					>📘</span
-				>
+				<img
+					src="/logo/logo-ringkas-icon-1024.png"
+					alt="Logo Ringkas"
+					width="24"
+					height="24"
+					class="h-6 w-6 shrink-0 rounded-lg"
+				/>
 				<span class="text-xl font-extrabold tracking-tight text-[#2273d8]">Ringkas</span>
 			</a>
 			<span class="ml-1 hidden rounded-full bg-[#fff3c4] px-2 py-0.5 text-[11px] font-bold text-[#92400e] sm:inline">
@@ -64,6 +67,19 @@
 
 	<main class="flex-1 px-4 pb-24 pt-4">
 		{@render children?.()}
+
+		<footer class="mt-8 border-t border-[#e6eefb] pt-4 text-center">
+			<p class="text-sm font-extrabold text-[#2273d8]">Ringkas</p>
+			<p class="mt-0.5 text-xs text-[#64748b]">Rangkuman Materi SD, SMP, SMA</p>
+			<nav class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-bold text-[#2273d8]">
+				<a href="/blog">Blog</a>
+				<a href="/faq">FAQ</a>
+				<a href="/update">Update</a>
+				<a href="/privasi">Privasi</a>
+				<a href="/syarat">Syarat</a>
+			</nav>
+			<p class="mt-3 text-[11px] text-[#94a3b8]">© 2026 Ringkas — Teman belajar yang ringkas.</p>
+		</footer>
 	</main>
 
 	{#if !hideTabs}
