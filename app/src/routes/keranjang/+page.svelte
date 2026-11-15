@@ -36,7 +36,7 @@
 {:else if error}
 	<p class="err mt-6">{error}</p>
 {:else if $cart.length === 0}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Keranjangmu masih kosong</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Yuk, cari rangkuman favoritmu di katalog.</p>
@@ -48,6 +48,8 @@
 			{missing} produk di keranjang sudah tidak tersedia dan tidak dihitung.
 		</p>
 	{/if}
+	<!-- Desktop: dua kolom — daftar item kiri, ringkasan sticky kanan -->
+	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
 	<div class="mt-4 space-y-3">
 		{#each items as p (p.id)}
 			<article class="card flex gap-3 p-3">
@@ -74,7 +76,7 @@
 		{/each}
 	</div>
 
-	<div class="card mt-4 p-4">
+	<div class="card mt-4 p-4 lg:sticky lg:top-[72px] lg:self-start">
 		<div class="flex justify-between text-sm">
 			<span class="text-[#5f6b62]">{items.length} produk</span>
 			<span class="font-bold">{formatRupiah(total)}</span>
@@ -94,5 +96,6 @@
 		<button type="button" class="btn btn-ghost btn-block mt-2" onclick={() => cart.clear()}>
 			Kosongkan Keranjang
 		</button>
+	</div>
 	</div>
 {/if}

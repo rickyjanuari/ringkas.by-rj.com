@@ -148,6 +148,57 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
 - Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/study/:product_id/:chapter_id/worksheet`
 - Keluarga & kelas: `POST /api/parent/link|redeem`, `GET /api/parent/children`, `POST /api/parent/lock|target`, `POST /api/class`, `POST /api/class/join`, `GET /api/class/:id`, `GET /api/class/:id/recap` (CSV)
+- Admin statistik: `GET /api/admin/stats` (hanya admin) — kartu Ringkasan + 10 order terbaru
+
+## Tampilan responsif & dashboard admin (2026-11-15)
+
+**Mobile (di bawah 1024px) — tidak berubah:** seluruh UI hidup di kolom HP
+(max 430px, terpusat, latar titik-titik), bottom tab bar 5 tab (Beranda,
+Katalog, Keranjang tombol tengah terangkat, Pesanan, Akun), carousel promo,
+grid produk 2 kolom, detail/checkout sebagai layar dorong (back chevron +
+judul tengah + sticky buy bar), Blog/FAQ/Update/Privasi/Syarat sebagai bottom
+sheet dari Akun.
+
+**Desktop (breakpoint `lg`, 1024px ke atas):** container melebar
+(`max-w-7xl`, latar kertas polos tanpa titik-titik) dan bottom tab bar
+disembunyikan (`lg:hidden`). Sebagai gantinya ada **top bar sticky**
+(`hidden lg:flex`): logo Ringkas + menu Beranda / Katalog / Pesanan / Akun
++ kotak pencarian + tombol keranjang dengan badge jumlah. Pencarian di top
+bar mengirim ke `/katalog?q=...`; halaman katalog membaca `?q=` saat mount
+maupun saat query berubah. Beranda: carousel tetap lebar penuh di atas
+(diperbesar), grid produk 3 kolom (tablet) / 4 kolom (desktop). Katalog:
+sidebar filter kiri (jenjang + mapel + urutkan, sticky) + grid produk kanan;
+kartu produk memakai markup yang sama, berubah dari baris (mobile) menjadi
+kartu grid (tablet/desktop) lewat class responsif. Detail produk: dua kolom
+(galeri/info kiri, panel beli sticky kanan). Checkout: dua kolom (form kiri,
+ringkasan order sticky kanan). Keranjang/Pesanan/Akun/Belajar: dua kolom
+(konten + panel samping sticky). Halaman info (Blog/FAQ/Update/Privasi/
+Syarat) jadi halaman lebar baca (`max-w-3xl`); BottomSheet dari Akun tetap
+bottom sheet di mobile dan menjadi dialog tengah (`max-w-2xl`) di desktop.
+Semua perubahan hanya class responsif Tailwind (`md:`/`lg:`) di komponen
+yang sama — tidak ada duplikasi halaman mobile/desktop, tidak ada perubahan
+logika, harga, atau gating.
+
+**Dashboard admin (`/admin`, role admin saja):** shell dashboard dengan
+sidebar kiri (desktop) / drawer (mobile, tombol hamburger) berisi menu
+Ringkasan, Produk, Voucher, Pengguna, Video per Bab, Email & Cron; header
+menampilkan judul halaman + nama admin yang login.
+- **Ringkasan** (tab default): 8 kartu dari `GET /api/admin/stats` — total
+  produk (tampil/tersembunyi), pengguna, total order, order lunas, pendapatan
+  (SUM `total_amount` order PAID), voucher aktif, email terkirim
+  (`sent_emails`) — + 10 order terbaru (pembeli, produk, total, status).
+  Semua angka dari database asli.
+- **Produk:** tabel (cover mini, judul, jenjang/mapel, harga + coret, badge
+  TAMPIL/TERSEMBUNYI + BUNDEL, aksi Edit / Sembunyikan-Tampilkan / Hapus /
+  "Gambar & Link" untuk link eksternal + upload feature/gallery); pencarian
+  + filter jenjang; form tambah/edit jadi modal dengan semua field lama
+  (judul, jenjang, mapel, harga, harga coret, halaman, kategori, label
+  cover, warna cover, badge, deskripsi, link eksternal). Di mobile tabel
+  jadi kartu per produk.
+- **Voucher / Pengguna / Video per Bab / Email & Cron:** panel yang sudah
+  ada dipindah ke shell dashboard (pengguna jadi tabel di desktop); semua
+  fungsi tetap: buat/nonaktifkan voucher, ubah role (guard demote diri
+  sendiri tetap di server), set video per bab, jalankan cron manual.
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 

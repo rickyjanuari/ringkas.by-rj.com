@@ -75,7 +75,7 @@
 
 <!-- Bar atas layar dorong: kembali + judul di tengah -->
 <div
-	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur"
+	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur lg:top-14 lg:-mx-8 lg:px-4"
 >
 	<button
 		type="button"
@@ -97,13 +97,16 @@
 	<p class="err mt-6">{error || "Produk tidak ditemukan."}</p>
 	<a href="/katalog" class="btn btn-primary mt-4">Lihat Katalog</a>
 {:else}
+	<!-- Desktop: dua kolom — galeri/info kiri, panel beli sticky kanan -->
+	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
+		<div class="min-w-0">
 	<!-- Cover besar -->
 	<div class="card mt-3 overflow-hidden">
 		{#if featureImage}
-			<img src={featureImage} alt={product.title} class="h-44 w-full object-cover" />
+			<img src={featureImage} alt={product.title} class="h-44 w-full object-cover lg:h-80" />
 		{:else}
 			<div
-				class="flex h-44 items-center justify-center px-6 text-center text-lg font-extrabold text-white"
+				class="flex h-44 items-center justify-center px-6 text-center text-lg font-extrabold text-white lg:h-80"
 				style="background: {product.cover_color}"
 			>
 				{product.cover_label}
@@ -212,17 +215,30 @@
 			</div>
 		{/each}
 	{/if}
+		</div>
 
-	<!-- Bar beli bawah -->
+		<!-- Panel beli: bar bawah di mobile, panel sticky kanan di desktop -->
+		<div class="lg:sticky lg:top-[72px] lg:self-start">
 	<div
-		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)]"
+		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)] lg:static lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:flex-col lg:rounded-2xl lg:border lg:p-4 lg:shadow-[0_2px_12px_rgb(23_114_69/0.06)]"
 	>
-		<button type="button" class="btn btn-outline flex-1" onclick={tambahKeranjang}>
+		<div class="hidden lg:block">
+			<p class="text-2xl font-extrabold text-[#177245]">{formatRupiah(product.price)}</p>
+			{#if product.strikethrough_price}
+				<p class="text-sm font-semibold text-[#9aa096] line-through">
+					{formatRupiah(product.strikethrough_price)}
+				</p>
+			{/if}
+			<p class="mt-1 text-xs text-[#5f6b62]">{product.pages} halaman • {product.category}</p>
+		</div>
+		<button type="button" class="btn btn-outline flex-1 lg:w-full" onclick={tambahKeranjang}>
 			<Icon name="shopping-cart" size={16} /> Tambah ke Keranjang
 		</button>
-		<button type="button" class="btn btn-primary flex-1" onclick={beliSekarang}>
+		<button type="button" class="btn btn-primary flex-1 lg:w-full" onclick={beliSekarang}>
 			<Icon name="zap" size={16} /> Beli Sekarang
 		</button>
 	</div>
-	<div class="h-16"></div>
+	<div class="h-16 lg:hidden"></div>
+		</div>
+	</div>
 {/if}

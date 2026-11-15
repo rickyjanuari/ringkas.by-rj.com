@@ -173,7 +173,7 @@
 
 <!-- Bar atas layar dorong: kembali + judul di tengah -->
 <div
-	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur"
+	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur lg:top-14 lg:-mx-8 lg:px-4"
 >
 	<button
 		type="button"
@@ -193,7 +193,7 @@
 	<p class="err mt-6">{error}</p>
 {:else if order}
 	<!-- Tampilan pembayaran QRIS (bila order sudah PAID, pengguna diarahkan ke /sukses) -->
-	<div class="card mt-4 p-4 text-center">
+	<div class="card mt-4 p-4 text-center lg:mx-auto lg:max-w-xl">
 		{#if order.status === "EXPIRED"}
 			<p class="flex justify-center"><Icon name="alarm-clock" size={40} class="text-[#b91c1c]" /></p>
 			<p class="mt-2 text-lg font-extrabold">Kode QRIS Kedaluwarsa</p>
@@ -255,15 +255,18 @@
 		{/if}
 	</div>
 {:else if items.length === 0}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Keranjangmu kosong</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Tidak ada yang perlu dibayar sekarang.</p>
 		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
 	</div>
 {:else}
+	<!-- Desktop: dua kolom — form kiri, ringkasan order sticky kanan -->
+	<div class="lg:mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+		<div class="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-[72px] lg:self-start">
 	<!-- Ringkasan order -->
-	<div class="card mt-4 p-4">
+	<div class="card mt-4 p-4 lg:mt-0">
 		<h2 class="text-sm font-extrabold text-[#3f4a42]">Ringkasan Order</h2>
 		<div class="mt-2 space-y-2">
 			{#each items as p (p.id)}
@@ -284,9 +287,11 @@
 			</div>
 		{/if}
 	</div>
+		</div>
 
+		<div class="min-w-0 lg:col-start-1 lg:row-start-1">
 	<!-- Kode voucher -->
-	<div class="card mt-3 p-4">
+	<div class="card mt-3 p-4 lg:mt-0">
 		<label class="lbl" for="voucher">Kode Voucher (opsional)</label>
 		{#if appliedVoucher}
 			<p class="ok-msg flex items-center justify-between gap-2">
@@ -358,4 +363,6 @@
 	<p class="mt-2 text-center text-xs text-[#5f6b62]">
 		Pembayaran aman via QRIS. Satu kode QRIS untuk satu order.
 	</p>
+		</div>
+	</div>
 {/if}

@@ -19,9 +19,16 @@ body {
 	font-family: var(--font-sans);
 	background-color: #f7f5ef;
 	color: #22302a;
-	background-image: radial-gradient(#dce8d8 1.2px, transparent 1.2px);
-	background-size: 22px 22px;
 	min-height: 100vh;
+}
+
+/* Latar titik-titik hanya di bawah lg (mobile/tablet);
+   di desktop latar kertas pucat polos. */
+@media (max-width: 1023.98px) {
+	body {
+		background-image: radial-gradient(#dce8d8 1.2px, transparent 1.2px);
+		background-size: 22px 22px;
+	}
 }
 
 /* Judul memakai serif Lora, isi memakai Nunito Sans. */
@@ -211,4 +218,20 @@ label.lbl {
 }
 .tablink svg {
 	display: block;
+}
+
+/* Tautan menu header desktop (hanya tampil di lg ke atas). */
+.navlink {
+	padding: 0.4rem 0.75rem;
+	border-radius: 999px;
+	color: #3f4a42;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.navlink:hover {
+	background: #ece9dc;
+}
+.navlink.active {
+	background: #dcefe2;
+	color: #115c39;
 }

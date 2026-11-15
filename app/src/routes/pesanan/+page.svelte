@@ -118,7 +118,7 @@
 	<p class="err mt-6">{error}</p>
 	<button type="button" class="btn btn-primary mt-3" onclick={loadOrders}>Coba Lagi</button>
 {:else if orders.length === 0}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Icon name="receipt" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-bold">Belum ada pesanan</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Pesananmu setelah checkout akan muncul di sini.</p>
@@ -128,7 +128,7 @@
 	{#if notice}
 		<p class="ok-msg mt-4">{notice}</p>
 	{/if}
-	<div class="mt-4 space-y-3">
+	<div class="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
 		{#each orders as o (o.id)}
 			<article class="card p-4">
 				<div class="flex items-start justify-between gap-2">

@@ -196,6 +196,9 @@
 		</button>
 	</div>
 
+	<!-- Desktop: dua kolom — materi kiri, kuis kanan -->
+	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
+		<div class="min-w-0">
 	<!-- Poin inti -->
 	<div class="card mt-4 p-4">
 		<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="target" size={16} /> Poin Inti</h2>
@@ -264,7 +267,9 @@
 			{/if}
 		</div>
 	</div>
+		</div>
 
+		<div class="min-w-0">
 	<!-- Kuis -->
 	<div class="card mt-4 p-4">
 		<h2 class="flex items-center gap-2 text-base font-extrabold"><Icon name="gamepad-2" size={18} /> Kuis Bab ({totalQ} soal)</h2>
@@ -391,5 +396,7 @@
 				<Icon name="refresh" size={16} /> Ulangi Kuis
 			</button>
 		{/if}
+	</div>
+		</div>
 	</div>
 {/if}

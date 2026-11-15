@@ -676,6 +676,68 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     return c.json({ products });
   });
 
+  // ------------------------- Admin: ringkasan dashboard -------------------------
+  // Satu endpoint untuk tab Ringkasan: angka-angka agregat + 10 order
+  // terbaru. Semua dari database asli; tanpa migrasi/tabel baru.
+
+  app.get("/api/admin/stats", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const productRow = await db.get<{ total: number; visible: number; hidden: number }>(
+      "SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS visible, COALESCE(SUM(active = 0), 0) AS hidden FROM products"
+    );
+    const userRow = await db.get<{ total: number }>("SELECT COUNT(*) AS total FROM users");
+    const orderRow = await db.get<{ total: number; paid: number; revenue: number }>(
+      "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'PAID'), 0) AS paid, COALESCE(SUM(CASE WHEN status = 'PAID' THEN COALESCE(total_amount, total) ELSE 0 END), 0) AS revenue FROM orders"
+    );
+    const voucherRow = await db.get<{ active: number }>(
+      "SELECT COALESCE(SUM(active = 1), 0) AS active FROM vouchers"
+    );
+    const emailRow = await db.get<{ total: number }>("SELECT COUNT(*) AS total FROM sent_emails");
+    const recent = await db.all<{
+      id: string;
+      total: number;
+      total_amount: number | null;
+      status: string;
+      created_at: string;
+      paid_at: string | null;
+      items: string;
+      buyer_name: string | null;
+      buyer_email: string | null;
+    }>(
+      `SELECT o.id, o.total, o.total_amount, o.status, o.created_at, o.paid_at, o.items,
+              u.name AS buyer_name, u.email AS buyer_email
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id
+       ORDER BY o.created_at DESC LIMIT 10`
+    );
+    return c.json({
+      stats: {
+        products_total: productRow?.total ?? 0,
+        products_visible: productRow?.visible ?? 0,
+        products_hidden: productRow?.hidden ?? 0,
+        users_total: userRow?.total ?? 0,
+        orders_total: orderRow?.total ?? 0,
+        orders_paid: orderRow?.paid ?? 0,
+        revenue_paid: orderRow?.revenue ?? 0,
+        vouchers_active: voucherRow?.active ?? 0,
+        emails_sent: emailRow?.total ?? 0
+      },
+      recentOrders: recent.map((o) => ({
+        id: o.id,
+        buyer_name: o.buyer_name,
+        buyer_email: o.buyer_email,
+        products: parseItems(o.items)
+          .filter((it) => !it.included_in_bundle)
+          .map((it) => it.title),
+        total: o.total_amount ?? o.total,
+        status: o.status,
+        created_at: o.created_at,
+        paid_at: o.paid_at
+      }))
+    });
+  });
+
   app.post("/api/admin/products", async (c) => {
     const admin = await authUser(c, db);
     if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);

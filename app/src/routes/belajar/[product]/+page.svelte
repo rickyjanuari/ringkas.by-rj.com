@@ -248,6 +248,9 @@
 		<p class="ok-msg mt-3">{notice}</p>
 	{/if}
 
+	<!-- Desktop: dua kolom — Daftar Bab kiri, Simulasi SAS kanan -->
+	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
+		<div class="min-w-0">
 	<!-- Daftar Bab -->
 	<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold"><Icon name="library" size={18} /> Daftar Bab</h2>
 	{#if pack.chapters.length === 0}
@@ -369,7 +372,9 @@
 			</div>
 		{/each}
 	{/if}
+		</div>
 
+		<div class="min-w-0">
 	<!-- Simulasi SAS -->
 	{#if pack.simulations.length > 0}
 		<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold"><Icon name="trophy" size={18} /> Simulasi SAS</h2>
@@ -619,6 +624,8 @@
 			{/each}
 		</div>
 	{/if}
+		</div>
+	</div>
 
 	<p class="mt-6 text-center text-xs text-[#9aa096]">
 		Harga produk: {formatRupiah(pack.product.price)} • Semangat belajarnya!

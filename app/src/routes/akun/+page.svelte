@@ -450,6 +450,9 @@
 	}
 </script>
 
+<!-- Desktop: dua kolom — akun kiri, Bantuan & Info sticky kanan -->
+<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
+	<div class="min-w-0">
 {#if !loggedIn}
 	<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="user" size={22} /> Akun</h1>
 	<p class="text-sm text-[#5f6b62]">Masuk untuk menyimpan progres belajarmu.</p>
@@ -464,7 +467,7 @@
 	</div>
 
 	<form
-		class="card mt-3 space-y-3 p-4"
+		class="card mt-3 space-y-3 p-4 lg:max-w-xl"
 		onsubmit={(e) => {
 			e.preventDefault();
 			submitAuth();
@@ -956,9 +959,11 @@
 		<p class="text-center text-xs text-[#9aa096]">Terakhir diperbarui {formatTanggal($auth.user?.created_at)}</p>
 	</div>
 {/if}
+	</div>
 
+	<div class="lg:sticky lg:top-[72px] lg:self-start">
 <!-- Bantuan & Info -->
-<div class="card mt-4 p-4">
+<div class="card mt-4 p-4 lg:mt-0">
 	<p class="text-sm font-extrabold">Bantuan &amp; Info</p>
 	<div class="mt-2 flex flex-wrap gap-2">
 		<button type="button" class="chip" onclick={() => (sheet = "blog")}>
@@ -980,6 +985,8 @@
 	<p class="mt-2 text-[11px] text-[#5f6b62]">
 		Ketuk untuk membaca di sini, atau buka halaman penuh dari menu bawah situs.
 	</p>
+</div>
+	</div>
 </div>
 
 <BottomSheet open={sheet !== null} title={sheetTitle} onClose={() => (sheet = null)}>

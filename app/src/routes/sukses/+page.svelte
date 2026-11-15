@@ -117,7 +117,7 @@
 
 <!-- Bar atas layar dorong: kembali + judul di tengah -->
 <div
-	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur"
+	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur lg:top-14 lg:-mx-8 lg:px-4"
 >
 	<button
 		type="button"
@@ -136,7 +136,7 @@
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if !orderId}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center">
 			<Icon name="help-circle" size={40} class="text-[#177245]" />
 		</p>
@@ -150,7 +150,7 @@
 		</div>
 	</div>
 {:else if error || !order}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center">
 			<Icon name="x-circle" size={40} class="text-[#b91c1c]" />
 		</p>
@@ -164,7 +164,7 @@
 		</div>
 	</div>
 {:else if order.status === "PAID"}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center">
 			<Icon name="check-circle" size={56} class="text-[#177245]" />
 		</p>
@@ -231,7 +231,7 @@
 		</div>
 	</div>
 {:else if order.status === "EXPIRED"}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center">
 			<Icon name="alarm-clock" size={40} class="text-[#b91c1c]" />
 		</p>
@@ -246,7 +246,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="card mt-4 p-6 text-center">
+	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center">
 			<Icon name="clock" size={40} class="text-[#177245]" />
 		</p>

@@ -123,12 +123,12 @@
 			style="transform: translateX(-{slideIdx * 100}%)"
 		>
 			{#each slides as s (s.title)}
-				<div class="w-full shrink-0 px-5 py-6 text-white" style="background: {s.bg}">
+				<div class="w-full shrink-0 px-5 py-6 text-white lg:px-10 lg:py-10" style="background: {s.bg}">
 					<p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#f2b33d]">
 						<Icon name={s.icon} size={14} /> {s.kicker}
 					</p>
-					<h1 class="mt-1 text-2xl font-extrabold leading-snug">{s.title}</h1>
-					<p class="mt-1 text-sm text-white/90">{s.text}</p>
+					<h1 class="mt-1 text-2xl font-extrabold leading-snug lg:text-4xl">{s.title}</h1>
+					<p class="mt-1 max-w-2xl text-sm text-white/90 lg:text-base">{s.text}</p>
 					<a href={s.href} class="btn btn-sun mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
 				</div>
 			{/each}
@@ -183,7 +183,7 @@
 </section>
 
 <!-- Chip jenjang -->
-<div class="mt-5 flex gap-2 overflow-x-auto pb-1">
+<div class="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-6">
 	{#each jenjangList as j (j)}
 		<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
 			{#if j === "Semua"}
@@ -202,7 +202,7 @@
 {:else if shown.length === 0}
 	<p class="mt-6 text-center text-sm text-[#5f6b62]">Belum ada produk untuk jenjang ini.</p>
 {:else}
-	<div class="mt-3 grid grid-cols-2 gap-3">
+	<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:mt-4 lg:grid-cols-4 lg:gap-4">
 		{#each shown as p (p.id)}
 			<div
 				class="card cursor-pointer overflow-hidden"
@@ -212,7 +212,7 @@
 				tabindex="0"
 			>
 				<div
-					class="flex h-24 items-center justify-center px-3 text-center text-sm font-extrabold text-white"
+					class="flex h-24 items-center justify-center px-3 text-center text-sm font-extrabold text-white lg:h-36 lg:text-base"
 					style="background: {p.cover_color}"
 				>
 					<span class="leading-tight">{p.cover_label}</span>

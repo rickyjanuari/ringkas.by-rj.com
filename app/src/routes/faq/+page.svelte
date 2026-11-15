@@ -3,7 +3,9 @@
 	import FaqContent from "$lib/info/FaqContent.svelte";
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="help-circle" size={22} /> FAQ</h1>
-<p class="mt-1 text-sm text-[#5f6b62]">Pertanyaan yang sering ditanyakan tentang Ringkas.</p>
+<div class="lg:mx-auto lg:max-w-3xl">
+	<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="help-circle" size={22} /> FAQ</h1>
+	<p class="mt-1 text-sm text-[#5f6b62]">Pertanyaan yang sering ditanyakan tentang Ringkas.</p>
 
-<FaqContent />
+	<FaqContent />
+</div>

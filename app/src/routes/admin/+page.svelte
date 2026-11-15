@@ -5,6 +5,7 @@
 	import {
 		api,
 		formatRupiah,
+		formatTanggal,
 		getToken,
 		type ChapterMeta,
 		type Product,
@@ -12,17 +13,113 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "produk" | "pengguna" | "video" | "voucher" | "cron";
-	let tab = $state<Tab>("produk");
+	type Tab = "ringkasan" | "produk" | "pengguna" | "video" | "voucher" | "cron";
+	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
 	let error = $state("");
 	let notice = $state("");
+	let adminName = $state("");
+	let drawerOpen = $state(false);
+
+	const MENU: { id: Tab; label: string; icon: string }[] = [
+		{ id: "ringkasan", label: "Ringkasan", icon: "chart" },
+		{ id: "produk", label: "Produk", icon: "package" },
+		{ id: "voucher", label: "Voucher", icon: "receipt" },
+		{ id: "pengguna", label: "Pengguna", icon: "users" },
+		{ id: "video", label: "Video per Bab", icon: "video" },
+		{ id: "cron", label: "Email & Cron", icon: "clock" }
+	];
+
+	const TAB_TITLE: Record<Tab, string> = {
+		ringkasan: "Ringkasan",
+		produk: "Produk",
+		voucher: "Voucher",
+		pengguna: "Pengguna & Role",
+		video: "Video per Bab",
+		cron: "Email & Cron"
+	};
+
+	function navClass(t: Tab): string {
+		const base =
+			"flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold";
+		return tab === t
+			? `${base} bg-[#177245] text-white`
+			: `${base} text-[#3f4a42] hover:bg-[#ece9dc]`;
+	}
+
+	// ---- Ringkasan ----
+	type AdminStats = {
+		products_total: number;
+		products_visible: number;
+		products_hidden: number;
+		users_total: number;
+		orders_total: number;
+		orders_paid: number;
+		revenue_paid: number;
+		vouchers_active: number;
+		emails_sent: number;
+	};
+	type RecentOrder = {
+		id: string;
+		buyer_name: string | null;
+		buyer_email: string | null;
+		products: string[];
+		total: number;
+		status: string;
+		created_at: string;
+		paid_at: string | null;
+	};
+	let stats = $state<AdminStats | null>(null);
+	let recentOrders = $state<RecentOrder[]>([]);
+	let statsLoading = $state(false);
+	let statsError = $state("");
+
+	async function loadStats() {
+		statsLoading = true;
+		statsError = "";
+		try {
+			const data = await api<{ stats: AdminStats; recentOrders: RecentOrder[] }>(
+				"/api/admin/stats"
+			);
+			stats = data.stats;
+			recentOrders = data.recentOrders ?? [];
+		} catch (e) {
+			statsError =
+				e instanceof Error ? e.message : "Gagal memuat ringkasan. Coba muat ulang ya.";
+		} finally {
+			statsLoading = false;
+		}
+	}
+
+	function statusBadge(status: string): string {
+		if (status === "PAID") return "badge badge-leaf";
+		if (status === "PENDING") return "badge badge-sun";
+		return "badge badge-gray";
+	}
 
 	// ---- Produk ----
 	let products = $state<Product[]>([]);
 	let productsLoading = $state(false);
 	let editId = $state<string | null>(null);
+	let searchQuery = $state("");
+	let jenjangFilter = $state("Semua");
+	let expandedProductId = $state<string | null>(null);
+	let jenjangOptions = $derived([
+		"Semua",
+		...new Set(products.map((p) => p.jenjang).filter(Boolean))
+	]);
+	let filteredProducts = $derived(
+		products.filter((p) => {
+			const q = searchQuery.trim().toLowerCase();
+			const cocokCari =
+				!q ||
+				p.title.toLowerCase().includes(q) ||
+				p.mapel.toLowerCase().includes(q);
+			const cocokJenjang = jenjangFilter === "Semua" || p.jenjang === jenjangFilter;
+			return cocokCari && cocokJenjang;
+		})
+	);
 	let form = $state({
 		title: "",
 		jenjang: "SD",
@@ -113,7 +210,9 @@
 				error = "Halaman ini hanya untuk admin.";
 			} else {
 				isAdmin = true;
+				adminName = user.name;
 				await loadProducts();
+				await loadStats();
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memeriksa hak akses.";
@@ -149,8 +248,10 @@
 	function switchTab(t: Tab) {
 		tab = t;
 		notice = "";
+		drawerOpen = false;
 		if (t === "pengguna" && users.length === 0) loadUsers();
 		if (t === "voucher" && vouchers.length === 0) loadVouchers();
+		if (t === "ringkasan" && !stats && !statsLoading) loadStats();
 	}
 
 	async function loadVouchers() {
@@ -438,55 +539,818 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}><Icon name="chevron-left" size={18} /> Kembali ke Akun</button>
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold"><Icon name="crown" size={22} /> Admin — Kelola Produk</h1>
-
 {#if checking}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if !isAdmin}
 	<p class="err mt-6">{error || "Halaman ini hanya untuk admin."}</p>
 	<a href="/" class="btn btn-primary mt-4">Kembali ke Beranda</a>
 {:else}
-	{#if error}
-		<p class="err mt-3">{error}</p>
-	{/if}
-	{#if notice}
-		<p class="ok-msg mt-3">{notice}</p>
-	{/if}
+	<div class="lg:flex lg:items-start lg:gap-4">
+		<!-- Sidebar desktop -->
+		<aside class="card sticky top-4 hidden w-60 shrink-0 flex-col gap-1 p-3 lg:flex">
+			<p class="flex items-center gap-2 px-2 pb-2 pt-1 text-base font-extrabold">
+				<Icon name="crown" size={20} /> Admin Ringkas
+			</p>
+			{#each MENU as m (m.id)}
+				<button type="button" class={navClass(m.id)} onclick={() => switchTab(m.id)}>
+					<Icon name={m.icon} size={18} /> {m.label}
+					{#if m.id === "produk"}
+						<span class="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">{products.length}</span>
+					{:else if m.id === "voucher"}
+						<span class="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">{vouchers.length}</span>
+					{/if}
+				</button>
+			{/each}
+			<div class="mt-3 border-t border-[#e7e2d2] pt-3">
+				<button type="button" class="btn btn-ghost w-full" onclick={() => goto("/akun")}>
+					<Icon name="chevron-left" size={18} /> Kembali ke Akun
+				</button>
+			</div>
+		</aside>
 
-	<div class="mt-4 flex flex-wrap gap-2">
-		<button type="button" class="chip" class:active={tab === "produk"} onclick={() => switchTab("produk")}>
-			<Icon name="package" size={16} /> Produk ({products.length})
-		</button>
-		<button type="button" class="chip" class:active={tab === "pengguna"} onclick={() => switchTab("pengguna")}>
-			<Icon name="users" size={16} /> Pengguna & Role
-		</button>
-		<button type="button" class="chip" class:active={tab === "video"} onclick={() => switchTab("video")}>
-			<Icon name="video" size={16} /> Video per Bab
-		</button>
-		<button type="button" class="chip" class:active={tab === "voucher"} onclick={() => switchTab("voucher")}>
-			<Icon name="receipt" size={16} /> Voucher ({vouchers.length})
-		</button>
-		<button type="button" class="chip" class:active={tab === "cron"} onclick={() => switchTab("cron")}>
-			<Icon name="clock" size={16} /> Cron Email
-		</button>
+		<!-- Drawer mobile -->
+		{#if drawerOpen}
+			<div class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Menu admin">
+				<button
+					type="button"
+					aria-label="Tutup menu"
+					class="absolute inset-0 bg-black/40"
+					onclick={() => (drawerOpen = false)}
+				></button>
+				<aside class="absolute left-0 top-0 flex h-full w-72 flex-col gap-1 overflow-y-auto bg-[#fffdf7] p-3 shadow-xl">
+					<div class="flex items-center justify-between px-2 pb-2 pt-1">
+						<p class="flex items-center gap-2 text-base font-extrabold">
+							<Icon name="crown" size={20} /> Admin Ringkas
+						</p>
+						<button
+							type="button"
+							aria-label="Tutup menu"
+							class="btn btn-ghost !px-2 !py-1.5"
+							onclick={() => (drawerOpen = false)}
+						>
+							<Icon name="x" size={18} />
+						</button>
+					</div>
+					{#each MENU as m (m.id)}
+						<button type="button" class={navClass(m.id)} onclick={() => switchTab(m.id)}>
+							<Icon name={m.icon} size={18} /> {m.label}
+							{#if m.id === "produk"}
+								<span class="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">{products.length}</span>
+							{:else if m.id === "voucher"}
+								<span class="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">{vouchers.length}</span>
+							{/if}
+						</button>
+					{/each}
+					<div class="mt-3 border-t border-[#e7e2d2] pt-3">
+						<button type="button" class="btn btn-ghost w-full" onclick={() => goto("/akun")}>
+							<Icon name="chevron-left" size={18} /> Kembali ke Akun
+						</button>
+					</div>
+				</aside>
+			</div>
+		{/if}
+
+		<!-- Konten dashboard -->
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2">
+				<button
+					type="button"
+					aria-label="Buka menu"
+					class="btn btn-ghost !px-2.5 !py-2 lg:hidden"
+					onclick={() => (drawerOpen = true)}
+				>
+					<Icon name="layers" size={18} />
+				</button>
+				<h1 class="flex items-center gap-2 text-xl font-extrabold">
+					<Icon name="crown" size={22} /> {TAB_TITLE[tab]}
+				</h1>
+				<span class="ml-auto flex min-w-0 items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-bold text-[#3f4a42]">
+					<Icon name="user" size={15} />
+					<span class="max-w-28 truncate sm:max-w-none">{adminName}</span>
+				</span>
+			</div>
+
+			{#if error}
+				<p class="err mt-3">{error}</p>
+			{/if}
+			{#if notice}
+				<p class="ok-msg mt-3">{notice}</p>
+			{/if}
+
+			{#if tab === "ringkasan"}
+				<div class="mt-4 flex items-center justify-between gap-2">
+					<p class="text-sm font-bold text-[#3f4a42]">Angka-angka dari database toko</p>
+					<button type="button" class="btn btn-ghost !px-2.5 !py-1.5 text-xs" disabled={statsLoading} onclick={loadStats}>
+						<Icon name="refresh" size={15} /> {statsLoading ? "Memuat..." : "Muat ulang"}
+					</button>
+				</div>
+				{#if statsLoading && !stats}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if statsError && !stats}
+					<p class="err mt-4">{statsError}</p>
+					<button type="button" class="btn btn-primary mt-3" onclick={loadStats}>Coba lagi</button>
+				{:else if stats}
+					{#if statsError}
+						<p class="err mt-4">{statsError}</p>
+					{/if}
+					<div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="package" size={15} /> Total Produk</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.products_total}</p>
+							<p class="text-xs text-[#5f6b62]">{stats.products_visible} tampil • {stats.products_hidden} tersembunyi</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="eye" size={15} /> Produk Tampil</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.products_visible}</p>
+							<p class="text-xs text-[#5f6b62]">dari {stats.products_total} produk</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="users" size={15} /> Pengguna</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.users_total}</p>
+							<p class="text-xs text-[#5f6b62]">akun terdaftar</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="receipt" size={15} /> Total Order</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.orders_total}</p>
+							<p class="text-xs text-[#5f6b62]">{stats.orders_paid} sudah lunas (PAID)</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="check" size={15} /> Order Lunas</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.orders_paid}</p>
+							<p class="text-xs text-[#5f6b62]">status PAID</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="credit-card" size={15} /> Pendapatan</p>
+							<p class="mt-1 text-2xl font-extrabold">{formatRupiah(stats.revenue_paid)}</p>
+							<p class="text-xs text-[#5f6b62]">total order PAID</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="bookmark" size={15} /> Voucher Aktif</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.vouchers_active}</p>
+							<p class="text-xs text-[#5f6b62]">kode bisa dipakai</p>
+						</div>
+						<div class="card p-3">
+							<p class="flex items-center gap-1.5 text-xs font-bold text-[#5f6b62]"><Icon name="sparkles" size={15} /> Email Terkirim</p>
+							<p class="mt-1 text-2xl font-extrabold">{stats.emails_sent}</p>
+							<p class="text-xs text-[#5f6b62]">jejak pengiriman email</p>
+						</div>
+					</div>
+
+					<h2 class="mt-5 text-base font-extrabold">Order Terbaru</h2>
+					{#if recentOrders.length === 0}
+						<p class="mt-2 text-sm text-[#5f6b62]">Belum ada order.</p>
+					{:else}
+						<div class="card mt-2 hidden overflow-x-auto p-0 md:block">
+							<table class="w-full min-w-[720px] text-left text-xs">
+								<thead>
+									<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+										<th class="px-3 py-2.5 font-extrabold">Order</th>
+										<th class="px-3 py-2.5 font-extrabold">Pembeli</th>
+										<th class="px-3 py-2.5 font-extrabold">Produk</th>
+										<th class="px-3 py-2.5 font-extrabold">Total</th>
+										<th class="px-3 py-2.5 font-extrabold">Status</th>
+										<th class="px-3 py-2.5 font-extrabold">Tanggal</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each recentOrders as o (o.id)}
+										<tr class="border-b border-[#f0ede2] align-top last:border-0">
+											<td class="px-3 py-2.5 font-extrabold">{o.id}</td>
+											<td class="px-3 py-2.5">
+												<p class="font-bold">{o.buyer_name ?? "-"}</p>
+												<p class="text-[#5f6b62]">{o.buyer_email ?? "-"}</p>
+											</td>
+											<td class="px-3 py-2.5">{o.products.join(", ") || "-"}</td>
+											<td class="px-3 py-2.5 font-bold">{formatRupiah(o.total)}</td>
+											<td class="px-3 py-2.5"><span class={statusBadge(o.status)}>{o.status}</span></td>
+											<td class="px-3 py-2.5">{formatTanggal(o.created_at)}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						<div class="mt-2 space-y-2 md:hidden">
+							{#each recentOrders as o (o.id)}
+								<article class="card p-3">
+									<div class="flex items-start justify-between gap-2">
+										<p class="text-sm font-extrabold">{o.id}</p>
+										<span class={statusBadge(o.status)}>{o.status}</span>
+									</div>
+									<p class="mt-1 text-xs font-bold">{o.buyer_name ?? "-"} • {o.buyer_email ?? "-"}</p>
+									<p class="mt-0.5 text-xs text-[#5f6b62]">{o.products.join(", ") || "-"}</p>
+									<p class="mt-1 text-sm font-bold">{formatRupiah(o.total)} <span class="text-xs font-normal text-[#5f6b62]">• {formatTanggal(o.created_at)}</span></p>
+								</article>
+							{/each}
+						</div>
+					{/if}
+				{/if}
+			{:else if tab === "produk"}
+				<div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+					<div class="relative flex-1">
+						<input
+							class="input !pl-9"
+							type="search"
+							placeholder="Cari judul atau mapel..."
+							bind:value={searchQuery}
+							aria-label="Cari produk"
+						/>
+						<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#5f6b62]"><Icon name="search" size={16} /></span>
+					</div>
+					<select class="input sm:!w-40" bind:value={jenjangFilter} aria-label="Filter jenjang">
+						{#each jenjangOptions as j (j)}
+							<option value={j}>{j === "Semua" ? "Semua jenjang" : j}</option>
+						{/each}
+					</select>
+					<button type="button" class="btn btn-primary" onclick={mulaiTambah}>
+						<Icon name="plus" size={16} /> Tambah Produk
+					</button>
+				</div>
+				<p class="mt-3 text-sm font-bold text-[#3f4a42]">
+					Menampilkan {filteredProducts.length} dari {products.length} produk
+				</p>
+
+				{#if productsLoading}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if filteredProducts.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">
+						{products.length === 0 ? "Belum ada produk." : "Tidak ada produk yang cocok dengan pencarian."}
+					</p>
+				{:else}
+					<!-- Tabel desktop -->
+					<div class="card mt-3 hidden overflow-x-auto p-0 md:block">
+						<table class="w-full min-w-[780px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Cover</th>
+									<th class="px-3 py-2.5 font-extrabold">Judul</th>
+									<th class="px-3 py-2.5 font-extrabold">Jenjang / Mapel</th>
+									<th class="px-3 py-2.5 font-extrabold">Harga</th>
+									<th class="px-3 py-2.5 font-extrabold">Status</th>
+									<th class="px-3 py-2.5 text-right font-extrabold">Aksi</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each filteredProducts as p (p.id)}
+									<tr class="border-b border-[#f0ede2] align-top">
+										<td class="px-3 py-2.5">
+											<div
+												class="flex h-12 w-12 items-center justify-center rounded-lg px-1 text-center text-[10px] font-extrabold leading-tight text-white"
+												style="background: {p.cover_color}"
+											>
+												{p.cover_label}
+											</div>
+										</td>
+										<td class="px-3 py-2.5">
+											<p class="text-sm font-bold leading-snug">{p.title}</p>
+											{#if p.badge}
+												<span class="badge badge-sun mt-1">{p.badge}</span>
+											{/if}
+										</td>
+										<td class="px-3 py-2.5">{p.jenjang} • {p.mapel}</td>
+										<td class="px-3 py-2.5">
+											<p class="font-bold">{formatRupiah(p.price)}</p>
+											{#if p.strikethrough_price}
+												<p class="text-[#5f6b62] line-through">{formatRupiah(p.strikethrough_price)}</p>
+											{/if}
+										</td>
+										<td class="px-3 py-2.5">
+											<div class="flex flex-wrap gap-1">
+												{#if p.active}
+													<span class="badge badge-leaf">TAMPIL</span>
+												{:else}
+													<span class="badge badge-gray">TERSEMBUNYI</span>
+												{/if}
+												{#if p.badge === "BUNDEL"}
+													<span class="badge badge-brand">BUNDEL</span>
+												{/if}
+												{#if p.external_url}
+													<span class="badge badge-brand"><Icon name="link" size={12} /> Link eksternal</span>
+												{/if}
+											</div>
+										</td>
+										<td class="px-3 py-2.5">
+											<div class="flex flex-wrap justify-end gap-1.5">
+												<button type="button" class="btn btn-outline !px-2.5 !py-1.5 text-xs" onclick={() => mulaiEdit(p)}>
+													<Icon name="edit" size={14} /> Edit
+												</button>
+												<button
+													type="button"
+													class="btn {p.active ? 'btn-ghost' : 'btn-leaf'} !px-2.5 !py-1.5 text-xs"
+													onclick={() => toggleActive(p)}
+												>
+													{p.active ? "Sembunyikan" : "Tampilkan"}
+												</button>
+												<button
+													type="button"
+													class="btn btn-danger !px-2.5 !py-1.5 text-xs"
+													onclick={() => hapusProduk(p.id, p.title)}
+												>
+													<Icon name="trash" size={14} /> Hapus
+												</button>
+												<button
+													type="button"
+													class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+													onclick={() => (expandedProductId = expandedProductId === p.id ? null : p.id)}
+												>
+													<Icon name="link" size={14} /> Gambar & Link
+												</button>
+											</div>
+										</td>
+									</tr>
+									{#if expandedProductId === p.id}
+										<tr class="border-b border-[#f0ede2] bg-[#f7f5ef]">
+											<td class="px-3 py-3" colspan="6">
+												<div class="flex flex-wrap items-center gap-2">
+													<input
+														class="input !w-64 !px-2 !py-1.5 text-xs"
+														placeholder="Link eksternal (https://...)"
+														value={p.external_url ?? ""}
+														oninput={(e) => (externalUrlDraft = e.currentTarget.value)}
+													/>
+													<button
+														type="button"
+														class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+														onclick={() => simpanExternalLink(p)}
+													>
+														Simpan Link
+													</button>
+													<input
+														type="file"
+														accept="image/*"
+														class="text-xs"
+														onchange={(e) => {
+															uploadFile = e.currentTarget.files?.[0] ?? null;
+														}}
+													/>
+													<select class="input !w-auto !px-2 !py-1.5 text-xs" bind:value={uploadKind}>
+														<option value="feature">Feature</option>
+														<option value="gallery">Gallery</option>
+													</select>
+													<button
+														type="button"
+														class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+														disabled={uploading || !uploadFile}
+														onclick={() => uploadGambar(p)}
+													>
+														{#if uploading}Mengunggah...{:else}<Icon name="upload" size={15} /> Upload Gambar{/if}
+													</button>
+												</div>
+											</td>
+										</tr>
+									{/if}
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					<!-- Kartu mobile -->
+					<div class="mt-3 space-y-3 md:hidden">
+						{#each filteredProducts as p (p.id)}
+							<article class="card p-3">
+								<div class="flex items-start gap-3">
+									<div
+										class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg px-1 text-center text-[10px] font-extrabold leading-tight text-white"
+										style="background: {p.cover_color}"
+									>
+										{p.cover_label}
+									</div>
+									<div class="min-w-0 flex-1">
+										<p class="text-sm font-bold leading-snug">{p.title}</p>
+										<p class="text-xs text-[#5f6b62]">
+											{p.jenjang} • {p.mapel} • {formatRupiah(p.price)}
+											{#if p.strikethrough_price}
+												<span class="line-through">{formatRupiah(p.strikethrough_price)}</span>
+											{/if}
+										</p>
+										<div class="mt-1 flex flex-wrap gap-1">
+											{#if p.active}
+												<span class="badge badge-leaf">TAMPIL</span>
+											{:else}
+												<span class="badge badge-gray">TERSEMBUNYI</span>
+											{/if}
+											{#if p.badge === "BUNDEL"}
+												<span class="badge badge-brand">BUNDEL</span>
+											{/if}
+											{#if p.badge}
+												<span class="badge badge-sun">{p.badge}</span>
+											{/if}
+											{#if p.external_url}
+												<span class="badge badge-brand"><Icon name="link" size={12} /> Link eksternal</span>
+											{/if}
+										</div>
+									</div>
+									<button
+										type="button"
+										class="btn {p.active ? 'btn-ghost' : 'btn-leaf'} shrink-0 !px-2.5 !py-1.5 text-xs"
+										onclick={() => toggleActive(p)}
+									>
+										{p.active ? "Sembunyikan" : "Tampilkan"}
+									</button>
+								</div>
+								<div class="mt-2 flex flex-wrap gap-2">
+									<button type="button" class="btn btn-outline !px-2.5 !py-1.5 text-xs" onclick={() => mulaiEdit(p)}>
+										<Icon name="edit" size={14} /> Edit
+									</button>
+									<button
+										type="button"
+										class="btn btn-danger !px-2.5 !py-1.5 text-xs"
+										onclick={() => hapusProduk(p.id, p.title)}
+									>
+										<Icon name="trash" size={14} /> Hapus
+									</button>
+									<input
+										class="input !w-44 !px-2 !py-1.5 text-xs"
+										placeholder="Link eksternal (https://...)"
+										value={p.external_url ?? ""}
+										oninput={(e) => (externalUrlDraft = e.currentTarget.value)}
+									/>
+									<button
+										type="button"
+										class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+										onclick={() => simpanExternalLink(p)}
+									>
+										Simpan Link
+									</button>
+								</div>
+								<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-dashed border-[#e7e2d2] pt-2">
+									<input
+										type="file"
+										accept="image/*"
+										class="text-xs"
+										onchange={(e) => {
+											uploadFile = e.currentTarget.files?.[0] ?? null;
+										}}
+									/>
+									<select class="input !w-auto !px-2 !py-1.5 text-xs" bind:value={uploadKind}>
+										<option value="feature">Feature</option>
+										<option value="gallery">Gallery</option>
+									</select>
+									<button
+										type="button"
+										class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+										disabled={uploading || !uploadFile}
+										onclick={() => uploadGambar(p)}
+									>
+										{#if uploading}Mengunggah...{:else}<Icon name="upload" size={15} /> Upload Gambar{/if}
+									</button>
+								</div>
+							</article>
+						{/each}
+					</div>
+				{/if}
+			{:else if tab === "pengguna"}
+				{#if usersLoading}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if users.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">Belum ada pengguna.</p>
+				{:else}
+					<div class="card mt-3 hidden overflow-x-auto p-0 md:block">
+						<table class="w-full min-w-[680px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Nama</th>
+									<th class="px-3 py-2.5 font-extrabold">Email</th>
+									<th class="px-3 py-2.5 font-extrabold">Order</th>
+									<th class="px-3 py-2.5 font-extrabold">Role</th>
+									<th class="px-3 py-2.5 text-right font-extrabold">Aksi</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each users as u (u.id)}
+									<tr class="border-b border-[#f0ede2] last:border-0">
+										<td class="px-3 py-2.5 font-bold">{u.name}</td>
+										<td class="px-3 py-2.5">{u.email}</td>
+										<td class="px-3 py-2.5">{u.order_count} order</td>
+										<td class="px-3 py-2.5">
+											{#if u.role === "admin"}
+												<span class="badge badge-sun"><Icon name="crown" size={12} /> Admin</span>
+											{:else}
+												<span class="badge badge-leaf"><Icon name="backpack" size={12} /> Pelanggan</span>
+											{/if}
+										</td>
+										<td class="px-3 py-2.5 text-right">
+											{#if u.role === "admin"}
+												<button
+													type="button"
+													class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+													onclick={() => setRole(u, "customer")}
+												>
+													Jadikan Pelanggan
+												</button>
+											{:else}
+												<button
+													type="button"
+													class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+													onclick={() => setRole(u, "admin")}
+												>
+													Jadikan Admin
+												</button>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					<div class="mt-3 space-y-2 md:hidden">
+						{#each users as u (u.id)}
+							<div class="card flex items-center gap-3 p-3">
+								<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ece9dc] text-[#177245]"><Icon name="user" size={18} /></span>
+								<div class="min-w-0 flex-1">
+									<p class="truncate text-sm font-bold">{u.name}</p>
+									<p class="truncate text-xs text-[#5f6b62]">
+										{u.email} • {u.order_count} order • {#if u.role === "admin"}<Icon name="crown" size={13} class="inline-block align-[-2px]" /> Admin{:else}<Icon name="backpack" size={13} class="inline-block align-[-2px]" /> Pelanggan{/if}
+									</p>
+								</div>
+								{#if u.role === "admin"}
+									<button
+										type="button"
+										class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+										onclick={() => setRole(u, "customer")}
+									>
+										Jadikan Pelanggan
+									</button>
+								{:else}
+									<button
+										type="button"
+										class="btn btn-sun !px-2.5 !py-1.5 text-xs"
+										onclick={() => setRole(u, "admin")}
+									>
+										Jadikan Admin
+									</button>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+			{:else if tab === "video"}
+				<div class="card mt-4 space-y-3 p-4">
+					<p class="text-sm font-bold"><Icon name="video" size={16} /> Video per Bab</p>
+					<p class="text-xs text-[#5f6b62]">
+						Video tampil di Ruang Belajar sebagai kartu "Tonton Video Pembelajaran". Kosongkan URL untuk
+						menghapus video.
+					</p>
+					<div>
+						<label class="lbl" for="v-produk">Pilih produk</label>
+						<select id="v-produk" class="input" bind:value={videoProductId} onchange={pilihProdukVideo}>
+							<option value="">— Pilih produk —</option>
+							{#each products as p (p.id)}
+								<option value={p.id}>{p.title}</option>
+							{/each}
+						</select>
+					</div>
+					{#if videoLoading}
+						<p class="text-sm text-[#5f6b62]">Memuat bab...</p>
+					{:else if videoChapters.length > 0}
+						<div>
+							<label class="lbl" for="v-bab">Pilih bab</label>
+							<select id="v-bab" class="input" bind:value={videoChapterId} onchange={pilihBabVideo}>
+								<option value="">— Pilih bab —</option>
+								{#each videoChapters as c (c.id)}
+									<option value={c.id}>
+										{c.title}{c.video_url ? " (ada video)" : ""}
+									</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+					{#if videoChapterId}
+						<div>
+							<label class="lbl" for="v-url">URL video (YouTube/embed, http/https)</label>
+							<input
+								id="v-url"
+								class="input"
+								type="url"
+								bind:value={videoUrl}
+								placeholder="https://www.youtube.com/embed/..."
+							/>
+						</div>
+						<div>
+							<label class="lbl" for="v-dur">Durasi (contoh: 1 menit 17 detik)</label>
+							<input id="v-dur" class="input" bind:value={videoDuration} placeholder="1 menit 17 detik" />
+						</div>
+						<button
+							type="button"
+							class="btn btn-primary"
+							disabled={videoSaving}
+							onclick={simpanVideo}
+						>
+							{#if videoSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Video{/if}
+						</button>
+					{/if}
+				</div>
+			{:else if tab === "voucher"}
+				<form
+					class="card mt-4 space-y-3 p-4"
+					onsubmit={(e) => {
+						e.preventDefault();
+						buatVoucher();
+					}}
+				>
+					<p class="text-sm font-bold"><Icon name="receipt" size={16} /> Buat Voucher Baru</p>
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="lbl" for="v-code">Kode voucher</label>
+							<input
+								id="v-code"
+								class="input uppercase"
+								bind:value={vForm.code}
+								placeholder="Contoh: HEMAT10"
+								required
+							/>
+						</div>
+						<div>
+							<label class="lbl" for="v-type">Tipe</label>
+							<select id="v-type" class="input" bind:value={vForm.type}>
+								<option value="percent">Persen (%)</option>
+								<option value="fixed">Nominal (Rp)</option>
+							</select>
+						</div>
+						<div>
+							<label class="lbl" for="v-value">
+								Nilai {vForm.type === "percent" ? "(%, 1–100)" : "(Rp)"}
+							</label>
+							<input
+								id="v-value"
+								class="input"
+								type="number"
+								min="1"
+								max={vForm.type === "percent" ? 100 : undefined}
+								bind:value={vForm.value}
+								required
+							/>
+						</div>
+						<div>
+							<label class="lbl" for="v-max">Maks. pemakaian (opsional)</label>
+							<input
+								id="v-max"
+								class="input"
+								type="number"
+								min="1"
+								bind:value={vForm.max_uses}
+								placeholder="Tanpa batas"
+							/>
+						</div>
+						<div>
+							<label class="lbl" for="v-min">Min. belanja Rp (opsional)</label>
+							<input
+								id="v-min"
+								class="input"
+								type="number"
+								min="0"
+								bind:value={vForm.min_total}
+								placeholder="Tanpa minimum"
+							/>
+						</div>
+						<div>
+							<label class="lbl" for="v-exp">Kedaluwarsa (opsional)</label>
+							<input id="v-exp" class="input" type="date" bind:value={vForm.expires_at} />
+						</div>
+					</div>
+					{#if vError}
+						<p class="err">{vError}</p>
+					{/if}
+					<button type="submit" class="btn btn-primary" disabled={vSaving}>
+						{#if vSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Voucher{/if}
+					</button>
+				</form>
+
+				{#if vouchersLoading}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if vouchers.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">Belum ada voucher.</p>
+				{:else}
+					<div class="card mt-3 overflow-x-auto p-0">
+						<table class="w-full min-w-[680px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Kode</th>
+									<th class="px-3 py-2.5 font-extrabold">Tipe</th>
+									<th class="px-3 py-2.5 font-extrabold">Nilai</th>
+									<th class="px-3 py-2.5 font-extrabold">Terpakai</th>
+									<th class="px-3 py-2.5 font-extrabold">Min. Belanja</th>
+									<th class="px-3 py-2.5 font-extrabold">Kedaluwarsa</th>
+									<th class="px-3 py-2.5 font-extrabold">Status</th>
+									<th class="px-3 py-2.5 font-extrabold"></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each vouchers as v (v.code)}
+									<tr class="border-b border-[#f0ede2] last:border-0">
+										<td class="px-3 py-2.5 font-extrabold">{v.code}</td>
+										<td class="px-3 py-2.5">{v.type === "percent" ? "Persen" : "Nominal"}</td>
+										<td class="px-3 py-2.5 font-bold">
+											{v.type === "percent" ? `${v.value}%` : formatRupiah(v.value)}
+										</td>
+										<td class="px-3 py-2.5">{v.uses}{v.max_uses ? ` / ${v.max_uses}` : ""}</td>
+										<td class="px-3 py-2.5">{v.min_total ? formatRupiah(v.min_total) : "-"}</td>
+										<td class="px-3 py-2.5">{fmtDate(v.expires_at)}</td>
+										<td class="px-3 py-2.5">
+											{#if v.active}
+												<span class="badge badge-leaf">Aktif</span>
+											{:else}
+												<span class="badge badge-gray">Nonaktif</span>
+											{/if}
+										</td>
+										<td class="px-3 py-2.5 text-right">
+											<button
+												type="button"
+												class="btn {v.active ? 'btn-ghost' : 'btn-leaf'} !px-2.5 !py-1.5 text-xs"
+												disabled={vToggling === v.code}
+												onclick={() => toggleVoucher(v)}
+											>
+												{v.active ? "Nonaktifkan" : "Aktifkan"}
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			{:else if tab === "cron"}
+				<div class="card mt-4 space-y-3 p-4">
+					<p class="text-sm font-bold"><Icon name="clock" size={16} /> Cron Email</p>
+					<p class="text-xs text-[#5f6b62]">
+						Jalankan pengiriman email terjadwal secara manual. Pengingat harian dikirim ke orang tua
+						anak yang belum belajar hari itu; laporan mingguan berisi ringkasan belajar 7 hari terakhir.
+					</p>
+					<div>
+						<label class="lbl" for="cron-date">Tanggal (opsional, bila kosong memakai hari ini)</label>
+						<input id="cron-date" class="input" type="date" bind:value={cronDate} />
+					</div>
+					<div class="flex flex-wrap gap-2">
+						<button
+							type="button"
+							class="btn btn-primary"
+							disabled={cronRunning !== null}
+							onclick={() => jalankanCron("daily")}
+						>
+							{#if cronRunning === "daily"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan pengingat harian{/if}
+						</button>
+						<button
+							type="button"
+							class="btn btn-sun"
+							disabled={cronRunning !== null}
+							onclick={() => jalankanCron("weekly")}
+						>
+							{#if cronRunning === "weekly"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan laporan mingguan{/if}
+						</button>
+					</div>
+					{#if cronError}
+						<p class="err">{cronError}</p>
+					{/if}
+					{#if cronResult}
+						<div class="rounded-xl bg-[#f7f5ef] p-3 text-sm">
+							<p class="font-extrabold">
+								Hasil: {cronResult.job === "daily" ? "Pengingat harian" : "Laporan mingguan"}
+							</p>
+							<p class="mt-1">
+								Terkirim: <b>{cronResult.sent}</b> • Dilewati: <b>{cronResult.skipped}</b>
+							</p>
+							{#if cronResult.errors.length > 0}
+								<p class="mt-2 font-bold text-[#b91c1c]">Error ({cronResult.errors.length}):</p>
+								<ul class="list-disc pl-5 text-[#b91c1c]">
+									{#each cronResult.errors as err (err)}
+										<li>{err}</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="mt-1 text-[#065f46]">Selesai tanpa error.</p>
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
 	</div>
 
-	{#if tab === "produk"}
-		<div class="mt-4 flex items-center justify-between">
-			<p class="text-sm font-bold text-[#3f4a42]">Total {products.length} produk</p>
-			<button type="button" class="btn btn-primary text-xs" onclick={mulaiTambah}>+ Tambah Produk</button>
-		</div>
-
-		{#if editId}
+	<!-- Modal form tambah/edit produk -->
+	{#if editId}
+		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label={editId === "baru" ? "Produk Baru" : "Edit Produk"}>
+			<button
+				type="button"
+				aria-label="Tutup form produk"
+				class="absolute inset-0 bg-black/40"
+				onclick={() => (editId = null)}
+			></button>
 			<form
-				class="card mt-3 space-y-3 p-4"
+				class="relative max-h-[92dvh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-2xl bg-[#fffdf7] p-4 shadow-xl sm:rounded-2xl"
 				onsubmit={(e) => {
 					e.preventDefault();
 					simpanProduk();
 				}}
 			>
-				<p class="flex items-center gap-2 font-extrabold">{editId === "baru" ? "Produk Baru" : "Edit Produk"}</p>
+				<div class="flex items-center justify-between gap-2">
+					<p class="flex items-center gap-2 font-extrabold">{editId === "baru" ? "Produk Baru" : "Edit Produk"}</p>
+					<button
+						type="button"
+						aria-label="Tutup form produk"
+						class="btn btn-ghost !px-2 !py-1.5"
+						onclick={() => (editId = null)}
+					>
+						<Icon name="x" size={18} />
+					</button>
+				</div>
 				<div>
 					<label class="lbl" for="f-title">Judul</label>
 					<input id="f-title" class="input" bind:value={form.title} required />
@@ -549,370 +1413,6 @@
 					<button type="button" class="btn btn-ghost" onclick={() => (editId = null)}>Batal</button>
 				</div>
 			</form>
-		{/if}
-
-		{#if productsLoading}
-			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
-		{:else}
-			<div class="mt-3 space-y-3">
-				{#each products as p (p.id)}
-					<article class="card p-3">
-						<div class="flex items-start gap-3">
-							<div
-								class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg px-1 text-center text-[10px] font-extrabold leading-tight text-white"
-								style="background: {p.cover_color}"
-							>
-								{p.cover_label}
-							</div>
-							<div class="min-w-0 flex-1">
-								<p class="text-sm font-bold leading-snug">{p.title}</p>
-								<p class="text-xs text-[#5f6b62]">
-									{p.jenjang} • {p.mapel} • {formatRupiah(p.price)}
-								</p>
-								<div class="mt-1 flex flex-wrap gap-1">
-									{#if p.active}
-										<span class="badge badge-leaf">TAMPIL</span>
-									{:else}
-										<span class="badge badge-gray">TERSEMBUNYI</span>
-									{/if}
-									{#if p.external_url}
-										<span class="badge badge-brand"><Icon name="link" size={12} /> Link eksternal</span>
-									{/if}
-								</div>
-							</div>
-							<button
-								type="button"
-								class="btn {p.active ? 'btn-ghost' : 'btn-leaf'} shrink-0 !px-2.5 !py-1.5 text-xs"
-								onclick={() => toggleActive(p)}
-							>
-								{p.active ? "Sembunyikan" : "Tampilkan"}
-							</button>
-						</div>
-						<div class="mt-2 flex flex-wrap gap-2">
-							<button type="button" class="btn btn-outline !px-2.5 !py-1.5 text-xs" onclick={() => mulaiEdit(p)}>
-								<Icon name="edit" size={14} /> Edit
-							</button>
-							<button
-								type="button"
-								class="btn btn-danger !px-2.5 !py-1.5 text-xs"
-								onclick={() => hapusProduk(p.id, p.title)}
-							>
-								<Icon name="trash" size={14} /> Hapus
-							</button>
-							<input
-								class="input !w-44 !px-2 !py-1.5 text-xs"
-								placeholder="Link eksternal (https://...)"
-								value={p.external_url ?? ""}
-								oninput={(e) => (externalUrlDraft = e.currentTarget.value)}
-							/>
-							<button
-								type="button"
-								class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
-								onclick={() => simpanExternalLink(p)}
-							>
-								Simpan Link
-							</button>
-						</div>
-						<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-dashed border-[#e7e2d2] pt-2">
-							<input
-								type="file"
-								accept="image/*"
-								class="text-xs"
-								onchange={(e) => {
-									uploadFile = e.currentTarget.files?.[0] ?? null;
-								}}
-							/>
-							<select class="input !w-auto !px-2 !py-1.5 text-xs" bind:value={uploadKind}>
-								<option value="feature">Feature</option>
-								<option value="gallery">Gallery</option>
-							</select>
-							<button
-								type="button"
-								class="btn btn-sun !px-2.5 !py-1.5 text-xs"
-								disabled={uploading || !uploadFile}
-								onclick={() => uploadGambar(p)}
-							>
-								{#if uploading}Mengunggah...{:else}<Icon name="upload" size={15} /> Upload Gambar{/if}
-							</button>
-						</div>
-					</article>
-				{/each}
-			</div>
-		{/if}
-	{:else if tab === "pengguna"}
-		{#if usersLoading}
-			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
-		{:else if users.length === 0}
-			<p class="mt-4 text-sm text-[#5f6b62]">Belum ada pengguna.</p>
-		{:else}
-			<div class="mt-3 space-y-2">
-				{#each users as u (u.id)}
-					<div class="card flex items-center gap-3 p-3">
-						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ece9dc] text-[#177245]"><Icon name="user" size={18} /></span>
-						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm font-bold">{u.name}</p>
-							<p class="truncate text-xs text-[#5f6b62]">
-								{u.email} • {u.order_count} order • {#if u.role === "admin"}<Icon name="crown" size={13} class="inline-block align-[-2px]" /> Admin{:else}<Icon name="backpack" size={13} class="inline-block align-[-2px]" /> Pelanggan{/if}
-							</p>
-						</div>
-						{#if u.role === "admin"}
-							<button
-								type="button"
-								class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
-								onclick={() => setRole(u, "customer")}
-							>
-								Jadikan Pelanggan
-							</button>
-						{:else}
-							<button
-								type="button"
-								class="btn btn-sun !px-2.5 !py-1.5 text-xs"
-								onclick={() => setRole(u, "admin")}
-							>
-								Jadikan Admin
-							</button>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
-	{:else if tab === "video"}
-		<div class="card mt-4 space-y-3 p-4">
-			<p class="text-sm font-bold"><Icon name="video" size={16} /> Video per Bab</p>
-			<p class="text-xs text-[#5f6b62]">
-				Video tampil di Ruang Belajar sebagai kartu "Tonton Video Pembelajaran". Kosongkan URL untuk
-				menghapus video.
-			</p>
-			<div>
-				<label class="lbl" for="v-produk">Pilih produk</label>
-				<select id="v-produk" class="input" bind:value={videoProductId} onchange={pilihProdukVideo}>
-					<option value="">— Pilih produk —</option>
-					{#each products as p (p.id)}
-						<option value={p.id}>{p.title}</option>
-					{/each}
-				</select>
-			</div>
-			{#if videoLoading}
-				<p class="text-sm text-[#5f6b62]">Memuat bab...</p>
-			{:else if videoChapters.length > 0}
-				<div>
-					<label class="lbl" for="v-bab">Pilih bab</label>
-					<select id="v-bab" class="input" bind:value={videoChapterId} onchange={pilihBabVideo}>
-						<option value="">— Pilih bab —</option>
-						{#each videoChapters as c (c.id)}
-							<option value={c.id}>
-								{c.title}{c.video_url ? " (ada video)" : ""}
-							</option>
-						{/each}
-					</select>
-				</div>
-			{/if}
-			{#if videoChapterId}
-				<div>
-					<label class="lbl" for="v-url">URL video (YouTube/embed, http/https)</label>
-					<input
-						id="v-url"
-						class="input"
-						type="url"
-						bind:value={videoUrl}
-						placeholder="https://www.youtube.com/embed/..."
-					/>
-				</div>
-				<div>
-					<label class="lbl" for="v-dur">Durasi (contoh: 1 menit 17 detik)</label>
-					<input id="v-dur" class="input" bind:value={videoDuration} placeholder="1 menit 17 detik" />
-				</div>
-				<button
-					type="button"
-					class="btn btn-primary"
-					disabled={videoSaving}
-					onclick={simpanVideo}
-				>
-					{#if videoSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Video{/if}
-				</button>
-			{/if}
-		</div>
-	{:else if tab === "voucher"}
-		<form
-			class="card mt-4 space-y-3 p-4"
-			onsubmit={(e) => {
-				e.preventDefault();
-				buatVoucher();
-			}}
-		>
-			<p class="text-sm font-bold"><Icon name="receipt" size={16} /> Buat Voucher Baru</p>
-			<div class="grid grid-cols-2 gap-2">
-				<div>
-					<label class="lbl" for="v-code">Kode voucher</label>
-					<input
-						id="v-code"
-						class="input uppercase"
-						bind:value={vForm.code}
-						placeholder="Contoh: HEMAT10"
-						required
-					/>
-				</div>
-				<div>
-					<label class="lbl" for="v-type">Tipe</label>
-					<select id="v-type" class="input" bind:value={vForm.type}>
-						<option value="percent">Persen (%)</option>
-						<option value="fixed">Nominal (Rp)</option>
-					</select>
-				</div>
-				<div>
-					<label class="lbl" for="v-value">
-						Nilai {vForm.type === "percent" ? "(%, 1–100)" : "(Rp)"}
-					</label>
-					<input
-						id="v-value"
-						class="input"
-						type="number"
-						min="1"
-						max={vForm.type === "percent" ? 100 : undefined}
-						bind:value={vForm.value}
-						required
-					/>
-				</div>
-				<div>
-					<label class="lbl" for="v-max">Maks. pemakaian (opsional)</label>
-					<input
-						id="v-max"
-						class="input"
-						type="number"
-						min="1"
-						bind:value={vForm.max_uses}
-						placeholder="Tanpa batas"
-					/>
-				</div>
-				<div>
-					<label class="lbl" for="v-min">Min. belanja Rp (opsional)</label>
-					<input
-						id="v-min"
-						class="input"
-						type="number"
-						min="0"
-						bind:value={vForm.min_total}
-						placeholder="Tanpa minimum"
-					/>
-				</div>
-				<div>
-					<label class="lbl" for="v-exp">Kedaluwarsa (opsional)</label>
-					<input id="v-exp" class="input" type="date" bind:value={vForm.expires_at} />
-				</div>
-			</div>
-			{#if vError}
-				<p class="err">{vError}</p>
-			{/if}
-			<button type="submit" class="btn btn-primary" disabled={vSaving}>
-				{#if vSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Voucher{/if}
-			</button>
-		</form>
-
-		{#if vouchersLoading}
-			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
-		{:else if vouchers.length === 0}
-			<p class="mt-4 text-sm text-[#5f6b62]">Belum ada voucher.</p>
-		{:else}
-			<div class="card mt-3 overflow-x-auto p-0">
-				<table class="w-full min-w-[680px] text-left text-xs">
-					<thead>
-						<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
-							<th class="px-3 py-2.5 font-extrabold">Kode</th>
-							<th class="px-3 py-2.5 font-extrabold">Tipe</th>
-							<th class="px-3 py-2.5 font-extrabold">Nilai</th>
-							<th class="px-3 py-2.5 font-extrabold">Terpakai</th>
-							<th class="px-3 py-2.5 font-extrabold">Min. Belanja</th>
-							<th class="px-3 py-2.5 font-extrabold">Kedaluwarsa</th>
-							<th class="px-3 py-2.5 font-extrabold">Status</th>
-							<th class="px-3 py-2.5 font-extrabold"></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each vouchers as v (v.code)}
-							<tr class="border-b border-[#f0ede2] last:border-0">
-								<td class="px-3 py-2.5 font-extrabold">{v.code}</td>
-								<td class="px-3 py-2.5">{v.type === "percent" ? "Persen" : "Nominal"}</td>
-								<td class="px-3 py-2.5 font-bold">
-									{v.type === "percent" ? `${v.value}%` : formatRupiah(v.value)}
-								</td>
-								<td class="px-3 py-2.5">{v.uses}{v.max_uses ? ` / ${v.max_uses}` : ""}</td>
-								<td class="px-3 py-2.5">{v.min_total ? formatRupiah(v.min_total) : "-"}</td>
-								<td class="px-3 py-2.5">{fmtDate(v.expires_at)}</td>
-								<td class="px-3 py-2.5">
-									{#if v.active}
-										<span class="badge badge-leaf">Aktif</span>
-									{:else}
-										<span class="badge badge-gray">Nonaktif</span>
-									{/if}
-								</td>
-								<td class="px-3 py-2.5 text-right">
-									<button
-										type="button"
-										class="btn {v.active ? 'btn-ghost' : 'btn-leaf'} !px-2.5 !py-1.5 text-xs"
-										disabled={vToggling === v.code}
-										onclick={() => toggleVoucher(v)}
-									>
-										{v.active ? "Nonaktifkan" : "Aktifkan"}
-									</button>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-	{:else if tab === "cron"}
-		<div class="card mt-4 space-y-3 p-4">
-			<p class="text-sm font-bold"><Icon name="clock" size={16} /> Cron Email</p>
-			<p class="text-xs text-[#5f6b62]">
-				Jalankan pengiriman email terjadwal secara manual. Pengingat harian dikirim ke orang tua
-				anak yang belum belajar hari itu; laporan mingguan berisi ringkasan belajar 7 hari terakhir.
-			</p>
-			<div>
-				<label class="lbl" for="cron-date">Tanggal (opsional, bila kosong memakai hari ini)</label>
-				<input id="cron-date" class="input" type="date" bind:value={cronDate} />
-			</div>
-			<div class="flex flex-wrap gap-2">
-				<button
-					type="button"
-					class="btn btn-primary"
-					disabled={cronRunning !== null}
-					onclick={() => jalankanCron("daily")}
-				>
-					{#if cronRunning === "daily"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan pengingat harian{/if}
-				</button>
-				<button
-					type="button"
-					class="btn btn-sun"
-					disabled={cronRunning !== null}
-					onclick={() => jalankanCron("weekly")}
-				>
-					{#if cronRunning === "weekly"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan laporan mingguan{/if}
-				</button>
-			</div>
-			{#if cronError}
-				<p class="err">{cronError}</p>
-			{/if}
-			{#if cronResult}
-				<div class="rounded-xl bg-[#f7f5ef] p-3 text-sm">
-					<p class="font-extrabold">
-						Hasil: {cronResult.job === "daily" ? "Pengingat harian" : "Laporan mingguan"}
-					</p>
-					<p class="mt-1">
-						Terkirim: <b>{cronResult.sent}</b> • Dilewati: <b>{cronResult.skipped}</b>
-					</p>
-					{#if cronResult.errors.length > 0}
-						<p class="mt-2 font-bold text-[#b91c1c]">Error ({cronResult.errors.length}):</p>
-						<ul class="list-disc pl-5 text-[#b91c1c]">
-							{#each cronResult.errors as err (err)}
-								<li>{err}</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="mt-1 text-[#065f46]">Selesai tanpa error.</p>
-					{/if}
-				</div>
-			{/if}
 		</div>
 	{/if}
 {/if}

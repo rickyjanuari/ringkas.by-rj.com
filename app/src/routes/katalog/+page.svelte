@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, type ProductPublic } from "$lib/api";
 	import { cart } from "$lib/store";
@@ -69,15 +70,70 @@
 		searchTimer = setTimeout(() => doSearch(q), 350);
 	}
 
-	onMount(loadCatalog);
+	// Dukungan ?q= dari pencarian header desktop: kata kunci awal dibaca dari URL,
+	// dan perubahan query saat sudah di halaman ini ikut diterapkan.
+	let lastAppliedQ = "";
+
+	$effect(() => {
+		const v = $page.url.searchParams.get("q") ?? "";
+		if (v !== lastAppliedQ) {
+			lastAppliedQ = v;
+			q = v;
+			if (v) void doSearch(v);
+			else void loadCatalog();
+		}
+	});
+
+	onMount(async () => {
+		const initial = $page.url.searchParams.get("q");
+		if (initial) {
+			lastAppliedQ = initial;
+			q = initial;
+			await doSearch(initial);
+		} else {
+			await loadCatalog();
+		}
+	});
 </script>
 
 <h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="library" size={22} /> Katalog</h1>
 <p class="text-sm text-[#5f6b62]">Cari rangkuman, bab, dan istilah belajar.</p>
 
+<div class="lg:mt-4 lg:flex lg:gap-6">
+	<!-- Sidebar filter (desktop saja; di mobile filter ada di bar lengket di bawah) -->
+	<aside class="hidden w-64 shrink-0 lg:sticky lg:top-[72px] lg:block lg:self-start">
+		<div class="card p-4">
+			<p class="text-sm font-extrabold">Jenjang</p>
+			<div class="mt-2 flex flex-col items-start gap-2">
+				{#each jenjangList as j (j)}
+					<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
+						{#if j === "Semua"}
+							<Icon name="sparkles" size={14} /> Semua
+						{:else}
+							<Icon name="backpack" size={14} /> {j}
+						{/if}
+					</button>
+				{/each}
+			</div>
+			<label class="lbl mt-4" for="filter-mapel">Mapel</label>
+			<select id="filter-mapel" class="input" bind:value={mapel} aria-label="Filter mapel">
+				{#each mapelList as m (m)}
+					<option value={m}>{m === "Semua" ? "Semua Mapel" : m}</option>
+				{/each}
+			</select>
+			<label class="lbl mt-4" for="filter-urut">Urutkan</label>
+			<select id="filter-urut" class="input" bind:value={sort} aria-label="Urutkan">
+				<option value="termurah">Termurah</option>
+				<option value="termahal">Termahal</option>
+				<option value="nama">Nama A–Z</option>
+			</select>
+		</div>
+	</aside>
+
+	<div class="min-w-0 flex-1">
 <!-- Search pill lengket + chip + sortir -->
 <div
-	class="sticky top-[49px] z-30 -mx-4 mt-3 border-b border-[#e7e2d2] bg-[#f7f5ef]/95 px-4 pb-3 pt-2 backdrop-blur"
+	class="sticky top-[49px] z-30 -mx-4 mt-3 border-b border-[#e7e2d2] bg-[#f7f5ef]/95 px-4 pb-3 pt-2 backdrop-blur lg:static lg:mx-0 lg:mt-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-0 lg:backdrop-blur-none"
 >
 	<div class="relative">
 		<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#5f6b62]">
@@ -93,7 +149,7 @@
 		/>
 	</div>
 
-	<div class="mt-2 flex gap-2 overflow-x-auto pb-1">
+	<div class="mt-2 flex gap-2 overflow-x-auto pb-1 lg:hidden">
 		{#each jenjangList as j (j)}
 			<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
 				{#if j === "Semua"}
@@ -105,7 +161,7 @@
 		{/each}
 	</div>
 
-	<div class="mt-2 flex gap-2">
+	<div class="mt-2 flex gap-2 lg:hidden">
 		<select class="input !w-auto flex-1" bind:value={mapel} aria-label="Filter mapel">
 			{#each mapelList as m (m)}
 				<option value={m}>{m === "Semua" ? "Semua Mapel" : m}</option>
@@ -126,7 +182,7 @@
 {:else}
 	{#if q.trim() && searchChapters.length > 0}
 		<h2 class="mt-5 text-sm font-extrabold text-[#3f4a42]">Bab yang cocok</h2>
-		<div class="mt-2 space-y-2">
+		<div class="mt-2 space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
 			{#each searchChapters as c (c.id)}
 				<button
 					type="button"
@@ -151,26 +207,26 @@
 			Tidak ada produk yang cocok. Coba kata kunci atau filter lain ya.
 		</p>
 	{:else}
-		<div class="mt-4 space-y-3">
+		<div class="mt-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
 			{#each filtered as p (p.id)}
 				<div
-					class="card flex cursor-pointer gap-3 overflow-hidden"
+					class="card flex cursor-pointer gap-3 overflow-hidden lg:flex-col lg:gap-0"
 					role="button"
 					tabindex="0"
 					onclick={() => goto(`/produk/${p.id}`)}
 					onkeydown={(e) => e.key === "Enter" && goto(`/produk/${p.id}`)}
 				>
 					<div
-						class="flex w-24 shrink-0 items-center justify-center px-2 text-center text-xs font-extrabold text-white"
+						class="flex w-24 shrink-0 items-center justify-center px-2 text-center text-xs font-extrabold text-white lg:h-28 lg:w-full lg:px-3 lg:text-sm"
 						style="background: {p.cover_color}"
 					>
 						{p.cover_label}
 					</div>
-					<div class="min-w-0 flex-1 py-3 pr-3">
+					<div class="min-w-0 flex-1 py-3 pr-3 lg:p-3">
 						{#if p.badge}
 							<span class="badge badge-sun">{p.badge}</span>
 						{/if}
-						<h2 class="mt-0.5 line-clamp-2 text-sm font-bold leading-snug">{p.title}</h2>
+						<h2 class="mt-0.5 line-clamp-2 text-sm font-bold leading-snug lg:min-h-10">{p.title}</h2>
 						<p class="text-xs text-[#5f6b62]">{p.jenjang} • {p.mapel} • {p.pages} hlm</p>
 						<div class="mt-2 flex items-center justify-between gap-2">
 							<p class="text-sm font-extrabold text-[#177245]">
@@ -198,3 +254,5 @@
 		</div>
 	{/if}
 {/if}
+	</div>
+</div>

@@ -17,7 +17,7 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 z-50 flex items-end justify-center"
+		class="fixed inset-0 z-50 flex items-end justify-center lg:items-center lg:p-6"
 		role="dialog"
 		aria-modal="true"
 		aria-label={title}
@@ -29,7 +29,7 @@
 			onclick={onClose}
 		></button>
 		<div
-			class="relative max-h-[80dvh] w-full max-w-[430px] overflow-y-auto rounded-t-3xl bg-[#fffdf7] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl"
+			class="relative max-h-[80dvh] w-full max-w-[430px] overflow-y-auto rounded-t-3xl bg-[#fffdf7] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl lg:max-h-[85dvh] lg:max-w-2xl lg:rounded-3xl lg:pb-5"
 		>
 			<div class="mb-3 flex items-center justify-between gap-2">
 				<h2 class="text-lg font-bold">{title}</h2>
