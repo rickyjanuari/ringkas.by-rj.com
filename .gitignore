@@ -8,6 +8,10 @@
 *.sqlite3
 node_modules/
 dist/
+build/
+.svelte-kit/
+app/data/
+app/uploads/
 .DS_Store
 credentials.json
 *secret*

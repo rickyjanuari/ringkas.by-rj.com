@@ -2,7 +2,12 @@
 
 **Ringkas** — Rangkuman Materi SD, SMP, SMA. Teman belajar anak yang mudah dipahami: rangkuman per bab, kuis, simulasi SAS/STS, flashcard, tracker belajar, dan worksheet.
 
-> Repo ini berisi dokumentasi dan template email Ringkas. **Kode aplikasi dan database-nya tinggal di hosting Muse** (artifact `rangkuman-materi-app`), jadi repo ini bukan salinan kode aplikasinya — melainkan tempat menyimpan dokumen, template, dan catatan setup yang aman dibagikan.
+> Repo ini berisi dokumentasi dan template email Ringkas, plus **aplikasi
+> mandiri di `app/`** (SvelteKit + Hono + SQLite — pembangunan ulang orisinal
+> dari spesifikasi aplikasi Ringkas, dibuat 2026-11-15). Aplikasi yang
+> berjalan di hosting Muse (artifact `rangkuman-materi-app`) tetap terpisah:
+> database dan akun di sana TIDAK ikut pindah — `app/` di-seed dari nol saat
+> pertama dijalankan.
 
 ## Status
 
@@ -21,6 +26,13 @@
 
 ## Isi repo
 
+- `app/` — **aplikasi mandiri Ringkas** (SvelteKit + Hono + SQLite): katalog,
+  auth, checkout KlikQRIS, Pesanan Saya + struk PDF, Ruang Belajar, simulasi
+  SAS, tracker/streak, admin, Mode Orang Tua, Paket Guru/Kelas. Baca
+  `app/README.md` untuk cara jalan, daftar env, dan status jujur v1
+  (apa yang sudah jalan, apa yang masih stub — termasuk: pembayaran belum
+  dites uang asli, email belum di-wire, konten Kelas 2–6 masih kerangka
+  generator, hanya Kelas 1 ditulis penuh).
 - `email-templates/` — 5 template email HTML Ringkas (selamat datang, QRIS menunggu bayar, pesanan lunas, pembayaran kedaluwarsa, laporan mingguan orang tua) + `README.md` berisi alur kirim dan variabel tiap template.
 - `docs/resend-connector.md` — cara kerja konektor Resend (auth Bearer, endpoint, batas gratis, pemulihan error).
 - `docs/` lainnya — catatan setup (ditambah seiring berjalan).
