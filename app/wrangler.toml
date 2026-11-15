@@ -36,7 +36,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "ringkas-db"
-database_id = "00000000-0000-0000-0000-000000000000" # TO-FILL: isi database_id dari `wrangler d1 create ringkas-db`
+database_id = "ed69abc1-16eb-464f-91bf-848feecc40b8" # D1 ringkas-db, dibuat 2026-11-15 (terverifikasi via API Cloudflare)
 migrations_dir = "server/migrations"
 
 [vars]
