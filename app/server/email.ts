@@ -5,6 +5,9 @@ import { TEMPLATE_01_WELCOME_HTML } from "./email-templates/01-welcome.js";
 import { TEMPLATE_02_PENDING_HTML } from "./email-templates/02-pending.js";
 import { TEMPLATE_03_PAID_HTML } from "./email-templates/03-paid.js";
 import { TEMPLATE_04_EXPIRED_HTML } from "./email-templates/04-expired.js";
+import { TEMPLATE_05_WEEKLY_HTML } from "./email-templates/05-weekly.js";
+import { TEMPLATE_06_REMINDER_HTML } from "./email-templates/06-reminder.js";
+import { TEMPLATE_07_STREAK_HTML } from "./email-templates/07-streak.js";
 
 // ---------------------------------------------------------------------------
 // Pengiriman email otomatis via Resend (gratis: 3.000/bln, maks 100/hari).
@@ -13,8 +16,11 @@ import { TEMPLATE_04_EXPIRED_HTML } from "./email-templates/04-expired.js";
 //   register → welcome | checkout (QRIS dibuat) → pending
 //   PAID terdeteksi (webhook / polling status) → paid
 //   EXPIRED terdeteksi (pemeriksaan status) → expired
-// Template laporan mingguan orang tua (05) BELUM di-wire — butuh cron,
-// lihat README bagian "Email otomatis".
+//   cron harian (server/cron.ts) → reminder (anak 3 hari tidak belajar)
+//     + streak (milestone 7/14/21/28 hari)
+//   cron mingguan (server/cron.ts) → weekly-report (laporan orang tua)
+// Template laporan mingguan orang tua (05) di-wire lewat cron mingguan —
+// lihat README bagian "Email otomatis & cron".
 //
 // Aturan keras:
 //   - RESEND_API_KEY tidak ada di repo. Bila kunci belum disetel, kirim
@@ -62,7 +68,14 @@ export interface OrderForEmail {
   paid_at: string | null;
 }
 
-export type EmailTemplateKey = "welcome" | "pending" | "paid" | "expired";
+export type EmailTemplateKey =
+  | "welcome"
+  | "pending"
+  | "paid"
+  | "expired"
+  | "weekly-report"
+  | "reminder"
+  | "streak";
 
 export interface SendEmailResult {
   sent: boolean;
@@ -75,7 +88,10 @@ const TEMPLATES: Record<EmailTemplateKey, string> = {
   welcome: TEMPLATE_01_WELCOME_HTML,
   pending: TEMPLATE_02_PENDING_HTML,
   paid: TEMPLATE_03_PAID_HTML,
-  expired: TEMPLATE_04_EXPIRED_HTML
+  expired: TEMPLATE_04_EXPIRED_HTML,
+  "weekly-report": TEMPLATE_05_WEEKLY_HTML,
+  reminder: TEMPLATE_06_REMINDER_HTML,
+  streak: TEMPLATE_07_STREAK_HTML
 };
 
 /** URL dasar situs untuk tautan di email (bisa diubah lewat var APP_URL). */
@@ -184,18 +200,21 @@ async function alreadySent(
   db: DB,
   template: EmailTemplateKey,
   orderId: string | null,
-  userId: string | null
+  userId: string | null,
+  period: string
 ): Promise<boolean> {
   const row = orderId
     ? await db.get<SentEmailRow>(
-        "SELECT id, resend_id, created_at FROM sent_emails WHERE order_id = ? AND template = ?",
+        "SELECT id, resend_id, created_at FROM sent_emails WHERE order_id = ? AND template = ? AND period = ?",
         orderId,
-        template
+        template,
+        period
       )
     : await db.get<SentEmailRow>(
-        "SELECT id, resend_id, created_at FROM sent_emails WHERE user_id = ? AND template = ?",
+        "SELECT id, resend_id, created_at FROM sent_emails WHERE user_id = ? AND template = ? AND period = ?",
         userId,
-        template
+        template,
+        period
       );
   if (!row) return false;
   if (row.resend_id) return true;
@@ -211,15 +230,17 @@ async function claimSlot(
   db: DB,
   template: EmailTemplateKey,
   orderId: string | null,
-  userId: string | null
+  userId: string | null,
+  period: string
 ): Promise<string | null> {
   const id = newId("eml");
   const result = await db.run(
-    "INSERT OR IGNORE INTO sent_emails (id, order_id, user_id, template, resend_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
+    "INSERT OR IGNORE INTO sent_emails (id, order_id, user_id, template, resend_id, period, created_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
     id,
     orderId,
     userId,
     template,
+    period,
     nowIso()
   );
   return result.changes === 1 ? id : null;
@@ -228,8 +249,11 @@ async function claimSlot(
 /**
  * Kirim satu email template. TIDAK PERNAH melempar — kegagalan
  * dikembalikan sebagai { sent: false } supaya alur utama tetap jalan.
- * Idempotensi: satu (order, template) atau (user, template) hanya
- * terkirim sekali; panggilan kedua mengembalikan skipped: "already-sent".
+ * Idempotensi: satu (order, template, period) atau (user, template,
+ * period) hanya terkirim sekali; panggilan kedua mengembalikan
+ * skipped: "already-sent". Email transaksional memakai period = ''
+ * (default); email cron memakai kunci periode, mis.
+ * 'reminder:usr-XXX:2026-11-15' atau 'weekly:usr-XXX:2026-W46'.
  * Bila RESEND_API_KEY belum disetel: log + skipped: "no-key" (tanpa klaim
  * yang tertinggal, jadi percobaan berikut tetap bisa mengirim).
  */
@@ -242,11 +266,13 @@ export async function sendTemplatedEmail(
     variables: Record<string, string>;
     orderId?: string | null;
     userId?: string | null;
+    period?: string;
   }
 ): Promise<SendEmailResult> {
   const { template, to, subject, variables } = opts;
   const orderId = opts.orderId ?? null;
   const userId = opts.userId ?? null;
+  const period = opts.period ?? "";
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     console.warn(`[email] alamat tujuan tidak valid (${template}) — dilewati.`);
     return { sent: false, error: "Alamat email tujuan tidak valid." };
@@ -268,10 +294,10 @@ export async function sendTemplatedEmail(
     return { sent: false, skipped: "no-key" };
   }
   try {
-    if (await alreadySent(db, template, orderId, userId)) {
+    if (await alreadySent(db, template, orderId, userId, period)) {
       return { sent: false, skipped: "already-sent" };
     }
-    const claimId = await claimSlot(db, template, orderId, userId);
+    const claimId = await claimSlot(db, template, orderId, userId, period);
     if (!claimId) {
       return { sent: false, skipped: "already-sent" };
     }
@@ -435,6 +461,95 @@ export async function sendExpiredEmail(db: DB, order: OrderForEmail): Promise<Se
       url_katalog: `${base}/katalog`
     },
     orderId: order.id
+  });
+}
+
+/** Cron harian: anak 3 hari tidak belajar → pengingat ke orang tua. */
+export async function sendReminderEmail(
+  db: DB,
+  opts: {
+    parent: User;
+    child: User;
+    daysSince: number;
+    lastStudyLabel: string;
+    period: string;
+  }
+): Promise<SendEmailResult> {
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "reminder",
+    to: opts.parent.email,
+    subject: `Pengingat belajar — ${opts.child.name} sudah ${opts.daysSince} hari tidak belajar`,
+    variables: {
+      nama_orang_tua: opts.parent.name,
+      nama_anak: opts.child.name,
+      hari_tidak_belajar: String(opts.daysSince),
+      tanggal_terakhir_belajar: opts.lastStudyLabel,
+      url_belajar: `${base}/katalog`,
+      email: opts.parent.email
+    },
+    userId: opts.parent.id,
+    period: opts.period
+  });
+}
+
+/** Cron harian: streak anak mencapai milestone 7/14/21/28 hari. */
+export async function sendStreakEmail(
+  db: DB,
+  opts: { parent: User; child: User; streak: number; period: string }
+): Promise<SendEmailResult> {
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "streak",
+    to: opts.parent.email,
+    subject: `${opts.child.name} mencapai streak ${opts.streak} hari!`,
+    variables: {
+      nama_orang_tua: opts.parent.name,
+      nama_anak: opts.child.name,
+      streak_hari: String(opts.streak),
+      url_belajar: `${base}/akun`,
+      email: opts.parent.email
+    },
+    userId: opts.parent.id,
+    period: opts.period
+  });
+}
+
+export interface WeeklyReportVariables {
+  bab_selesai: string;
+  streak_hari: string;
+  rata_simulasi: string;
+  pencapaian_1: string;
+  pencapaian_2: string;
+  bab_lemah: string;
+  target_harian: string;
+  periode_minggu: string;
+}
+
+/** Cron mingguan: laporan belajar anak ke orang tua (template 05). */
+export async function sendWeeklyReportEmail(
+  db: DB,
+  opts: {
+    parent: User;
+    child: User;
+    report: WeeklyReportVariables;
+    period: string;
+  }
+): Promise<SendEmailResult> {
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "weekly-report",
+    to: opts.parent.email,
+    subject: `Laporan belajar mingguan ${opts.child.name}`,
+    variables: {
+      nama_anak: opts.child.name,
+      nama_orang_tua: opts.parent.name,
+      email: opts.parent.email,
+      url_laporan: `${base}/akun`,
+      ...opts.report
+    },
+    userId: opts.parent.id,
+    period: opts.period
   });
 }
 

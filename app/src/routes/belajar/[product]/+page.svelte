@@ -5,6 +5,8 @@
 	import { goto } from "$app/navigation";
 	import {
 		api,
+		apiBlob,
+		downloadBlob,
 		formatRupiah,
 		getToken,
 		type PublicQuestion,
@@ -35,6 +37,8 @@
 	let simSubmitting = $state(false);
 	let simError = $state("");
 	let simTimeLeft = $state(0);
+	let certLoading = $state(false);
+	let certError = $state("");
 
 	let simCurrent = $derived(simQuestions[simIdx]);
 	let simTotal = $derived(simQuestions.length);
@@ -192,6 +196,22 @@
 			simSubmitting = false;
 		}
 	}
+
+	/** Unduh sertifikat PDF untuk simulasi yang lulus (passed + attempt_id). */
+	async function unduhSertifikat() {
+		const id = simResult?.attempt_id;
+		if (!id || certLoading) return;
+		certLoading = true;
+		certError = "";
+		try {
+			const { blob } = await apiBlob(`/api/certificate/${id}`);
+			downloadBlob(blob, `sertifikat-${id}.pdf`);
+		} catch (e) {
+			certError = e instanceof Error ? e.message : "Gagal mengunduh sertifikat.";
+		} finally {
+			certLoading = false;
+		}
+	}
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto(`/produk/${productId}`)}>
@@ -242,6 +262,10 @@
 							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"><Icon name="file-text" size={18} /></span>
 							<div class="min-w-0 flex-1">
 								<p class="text-sm font-bold leading-snug">{ch.title}</p>
+								<p class="mt-1 flex flex-wrap gap-1">
+									{#if ch.free}<span class="badge badge-leaf">GRATIS</span>{/if}
+									{#if ch.locked}<span class="badge badge-gray"><Icon name="lock" size={12} /> Terkunci</span>{/if}
+								</p>
 								<p class="text-xs text-[#5f6b62]">
 									Kelas {ch.grade} • Semester {ch.semester}
 									{#if doneSet.has(ch.id)}• <Icon name="check" size={13} class="inline-block align-[-2px]" /> Selesai{/if}
@@ -250,7 +274,7 @@
 							<button
 								type="button"
 								class="btn {doneSet.has(ch.id) ? 'btn-leaf' : 'btn-ghost'} shrink-0 !px-2.5 !py-1.5 text-xs"
-								disabled={markingId === ch.id}
+								disabled={markingId === ch.id || ch.locked}
 								onclick={() => tandaiSelesai(ch.id)}
 							>
 								{#if doneSet.has(ch.id)}<Icon name="check" size={14} /> Selesai{:else}Tandai Selesai{/if}
@@ -328,12 +352,18 @@
 							{/if}
 						{/if}
 
-						<a
-							href={`/belajar/${productId}/${ch.id}`}
-							class="btn btn-outline btn-block mt-3 text-xs"
-						>
-							<Icon name="book-open" size={14} /> Baca Bab & Kerjakan Kuis
-						</a>
+						{#if ch.locked}
+							<a href={`/produk/${productId}`} class="btn btn-sun btn-block mt-3 text-xs">
+								<Icon name="lock" size={14} /> Beli untuk membuka
+							</a>
+						{:else}
+							<a
+								href={`/belajar/${productId}/${ch.id}`}
+								class="btn btn-outline btn-block mt-3 text-xs"
+							>
+								<Icon name="book-open" size={14} /> Baca Bab & Kerjakan Kuis
+							</a>
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -512,6 +542,19 @@
 							<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
 						{/if}
 					</p>
+					{#if simResult.passed && simResult.attempt_id}
+						<button
+							type="button"
+							class="btn btn-sun btn-block mt-3"
+							disabled={certLoading}
+							onclick={unduhSertifikat}
+						>
+							{#if certLoading}Mengunduh...{:else}<Icon name="award" size={16} /> Unduh Sertifikat{/if}
+						</button>
+						{#if certError}
+							<p class="err mt-2">{certError}</p>
+						{/if}
+					{/if}
 					<div class="mt-3 space-y-2">
 						{#each simResult.review as r (r.questionId)}
 							<div class="card !rounded-lg p-3 text-sm">
@@ -547,21 +590,31 @@
 								{sim.subject} • Kelas {sim.grade} • Paket {sim.paket}
 							</p>
 						</div>
-						<span class="badge badge-brand shrink-0">SAS</span>
+						<span class="flex shrink-0 flex-wrap justify-end gap-1">
+							{#if sim.free}<span class="badge badge-leaf">GRATIS</span>{/if}
+							{#if sim.locked}<span class="badge badge-gray"><Icon name="lock" size={12} /> Terkunci</span>{/if}
+							<span class="badge badge-brand">SAS</span>
+						</span>
 					</div>
 					<div class="mt-3 flex gap-2 text-center text-xs font-bold">
 						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="timer" size={14} /> {sim.total_minutes} menit</span>
 						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="file-text" size={14} /> {simQuestionCount(sim)} soal</span>
 						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="star" size={14} /> {sim.max_points} poin</span>
 					</div>
-					<button
-						type="button"
-						class="btn btn-primary btn-block mt-3"
-						disabled={pack.simLocked}
-						onclick={() => mulaiSimulasi(sim)}
-					>
-						{#if pack.simLocked}<Icon name="lock" size={16} /> Dikunci Orang Tua{:else}<Icon name="rocket" size={16} /> Mulai Simulasi{/if}
-					</button>
+					{#if sim.locked}
+						<a href={`/produk/${productId}`} class="btn btn-sun btn-block mt-3">
+							<Icon name="lock" size={16} /> Beli untuk membuka
+						</a>
+					{:else}
+						<button
+							type="button"
+							class="btn btn-primary btn-block mt-3"
+							disabled={pack.simLocked}
+							onclick={() => mulaiSimulasi(sim)}
+						>
+							{#if pack.simLocked}<Icon name="lock" size={16} /> Dikunci Orang Tua{:else}<Icon name="rocket" size={16} /> Mulai Simulasi{/if}
+						</button>
+					{/if}
 				</div>
 			{/each}
 		</div>

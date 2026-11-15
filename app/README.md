@@ -142,22 +142,23 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 ## Endpoint (ringkas — detail di API_CONTRACT.md)
 
 - Auth: `POST /api/auth/register|login`, `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/account/whatsapp`
-- Katalog: `GET /api/catalog`, `GET /api/products/:id`
-- Admin: `GET/POST/PUT/DELETE /api/admin/products`, `POST .../active`, `.../external-link`, `.../images`, `.../feature`, `DELETE /api/admin/images/:id`, `GET /api/admin/users`, `POST /api/admin/users/:id/role`, `POST /api/admin/chapters/:id/video`
-- Checkout KlikQRIS: `POST /api/checkout` (idempotency key), `GET /api/payment/status/:order_id`, `POST /api/webhook/klikqris`
+- Katalog: `GET /api/catalog`, `GET /api/products/:id` (menambah `bundleItems` bila produk bundel)
+- Admin: `GET/POST/PUT/DELETE /api/admin/products`, `POST .../active`, `.../external-link`, `.../images`, `.../feature`, `DELETE /api/admin/images/:id`, `GET /api/admin/users`, `POST /api/admin/users/:id/role`, `POST /api/admin/chapters/:id/video`, `GET/POST /api/admin/vouchers`, `POST /api/admin/vouchers/:code/active`, `POST /api/admin/cron/run` (`{job: 'daily'|'weekly', date?}`)
+- Checkout KlikQRIS: `POST /api/checkout` (idempotency key, `voucher_code` opsional), `GET /api/voucher/validate?code=&total=`, `GET /api/payment/status/:order_id`, `POST /api/webhook/klikqris`
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
-- Belajar: `GET /api/study/:product_id`, `GET /api/simulations/:id/questions`, `POST /api/quiz/submit`, `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/study/:product_id/:chapter_id/worksheet`
+- Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/study/:product_id/:chapter_id/worksheet`
 - Keluarga & kelas: `POST /api/parent/link|redeem`, `GET /api/parent/children`, `POST /api/parent/lock|target`, `POST /api/class`, `POST /api/class/join`, `GET /api/class/:id`, `GET /api/class/:id/recap` (CSV)
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
 **Sudah jalan dan dites:**
 - `npm run build` hijau (vite build + `tsc -p tsconfig.server.json --noEmit`).
-- Server boot, migrasi 0001–0003 teraplikasi, seed: **51 produk**
-  (13 SD aktif di katalog pembeli, 38 non-SD `active=0`), **148 bab**,
+- Server boot, migrasi 0001–0005 teraplikasi, seed: **57 produk**
+  (19 SD aktif di katalog pembeli — 13 produk + 6 bundel kelas,
+  38 non-SD `active=0`), **148 bab**,
   **740 flashcard**, **3.396 soal**, **58 simulasi**.
-- Katalog mengembalikan tepat 13 produk SD (`k1`–`k6`, `mtk-sd`,
-  `sas-k1-s1`, `sas-k2`–`sas-k6`).
+- Katalog mengembalikan tepat 19 produk SD (`k1`–`k6`, `mtk-sd`,
+  `sas-k1-s1`, `sas-k2`–`sas-k6`, `bundle-k1`–`bundle-k6`).
 - Register/login (password salah → 401), WhatsApp ternormalisasi ke `62xx`,
   `/api/auth/me`, tracker (streak + skor tersimpan).
 - Study pack Kelas 1: 26 bab + 7 simulasi; kuis 10 soal per bab tanpa jawaban
@@ -176,12 +177,12 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
   - `npm run build` hijau; `wrangler deploy --dry-run` hijau tanpa auth
     (konfigurasi valid, 39 file aset = 1.175 KB / 295,9 KB gzip, binding
     D1 + ASSETS + `RESEND_FROM` terbaca).
-  - `wrangler d1 migrations apply ringkas-db --local`: 3/3 migrasi ✅.
+  - `wrangler d1 migrations apply ringkas-db --local`: 5/5 migrasi ✅.
   - `wrangler d1 execute ringkas-db --local --file=server/seed/seed.sql`:
-    seed masuk D1 lokal dengan jumlah sama persis seperti Node — 51 produk
-    (13 aktif), 148 bab, 740 flashcard, 3.396 soal, 58 simulasi.
+    seed masuk D1 lokal dengan jumlah sama persis seperti Node — 57 produk
+    (19 aktif), 148 bab, 740 flashcard, 3.396 soal, 58 simulasi.
   - `wrangler dev --local` (port 8788): `/api/health` OK, katalog tepat
-    13 produk SD, register + login (password salah → 401), study pack
+    19 produk SD, register + login (password salah → 401), study pack
     Kelas 1 = 26 bab + 7 simulasi, simulasi Kelas 3 Matematika = 35 soal
     / 70 menit, submit kuis = 0/10 dengan 10 review, struk + worksheet +
     unduhan produk mengembalikan PDF valid (`%PDF-1.7`, isi terverifikasi),
@@ -198,10 +199,45 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
   pelunasan otomatis jalan (sementara polling status adalah mekanismenya).
   Kode webhook idempotent (order PAID tepat satu kali), tapi belum ada
   transaksi nyata yang membuktikannya.
-- **Email belum di-wire.** `getOrderEmailData` hanya menyediakan variabel;
-  template ada di `email-templates/` (root repo). Trigger register /
-  checkout / PAID / kedaluwarsa / mingguan didokumentasikan di
-  `API_CONTRACT.md`, belum dipanggil otomatis.
+- **Fitur baru (2026-11-15, diverifikasi end-to-end lokal dengan fetch
+  KlikQRIS + Resend di-stub — 56/56 cek lolos, lihat
+  `server/migrations/0005_fiturs_baru.sql`):**
+  - **Kode voucher** — tabel `vouchers`, admin buat/lihat/nonaktifkan
+    (`/api/admin/vouchers`); checkout menerima `voucher_code` (validasi
+    server-side: aktif, belum kedaluwarsa, kuota, min. belanja); diskon
+    persen/nominal mengurangi total SEBELUM create KlikQRIS; total akhir
+    minimal Rp100; `uses` bertambah saat order dibuat dan TIDAK kembali
+    bila order kedaluwarsa (anti-abuse); retry checkout dengan voucher
+    yang sama mengembalikan order PENDING yang sama.
+  - **Paket bundel Kelas 1–6** — `bundle-k1`–`bundle-k6`, masing-masing
+    berisi produk kelas + paket SAS kelas itu (K1 Rp28.800, K2 Rp28.800,
+    K3 Rp29.600, K4 Rp30.400, K5 Rp31.200, K6 Rp32.000 = harga satuan −
+    20%); order bundel menyimpan SEMUA product_id anggotanya di items,
+    jadi kepemilikan/unduhan tiap produk jalan lewat jalur yang sudah ada.
+  - **Coba gratis** — bab pertama tiap produk + simulasi pertama tiap
+    mapel (Paket A) terbuka untuk semua akun login (flag `free` di study
+    pack); bab/simulasi lain terkunci (`locked`, hanya metadata) bila
+    produk belum dibeli — submit kuis/soal simulasi terkunci menolak 403.
+    Worksheet dan unduhan produk tetap hanya untuk pemilik LUNAS.
+    **Perubahan perilaku:** study pack sebelumnya terbuka untuk semua
+    akun login; sejak fitur ini, konten non-gratis di-hard-gate ke
+    kepemilikan (dulu hanya worksheet/unduhan yang di-gate).
+  - **Sertifikat penyelesaian** — simulasi SAS lulus (skor ≥ 70%)
+    bisa diunduh sebagai PDF A4 landscape (`GET /api/certificate/:attemptId`,
+    nomor `SRT-000123`); gagal < 70% → 400, milik orang lain → 403.
+  - **Pengingat belajar + ucapan streak (cron harian)** dan **laporan
+    mingguan orang tua (cron mingguan)** — lihat bagian "Email otomatis
+    & cron" di bawah.
+- **Email otomatis (Resend) sudah di-wire** — register → 01, checkout →
+  02, PAID → 03, EXPIRED → 04, plus cron 05/06/07 (lihat bagian "Email
+  otomatis & cron"). Render + idempotensi teruji di level modul dan
+  end-to-end lokal (fetch Resend di-stub); pengiriman sampai inbox
+  BELUM teruji tanpa `RESEND_API_KEY` di Worker — lihat catatan di
+  bawah.
+- **Cron Cloudflare sudah dipasang** (`[triggers] crons` di
+  `wrangler.toml` + `scheduled` handler di `server/worker.ts`);
+  penembakan cron sungguhan di Cloudflare BELUM teruji dari repo ini
+  (butuh deploy) — uji manual tersedia lewat `POST /api/admin/cron/run`.
 - **WhatsApp hanya tautan `wa.me`** (pesan siap kirim, bukan pengiriman
   otomatis server). Kirim otomatis butuh WhatsApp Business API + kredensial
   bisnis terpisah.
@@ -212,9 +248,9 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
   Paket A di v1.
 - **Harga produk non-SD di seed adalah perkiraan** dari rentang katalog
   awal (bukan salinan harga live).
-- Study pack bisa dibuka akun mana pun yang login (kepemilikan ditampilkan,
-  tidak di-hard-gate ke order PAID) — sama seperti versi hosting; worksheet
-  PDF dan unduhan produk tetap hanya untuk pemilik LUNAS.
+- Study pack kini di-hard-gate ke kepemilikan kecuali konten gratis
+  (bab pertama + simulasi Paket A tiap mapel) — worksheet PDF dan
+  unduhan produk tetap hanya untuk pemilik LUNAS.
 - Gambar produk disimpan sebagai berkas lokal di `app/uploads/` (cukup
   untuk self-host kecil; untuk produksi pakai object storage). **Di
   Cloudflare Workers, upload gambar TIDAK persisten** — endpoint upload
@@ -281,10 +317,10 @@ nanti; begitu kunci diisi, email berikutnya (register/checkout/lunas/
 kedaluwarsa) terkirim seperti biasa. Order yang sudah lunas sebelum kunci
 diisi tidak dikirimi email susulan.
 
-### Email otomatis (Resend)
+### Email otomatis & cron (Resend)
 
-Template transaksional disalin ke `server/email-templates/` (01–04) dan
-ikut ter-bundle di Worker. Pengirim: `Ringkas <halo@ringkas.by-rj.com>`
+Template disalin ke `server/email-templates/` (01–07) dan ikut
+ter-bundle di Worker. Pengirim: `Ringkas <halo@ringkas.by-rj.com>`
 (var `RESEND_FROM` di `wrangler.toml`); domain `ringkas.by-rj.com`
 sudah terverifikasi di Resend. Pemicu:
 
@@ -294,19 +330,39 @@ sudah terverifikasi di Resend. Pemicu:
 | Checkout berhasil, QRIS dibuat | 02 menunggu bayar | order |
 | PAID terdeteksi (webhook / polling status) | 03 lunas | order |
 | EXPIRED terdeteksi (pemeriksaan status) | 04 kedaluwarsa | order |
+| Cron mingguan (Minggu 18:00 WIB) | 05 laporan mingguan orang tua | anak + minggu ISO |
+| Cron harian (07:00 WIB), anak 3 hari tidak belajar | 06 pengingat belajar | anak + hari |
+| Cron harian (07:00 WIB), streak 7/14/21/28 hari | 07 ucapan streak | anak + milestone + hari |
 
-Idempotensi dicatat di tabel `sent_emails` (migrasi `0004`): satu
-order tidak menerima email yang sama dua kali, walau webhook dan
-polling sama-sama mendeteksi PAID. **Template 05 (laporan mingguan
-orang tua) belum di-wire** — butuh cron/scheduler terpisah; data
-laporannya sudah tersedia di server (`/api/parent/children` +
-tracker). Bila migrasi `0004` belum diterapkan di D1 remote, jalankan
-`wrangler d1 migrations apply ringkas-db --remote` sebelum deploy
-(atau email gagal dicatat dan pemicu dilewati dengan log error).
+Idempotensi dicatat di tabel `sent_emails` (migrasi `0004`, kolom
+`period` ditambah migrasi `0005`): satu order tidak menerima email
+yang sama dua kali, walau webhook dan polling sama-sama mendeteksi
+PAID; email cron memakai kunci periode gabungan per anak
+(`reminder:<childId>:<YYYY-MM-DD>`,
+`streak:<childId>:<milestone>:<YYYY-MM-DD>`,
+`weekly:<childId>:<YYYY-Www>`) — jalan kedua di periode yang sama
+menjadi no-op. Bila migrasi `0004`/`0005` belum diterapkan di D1
+remote, jalankan `wrangler d1 migrations apply ringkas-db --remote`
+sebelum deploy (atau email gagal dicatat dan pemicu dilewati dengan
+log error).
+
+**Cron** — jadwal di `wrangler.toml` (`[triggers] crons`):
+`0 0 * * *` (tiap hari 00:00 UTC = 07:00 WIB: pengingat + streak)
+dan `0 11 * * 0` (tiap Minggu 11:00 UTC = 18:00 WIB: laporan
+mingguan). Handler-nya di `server/worker.ts` (`scheduled`) dan logika
+di `server/cron.ts`. Uji manual tanpa menunggu cron: admin dapat
+menjalankan `POST /api/admin/cron/run` dengan body
+`{job: "daily"|"weekly", date?: "YYYY-MM-DD"}` (tanggal opsional
+untuk menguji hari tertentu) — mengembalikan `{sent, skipped,
+errors}`. Pengiriman cron tetap mengikuti pola yang sama: tanpa
+`RESEND_API_KEY`, email dilewati + dicatat di log, cron selesai
+dengan sukses.
 
 Cara menguji: setelah deploy + `RESEND_API_KEY` terisi, buat satu
 order tes nominal kecil dan bayar — email "menunggu bayar" terkirim
-saat checkout, email "lunas" terkirim saat status jadi PAID.
+saat checkout, email "lunas" terkirim saat status jadi PAID. Untuk
+cron, jalankan endpoint admin manual di atas dan periksa inbox orang
+tua yang tertaut (Mode Orang Tua).
 
 ### Langkah 4 — Build & deploy
 
@@ -316,7 +372,7 @@ wrangler deploy
 ```
 
 Aplikasi terbit di `https://ringkas.<subdomain-anda>.workers.dev`.
-Periksa: buka URL itu, katalog harus menampilkan 13 produk SD.
+Periksa: buka URL itu, katalog harus menampilkan 19 produk SD.
 
 ### Langkah 5 — Domain sendiri `ringkas.by-rj.com`
 
@@ -363,12 +419,11 @@ Periksa: buka URL itu, katalog harus menampilkan 13 produk SD.
   `/uploads/*` dari R2 di `server/worker.ts`.
 - **PDF sudah aman di Workers** (pdf-lib, pure JS) — struk, worksheet,
   dan unduhan produk terverifikasi di `wrangler dev --local`.
-- **Email belum di-wire** — template ada di `email-templates/` (root
-  repo); `getOrderEmailData` hanya menyediakan variabel. Kirim otomatis
-  (register/checkout/PAID/kedaluwarsa) belum dibangun.
-- **Tidak ada cron/queues.** Laporan mingguan orang tua, pengingat, dan
-  tugas berkala lain belum dijadwalkan — bila perlu, tambahkan
-  Cloudflare Cron Trigger (`[triggers] crons`) terpisah.
+- **Email & cron butuh `RESEND_API_KEY` di Worker** — tanpa kunci,
+  pengiriman dilewati + dicatat di log (aplikasi dan cron tetap jalan).
+  Pengiriman sampai inbox dan penembakan cron sungguhan di Cloudflare
+  belum teruji dari repo ini (butuh deploy + kunci); uji manual cron
+  tersedia lewat `POST /api/admin/cron/run`.
 - **Tidak ada migrasi data dari hosting Muse.** Database D1 mulai dari
   seed baru; akun dan order lama tidak ikut pindah.
 - Deploy nyata (remote) belum pernah dijalankan dari repo ini — semua

@@ -20,6 +20,7 @@ import { createApp } from "./app.js";
 import { openD1Database, type D1DatabaseBinding } from "./d1.js";
 import { setEnv } from "./env.js";
 import { UnavailableImageStorage } from "./storage.js";
+import { runDailyJob, runWeeklyJob } from "./cron.js";
 
 export interface Env {
   DB: D1DatabaseBinding;
@@ -35,9 +36,10 @@ export interface Env {
 
 // Aplikasi dibuat sekali per isolate Worker, lalu dipakai ulang.
 let app: Hono | null = null;
+let envReady = false;
 
-function getApp(env: Env): Hono {
-  if (app) return app;
+function initEnv(env: Env): void {
+  if (envReady) return;
   setEnv({
     sessionSecret: env.SESSION_SECRET ?? "",
     klikqrisApiKey: env.KLIKQRIS_API_KEY ?? "",
@@ -47,10 +49,37 @@ function getApp(env: Env): Hono {
     resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: env.APP_URL ?? "https://ringkas.by-rj.com"
   });
+  envReady = true;
+}
+
+function getApp(env: Env): Hono {
+  if (app) return app;
+  initEnv(env);
   app = createApp(openD1Database(env.DB), {
     storage: new UnavailableImageStorage()
   });
   return app;
+}
+
+// Jadwal cron (lihat wrangler.toml [triggers]):
+//   "0 0 * * *"   → harian 07:00 WIB: pengingat + ucapan streak.
+//   "0 11 * * 0"  → Minggu 18:00 WIB: laporan mingguan orang tua.
+// Tanpa RESEND_API_KEY, pengiriman dilewati + dicatat di log (cron tetap
+// selesai dengan sukses, tidak melempar).
+async function runScheduled(env: Env, cron: string): Promise<void> {
+  initEnv(env);
+  const db = openD1Database(env.DB);
+  try {
+    if (cron === "0 11 * * 0") {
+      const r = await runWeeklyJob(db, new Date());
+      console.log(`[cron] weekly: terkirim ${r.sent}, dilewati ${r.skipped}, error ${r.errors.length}`);
+    } else {
+      const r = await runDailyJob(db, new Date());
+      console.log(`[cron] daily: terkirim ${r.sent}, dilewati ${r.skipped}, error ${r.errors.length}`);
+    }
+  } catch (err) {
+    console.error("[cron] gagal:", err);
+  }
 }
 
 export default {
@@ -69,5 +98,13 @@ export default {
       );
     }
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(
+    event: { cron: string; scheduledTime: number },
+    env: Env,
+    ctx: { waitUntil(p: Promise<unknown>): void }
+  ): Promise<void> {
+    ctx.waitUntil(runScheduled(env, event.cron));
   }
 };

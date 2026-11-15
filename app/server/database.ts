@@ -129,6 +129,8 @@ export interface Order {
   signature: string | null;
   whatsapp: string | null;
   idempotency_key: string | null;
+  voucher_code: string | null;
+  discount_amount: number;
   created_at: string;
   paid_at: string | null;
 }

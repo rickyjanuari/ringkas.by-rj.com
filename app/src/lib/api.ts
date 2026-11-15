@@ -10,6 +10,13 @@ export interface User {
 	created_at: string;
 }
 
+/** Satu produk di dalam bundel (dari GET /api/products/:id). */
+export interface BundleItem {
+	product_id: string;
+	title: string;
+	price: number;
+}
+
 /** Produk publik: semua kolom produk KECUALI external_url. */
 export interface ProductPublic {
 	id: string;
@@ -57,6 +64,10 @@ export interface FullChapter extends ChapterMeta {
 	focus_text: string;
 	flashcards: { front: string; back: string }[];
 	quiz: PublicQuestion[];
+	/** Bab gratis (bisa dibuka tanpa membeli produk). */
+	free?: boolean;
+	/** Bab terkunci (belum dibeli) — hanya berisi metadata. */
+	locked?: boolean;
 }
 
 export interface SimulationMeta {
@@ -69,6 +80,10 @@ export interface SimulationMeta {
 	total_minutes: number;
 	max_points: number;
 	created_at: string;
+	/** Simulasi gratis (bisa dikerjakan tanpa membeli produk). */
+	free?: boolean;
+	/** Simulasi terkunci (belum dibeli). */
+	locked?: boolean;
 }
 
 export interface SimulationPack {
@@ -81,6 +96,10 @@ export interface QuizResult {
 	max_score: number;
 	correct: Record<string, boolean>;
 	review: { questionId: string; correct: boolean; discussion: string }[];
+	/** Id attempt (untuk unduh sertifikat). */
+	attempt_id?: number;
+	/** Lulus = skor/max >= 70% dan kind === 'simulation'. */
+	passed?: boolean;
 }
 
 export interface StudyPack {
@@ -115,6 +134,10 @@ export interface Order {
 	created_at: string;
 	paid_at: string | null;
 	expired_at: string | null;
+	/** Kode voucher yang dipakai pada order ini (bila ada). */
+	voucher_code?: string | null;
+	/** Besaran diskon voucher (Rp) pada order ini. */
+	discount_amount?: number;
 }
 
 export interface TrackerData {
@@ -123,7 +146,7 @@ export interface TrackerData {
 	doneChapters: { product_id: string; chapter_id: string; done_at: string }[];
 	badges: string[];
 	stickers: { chapter_id: string; earned_at: string }[];
-	scores: { kind: string; ref_id: string; score: number; max_score: number; created_at: string }[];
+	scores: { id: number; kind: string; ref_id: string; score: number; max_score: number; created_at: string }[];
 }
 
 const TOKEN_KEY = "ringkas_token";

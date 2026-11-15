@@ -4,7 +4,7 @@
 // Idempotent: tidak berbuat apa-apa bila tabel products sudah berisi baris.
 import { nowIso } from "../database.js";
 import type { DB } from "../database.js";
-import { PRODUCTS } from "./products.js";
+import { BUNDLES, PRODUCTS } from "./products.js";
 import {
   CHAPTERS,
   SIM_MINUTES,
@@ -76,15 +76,20 @@ async function insertSimulation(
 }
 
 export async function seedDatabase(db: DB): Promise<void> {
-  const existing = await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM products");
-  if (existing && existing.n > 0) return;
+  // Guard: jangan seed ulang bila produk inti sudah ada. (Jangan pakai
+  // COUNT(*) — migrasi 0005 meng-insert 6 produk bundel SEBELUM seed
+  // jalan di database baru, jadi COUNT > 0 padahal seed belum jalan.)
+  const existing = await db.get<{ id: string }>("SELECT id FROM products WHERE id = 'k1'");
+  if (existing) return;
 
   const now = nowIso();
   await db.transaction(async () => {
     // ---- Produk -----------------------------------------------------------
+    // INSERT OR IGNORE: 6 produk bundel sudah di-insert oleh migrasi 0005
+    // (yang jalan sebelum seed di database baru) — jangan gagal karenanya.
     for (const p of PRODUCTS) {
       await db.run(
-        `INSERT INTO products
+        `INSERT OR IGNORE INTO products
            (id, title, jenjang, mapel, price, strikethrough_price, pages,
             cover_label, cover_color, badge, active, category, description,
             external_url, created_at)
@@ -105,6 +110,17 @@ export async function seedDatabase(db: DB): Promise<void> {
         p.external_url,
         now
       );
+    }
+
+    // ---- Anggota bundel (bundle_members) ----------------------------------
+    for (const b of BUNDLES) {
+      for (const memberId of b.members) {
+        await db.run(
+          "INSERT OR IGNORE INTO bundle_members (bundle_product_id, product_id) VALUES (?, ?)",
+          b.bundleId,
+          memberId
+        );
+      }
     }
 
     // ---- Bab + kartu + kuis bab -------------------------------------------

@@ -12,7 +12,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "produk" | "pengguna" | "video";
+	type Tab = "produk" | "pengguna" | "video" | "voucher" | "cron";
 	let tab = $state<Tab>("produk");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -58,6 +58,48 @@
 	let videoDuration = $state("");
 	let videoLoading = $state(false);
 	let videoSaving = $state(false);
+
+	// ---- Voucher ----
+	type Voucher = {
+		code: string;
+		type: "percent" | "fixed";
+		value: number;
+		max_uses: number | null;
+		uses: number;
+		min_total: number | null;
+		expires_at: string | null;
+		active: number;
+		created_at: string;
+	};
+	let vouchers = $state<Voucher[]>([]);
+	let vouchersLoading = $state(false);
+	let vForm = $state({
+		code: "",
+		type: "percent" as "percent" | "fixed",
+		value: 0,
+		max_uses: "",
+		min_total: "",
+		expires_at: ""
+	});
+	let vSaving = $state(false);
+	let vError = $state("");
+	let vToggling = $state<string | null>(null);
+
+	// ---- Cron Email ----
+	let cronDate = $state("");
+	let cronRunning = $state<"daily" | "weekly" | null>(null);
+	let cronResult = $state<{ job: string; sent: number; skipped: number; errors: string[] } | null>(
+		null
+	);
+	let cronError = $state("");
+
+	/** Tanggal saja (tanpa jam) untuk kolom kedaluwarsa voucher. */
+	function fmtDate(iso: string | null): string {
+		if (!iso) return "-";
+		const d = new Date(iso);
+		if (Number.isNaN(d.getTime())) return iso;
+		return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+	}
 
 	onMount(async () => {
 		if (!getToken()) {
@@ -108,6 +150,81 @@
 		tab = t;
 		notice = "";
 		if (t === "pengguna" && users.length === 0) loadUsers();
+		if (t === "voucher" && vouchers.length === 0) loadVouchers();
+	}
+
+	async function loadVouchers() {
+		vouchersLoading = true;
+		try {
+			const data = await api<{ vouchers: Voucher[] }>("/api/admin/vouchers");
+			vouchers = data.vouchers ?? [];
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal memuat voucher.";
+		} finally {
+			vouchersLoading = false;
+		}
+	}
+
+	async function buatVoucher() {
+		vSaving = true;
+		vError = "";
+		const body: Record<string, unknown> = {
+			code: vForm.code.trim().toUpperCase(),
+			type: vForm.type,
+			value: Number(vForm.value)
+		};
+		if (vForm.max_uses.trim()) body.max_uses = Number(vForm.max_uses);
+		if (vForm.min_total.trim()) body.min_total = Number(vForm.min_total);
+		if (vForm.expires_at) body.expires_at = vForm.expires_at;
+		try {
+			const data = await api<{ voucher: Voucher }>("/api/admin/vouchers", {
+				method: "POST",
+				body: JSON.stringify(body)
+			});
+			vouchers = [data.voucher, ...vouchers];
+			notice = `Voucher ${data.voucher.code} dibuat.`;
+			vForm = { code: "", type: "percent", value: 0, max_uses: "", min_total: "", expires_at: "" };
+		} catch (e) {
+			vError = e instanceof Error ? e.message : "Gagal membuat voucher.";
+		} finally {
+			vSaving = false;
+		}
+	}
+
+	async function toggleVoucher(v: Voucher) {
+		vToggling = v.code;
+		try {
+			const data = await api<{ voucher: Voucher }>(
+				`/api/admin/vouchers/${encodeURIComponent(v.code)}/active`,
+				{ method: "POST", body: JSON.stringify({ active: v.active ? 0 : 1 }) }
+			);
+			vouchers = vouchers.map((x) => (x.code === v.code ? data.voucher : x));
+			notice = `Voucher ${v.code} ${data.voucher.active ? "diaktifkan" : "dinonaktifkan"}.`;
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal mengubah status voucher.";
+		} finally {
+			vToggling = null;
+		}
+	}
+
+	async function jalankanCron(job: "daily" | "weekly") {
+		cronRunning = job;
+		cronError = "";
+		cronResult = null;
+		try {
+			const data = await api<{ job: string; sent: number; skipped: number; errors: string[] }>(
+				"/api/admin/cron/run",
+				{
+					method: "POST",
+					body: JSON.stringify({ job, ...(cronDate ? { date: cronDate } : {}) })
+				}
+			);
+			cronResult = data;
+		} catch (e) {
+			cronError = e instanceof Error ? e.message : "Gagal menjalankan cron.";
+		} finally {
+			cronRunning = null;
+		}
 	}
 
 	// ---- CRUD produk ----
@@ -337,7 +454,7 @@
 		<p class="ok-msg mt-3">{notice}</p>
 	{/if}
 
-	<div class="mt-4 flex gap-2">
+	<div class="mt-4 flex flex-wrap gap-2">
 		<button type="button" class="chip" class:active={tab === "produk"} onclick={() => switchTab("produk")}>
 			<Icon name="package" size={16} /> Produk ({products.length})
 		</button>
@@ -346,6 +463,12 @@
 		</button>
 		<button type="button" class="chip" class:active={tab === "video"} onclick={() => switchTab("video")}>
 			<Icon name="video" size={16} /> Video per Bab
+		</button>
+		<button type="button" class="chip" class:active={tab === "voucher"} onclick={() => switchTab("voucher")}>
+			<Icon name="receipt" size={16} /> Voucher ({vouchers.length})
+		</button>
+		<button type="button" class="chip" class:active={tab === "cron"} onclick={() => switchTab("cron")}>
+			<Icon name="clock" size={16} /> Cron Email
 		</button>
 	</div>
 
@@ -553,7 +676,7 @@
 				{/each}
 			</div>
 		{/if}
-	{:else}
+	{:else if tab === "video"}
 		<div class="card mt-4 space-y-3 p-4">
 			<p class="text-sm font-bold"><Icon name="video" size={16} /> Video per Bab</p>
 			<p class="text-xs text-[#5f6b62]">
@@ -607,6 +730,188 @@
 				>
 					{#if videoSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Video{/if}
 				</button>
+			{/if}
+		</div>
+	{:else if tab === "voucher"}
+		<form
+			class="card mt-4 space-y-3 p-4"
+			onsubmit={(e) => {
+				e.preventDefault();
+				buatVoucher();
+			}}
+		>
+			<p class="text-sm font-bold"><Icon name="receipt" size={16} /> Buat Voucher Baru</p>
+			<div class="grid grid-cols-2 gap-2">
+				<div>
+					<label class="lbl" for="v-code">Kode voucher</label>
+					<input
+						id="v-code"
+						class="input uppercase"
+						bind:value={vForm.code}
+						placeholder="Contoh: HEMAT10"
+						required
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="v-type">Tipe</label>
+					<select id="v-type" class="input" bind:value={vForm.type}>
+						<option value="percent">Persen (%)</option>
+						<option value="fixed">Nominal (Rp)</option>
+					</select>
+				</div>
+				<div>
+					<label class="lbl" for="v-value">
+						Nilai {vForm.type === "percent" ? "(%, 1–100)" : "(Rp)"}
+					</label>
+					<input
+						id="v-value"
+						class="input"
+						type="number"
+						min="1"
+						max={vForm.type === "percent" ? 100 : undefined}
+						bind:value={vForm.value}
+						required
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="v-max">Maks. pemakaian (opsional)</label>
+					<input
+						id="v-max"
+						class="input"
+						type="number"
+						min="1"
+						bind:value={vForm.max_uses}
+						placeholder="Tanpa batas"
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="v-min">Min. belanja Rp (opsional)</label>
+					<input
+						id="v-min"
+						class="input"
+						type="number"
+						min="0"
+						bind:value={vForm.min_total}
+						placeholder="Tanpa minimum"
+					/>
+				</div>
+				<div>
+					<label class="lbl" for="v-exp">Kedaluwarsa (opsional)</label>
+					<input id="v-exp" class="input" type="date" bind:value={vForm.expires_at} />
+				</div>
+			</div>
+			{#if vError}
+				<p class="err">{vError}</p>
+			{/if}
+			<button type="submit" class="btn btn-primary" disabled={vSaving}>
+				{#if vSaving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Voucher{/if}
+			</button>
+		</form>
+
+		{#if vouchersLoading}
+			<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+		{:else if vouchers.length === 0}
+			<p class="mt-4 text-sm text-[#5f6b62]">Belum ada voucher.</p>
+		{:else}
+			<div class="card mt-3 overflow-x-auto p-0">
+				<table class="w-full min-w-[680px] text-left text-xs">
+					<thead>
+						<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+							<th class="px-3 py-2.5 font-extrabold">Kode</th>
+							<th class="px-3 py-2.5 font-extrabold">Tipe</th>
+							<th class="px-3 py-2.5 font-extrabold">Nilai</th>
+							<th class="px-3 py-2.5 font-extrabold">Terpakai</th>
+							<th class="px-3 py-2.5 font-extrabold">Min. Belanja</th>
+							<th class="px-3 py-2.5 font-extrabold">Kedaluwarsa</th>
+							<th class="px-3 py-2.5 font-extrabold">Status</th>
+							<th class="px-3 py-2.5 font-extrabold"></th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each vouchers as v (v.code)}
+							<tr class="border-b border-[#f0ede2] last:border-0">
+								<td class="px-3 py-2.5 font-extrabold">{v.code}</td>
+								<td class="px-3 py-2.5">{v.type === "percent" ? "Persen" : "Nominal"}</td>
+								<td class="px-3 py-2.5 font-bold">
+									{v.type === "percent" ? `${v.value}%` : formatRupiah(v.value)}
+								</td>
+								<td class="px-3 py-2.5">{v.uses}{v.max_uses ? ` / ${v.max_uses}` : ""}</td>
+								<td class="px-3 py-2.5">{v.min_total ? formatRupiah(v.min_total) : "-"}</td>
+								<td class="px-3 py-2.5">{fmtDate(v.expires_at)}</td>
+								<td class="px-3 py-2.5">
+									{#if v.active}
+										<span class="badge badge-leaf">Aktif</span>
+									{:else}
+										<span class="badge badge-gray">Nonaktif</span>
+									{/if}
+								</td>
+								<td class="px-3 py-2.5 text-right">
+									<button
+										type="button"
+										class="btn {v.active ? 'btn-ghost' : 'btn-leaf'} !px-2.5 !py-1.5 text-xs"
+										disabled={vToggling === v.code}
+										onclick={() => toggleVoucher(v)}
+									>
+										{v.active ? "Nonaktifkan" : "Aktifkan"}
+									</button>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	{:else if tab === "cron"}
+		<div class="card mt-4 space-y-3 p-4">
+			<p class="text-sm font-bold"><Icon name="clock" size={16} /> Cron Email</p>
+			<p class="text-xs text-[#5f6b62]">
+				Jalankan pengiriman email terjadwal secara manual. Pengingat harian dikirim ke orang tua
+				anak yang belum belajar hari itu; laporan mingguan berisi ringkasan belajar 7 hari terakhir.
+			</p>
+			<div>
+				<label class="lbl" for="cron-date">Tanggal (opsional, bila kosong memakai hari ini)</label>
+				<input id="cron-date" class="input" type="date" bind:value={cronDate} />
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<button
+					type="button"
+					class="btn btn-primary"
+					disabled={cronRunning !== null}
+					onclick={() => jalankanCron("daily")}
+				>
+					{#if cronRunning === "daily"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan pengingat harian{/if}
+				</button>
+				<button
+					type="button"
+					class="btn btn-sun"
+					disabled={cronRunning !== null}
+					onclick={() => jalankanCron("weekly")}
+				>
+					{#if cronRunning === "weekly"}Menjalankan...{:else}<Icon name="refresh" size={16} /> Jalankan laporan mingguan{/if}
+				</button>
+			</div>
+			{#if cronError}
+				<p class="err">{cronError}</p>
+			{/if}
+			{#if cronResult}
+				<div class="rounded-xl bg-[#f7f5ef] p-3 text-sm">
+					<p class="font-extrabold">
+						Hasil: {cronResult.job === "daily" ? "Pengingat harian" : "Laporan mingguan"}
+					</p>
+					<p class="mt-1">
+						Terkirim: <b>{cronResult.sent}</b> • Dilewati: <b>{cronResult.skipped}</b>
+					</p>
+					{#if cronResult.errors.length > 0}
+						<p class="mt-2 font-bold text-[#b91c1c]">Error ({cronResult.errors.length}):</p>
+						<ul class="list-disc pl-5 text-[#b91c1c]">
+							{#each cronResult.errors as err (err)}
+								<li>{err}</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-1 text-[#065f46]">Selesai tanpa error.</p>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	{/if}

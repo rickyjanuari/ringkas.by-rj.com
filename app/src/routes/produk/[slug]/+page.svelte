@@ -2,13 +2,14 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
-	import { api, formatRupiah, getToken, type ProductPublic, type ChapterMeta } from "$lib/api";
+	import { api, formatRupiah, getToken, type ProductPublic, type ChapterMeta, type BundleItem } from "$lib/api";
 	import { cart, auth } from "$lib/store";
 	import Icon from "$lib/Icon.svelte";
 
 	let slug = $derived($page.params.slug);
 	let product = $state<ProductPublic | null>(null);
 	let chapters = $state<ChapterMeta[]>([]);
+	let bundleItems = $state<BundleItem[]>([]);
 	let images = $state<{ id: number; url: string; kind: string }[]>([]);
 	let loading = $state(true);
 	let error = $state("");
@@ -32,9 +33,11 @@
 				product: ProductPublic;
 				chapters: ChapterMeta[];
 				images: { id: number; url: string; kind: string }[];
+				bundleItems?: BundleItem[];
 			}>(`/api/products/${slug}`);
 			product = data.product;
 			chapters = data.chapters ?? [];
+			bundleItems = data.bundleItems ?? [];
 			images = data.images ?? [];
 			// Cek kepemilikan (order PAID) untuk kartu Ruang Belajar.
 			if (getToken()) {
@@ -159,6 +162,22 @@
 			<a href={`/belajar/${product.id}`} class="btn btn-leaf mt-3 w-full">
 				<Icon name="book-open" size={16} /> Buka Ruang Belajar
 			</a>
+		</div>
+	{/if}
+
+	<!-- Isi Bundel -->
+	{#if bundleItems.length > 0}
+		<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold">
+			<Icon name="package" size={18} /> Isi Bundel
+		</h2>
+		<p class="text-xs text-[#5f6b62]">Bundel ini berisi {bundleItems.length} produk:</p>
+		<div class="mt-2 space-y-2">
+			{#each bundleItems as item (item.product_id)}
+				<div class="card flex items-center justify-between gap-2 p-3">
+					<span class="min-w-0 flex-1 text-sm font-bold leading-snug">{item.title}</span>
+					<span class="shrink-0 text-sm font-extrabold text-[#177245]">{formatRupiah(item.price)}</span>
+				</div>
+			{/each}
 		</div>
 	{/if}
 

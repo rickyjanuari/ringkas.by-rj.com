@@ -1,5 +1,6 @@
-// Daftar produk seed Ringkas — 13 produk SD aktif + 38 produk non-SD
-// (nonaktif, tetap di-seed lengkap agar bisa diaktifkan dari panel admin).
+// Daftar produk seed Ringkas — 19 produk SD aktif (13 produk + 6 bundel
+// kelas) + 38 produk non-SD (nonaktif, tetap di-seed lengkap agar bisa
+// diaktifkan dari panel admin).
 // CATATAN JUMLAH: tugas menyebut "46 produk", tetapi daftar yang dirinci
 // adalah 13 SD + 38 non-SD = 51 produk. Semua 51 di-seed sesuai rincian;
 // bila yang dimaksud adalah 46, 5 produk non-SD perlu dicoret oleh admin.
@@ -84,6 +85,24 @@ export const PRODUCTS: SeedProduct[] = [
   p("sas-k6", "Paket SAS Kelas 6", "SD", "SAS", 21000, 38000, 80, "SAS6", C.ungu, null, 1, "SD",
     "Paket simulasi SAS Kelas 6 untuk semua mapel. Latihan ujian dengan kunci dan pembahasan."),
 
+  // ---- 6 produk bundel Kelas 1-6 (aktif) ---------------------------------
+  // Harga = jumlah harga satuan - diskon 20% (bulatkan ke bawah ke
+  // kelipatan Rp100). Anggota bundel ada di BUNDLES di bawah (dipakai
+  // seed.ts untuk mengisi bundle_members; migrasi 0005 juga meng-insert
+  // produk + anggota yang sama untuk database yang sudah ada).
+  p("bundle-k1", "Paket Bundel Kelas 1 — Rangkuman + SAS", "SD", "Semua Mapel", 28800, 36000, 210, "BND1", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 1: Rangkuman Materi Kelas 1 Semua Tema + Kumpulan Soal SAS & PAS Kelas 1 Semester 1. Hemat 20% dari harga satuan."),
+  p("bundle-k2", "Paket Bundel Kelas 2 — Rangkuman + SAS", "SD", "Semua Mapel", 28800, 36000, 220, "BND2", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 2: Rangkuman Materi Kelas 2 Semua Tema + Paket SAS Kelas 2. Hemat 20% dari harga satuan."),
+  p("bundle-k3", "Paket Bundel Kelas 3 — Rangkuman + SAS", "SD", "Semua Mapel", 29600, 37000, 240, "BND3", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 3: Rangkuman Materi Kelas 3 Semua Tema + Paket SAS Kelas 3. Hemat 20% dari harga satuan."),
+  p("bundle-k4", "Paket Bundel Kelas 4 — Rangkuman + SAS", "SD", "Semua Mapel", 30400, 38000, 255, "BND4", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 4: Rangkuman Materi Kelas 4 Semua Mapel + Paket SAS Kelas 4. Hemat 20% dari harga satuan."),
+  p("bundle-k5", "Paket Bundel Kelas 5 — Rangkuman + SAS", "SD", "Semua Mapel", 31200, 39000, 270, "BND5", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 5: Rangkuman Materi Kelas 5 Semua Mapel + Paket SAS Kelas 5. Hemat 20% dari harga satuan."),
+  p("bundle-k6", "Paket Bundel Kelas 6 — Rangkuman + SAS", "SD", "Semua Mapel", 32000, 40000, 280, "BND6", C.navy, "BUNDEL", 1, "SD",
+    "Satu paket hemat Kelas 6: Rangkuman Materi Kelas 6 Semua Mapel + Paket SAS Kelas 6. Hemat 20% dari harga satuan."),
+
   // ---- 38 produk non-SD (active = 0, tetap di-seed lengkap) --------------
   p("bing-smp", "Rangkuman Bahasa Inggris SMP", "SMP", "B. Inggris", 25000, 45000, 160, "BING", C.biru, null, 0, "SMP",
     "Rangkuman Bahasa Inggris SMP Kelas 7–9. Grammar, vocabulary, dan latihan soal."),
@@ -161,4 +180,15 @@ export const PRODUCTS: SeedProduct[] = [
     "Rangkuman Geografi SMA Kelas 10–12. Peta, iklim, dan kependudukan."),
   p("sos-sma", "Rangkuman Sosiologi SMA", "SMA", "Sosiologi", 29000, 52000, 190, "SOS", C.ungu, null, 0, "SMA",
     "Rangkuman Sosiologi SMA Kelas 10–12. Masyarakat, budaya, dan perubahan sosial."),
+];
+
+// Anggota tiap produk bundel (dipakai seed.ts untuk bundle_members).
+// Harus sama dengan migrasi 0005_fiturs_baru.sql.
+export const BUNDLES: { bundleId: string; members: string[] }[] = [
+  { bundleId: "bundle-k1", members: ["k1", "sas-k1-s1"] },
+  { bundleId: "bundle-k2", members: ["k2", "sas-k2"] },
+  { bundleId: "bundle-k3", members: ["k3", "sas-k3"] },
+  { bundleId: "bundle-k4", members: ["k4", "sas-k4"] },
+  { bundleId: "bundle-k5", members: ["k5", "sas-k5"] },
+  { bundleId: "bundle-k6", members: ["k6", "sas-k6"] }
 ];

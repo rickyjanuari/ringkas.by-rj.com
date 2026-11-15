@@ -32,13 +32,18 @@ function esc(value: unknown): string {
 }
 
 rmSync(tmpPath, { force: true });
+// Hapus juga -wal/-shm: bila proses crash di tengah dump, SQLite bisa
+// memulihkan state lama dari -wal walau berkas .db sudah dihapus.
+rmSync(`${tmpPath}-wal`, { force: true });
+rmSync(`${tmpPath}-shm`, { force: true });
 const db = openDatabase(tmpPath);
 db.migrate(join(__dirname, "..", "migrations"));
 await seedDatabase(db);
 
 const raw = new DatabaseSync(tmpPath, { readOnly: true });
 // Urutan tabel menghormati foreign key (products → chapters → ...).
-const order = ["products", "chapters", "flashcards", "simulations", "questions"];
+// bundle_members setelah products (FK ke products).
+const order = ["products", "bundle_members", "chapters", "flashcards", "simulations", "questions"];
 const lines: string[] = [
   "-- seed.sql — dibuat otomatis oleh `npm run seed:dump`.",
   "-- JANGAN edit manual: ubah server/seed/* lalu jalankan ulang dump.",
@@ -55,7 +60,10 @@ for (const table of order) {
   const rows = raw.prepare(`SELECT * FROM "${table}"`).all() as Record<string, unknown>[];
   for (const row of rows) {
     const values = cols.map((c) => esc(row[c.name])).join(", ");
-    lines.push(`INSERT INTO "${table}" (${colNames}) VALUES (${values});`);
+    // INSERT OR IGNORE: migrasi 0005 sudah meng-insert 6 produk bundel
+    // sebelum seed jalan di database baru — seed ulang tidak boleh gagal
+    // karenanya (dan seed.sql jadi aman dijalankan ulang).
+    lines.push(`INSERT OR IGNORE INTO "${table}" (${colNames}) VALUES (${values});`);
   }
   lines.push(`-- ${table}: ${rows.length} baris`);
 }

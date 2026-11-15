@@ -25,12 +25,20 @@
 	let createError = $state("");
 	let statusMsg = $state("");
 
+	// ---- Voucher ----
+	let voucherCode = $state("");
+	let voucherApplying = $state(false);
+	let voucherMsg = $state("");
+	let voucherError = $state("");
+	let appliedVoucher = $state<{ code: string; discount: number; total_after: number } | null>(null);
+
 	let items = $derived(
 		$cart
 			.map((id) => catalog.find((p) => p.id === id))
 			.filter((p): p is ProductPublic => Boolean(p))
 	);
 	let total = $derived(items.reduce((s, p) => s + p.price, 0));
+	let totalBayar = $derived(appliedVoucher ? appliedVoucher.total_after : total);
 	let loggedIn = $derived(Boolean(getToken()));
 
 	async function loadOrder(id: string) {
@@ -76,6 +84,41 @@
 		return `key-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 	}
 
+	async function pakaiVoucher() {
+		const code = voucherCode.trim().toUpperCase();
+		if (!code) {
+			voucherError = "Masukkan kode voucher dulu ya.";
+			return;
+		}
+		voucherApplying = true;
+		voucherError = "";
+		voucherMsg = "";
+		try {
+			const data = await api<{
+				valid: boolean;
+				code: string;
+				type: string;
+				value: number;
+				discount: number;
+				total_after: number;
+			}>(`/api/voucher/validate?code=${encodeURIComponent(code)}&total=${total}`);
+			appliedVoucher = { code: data.code, discount: data.discount, total_after: data.total_after };
+			voucherMsg = `Voucher ${data.code} dipakai — hemat ${formatRupiah(data.discount)}!`;
+		} catch (e) {
+			voucherError = e instanceof Error ? e.message : "Voucher tidak bisa dipakai.";
+			appliedVoucher = null;
+		} finally {
+			voucherApplying = false;
+		}
+	}
+
+	function hapusVoucher() {
+		appliedVoucher = null;
+		voucherCode = "";
+		voucherMsg = "";
+		voucherError = "";
+	}
+
 	async function buatQris() {
 		if (creating || items.length === 0) return;
 		creating = true;
@@ -87,7 +130,8 @@
 				body: JSON.stringify({
 					items: items.map((p) => p.id),
 					idempotency_key: newIdempotencyKey(),
-					whatsapp: whatsapp.trim() || undefined
+					whatsapp: whatsapp.trim() || undefined,
+					voucher_code: appliedVoucher?.code ?? undefined
 				})
 			});
 			order = data.order;
@@ -172,6 +216,13 @@
 			<p class="mt-3 text-2xl font-extrabold text-[#177245]">
 				{formatRupiah(order.total_amount ?? order.total)}
 			</p>
+			{#if order.discount_amount}
+				<p class="mt-1 text-sm font-bold text-[#065f46]">
+					Diskon voucher{#if order.voucher_code} ({order.voucher_code}){/if}: -{formatRupiah(
+						order.discount_amount
+					)}
+				</p>
+			{/if}
 			{#if order.expired_at}
 				<p class="mt-1 text-xs font-semibold text-[#b91c1c]">
 					Berlaku sampai {formatTanggal(order.expired_at)}
@@ -224,8 +275,57 @@
 		</div>
 		<div class="mt-3 flex justify-between border-t border-dashed border-[#e7e2d2] pt-3">
 			<span class="font-extrabold">Total Bayar</span>
-			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(total)}</span>
+			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(totalBayar)}</span>
 		</div>
+		{#if appliedVoucher}
+			<div class="mt-2 flex justify-between text-sm font-bold text-[#065f46]">
+				<span>Diskon ({appliedVoucher.code})</span>
+				<span>-{formatRupiah(appliedVoucher.discount)}</span>
+			</div>
+		{/if}
+	</div>
+
+	<!-- Kode voucher -->
+	<div class="card mt-3 p-4">
+		<label class="lbl" for="voucher">Kode Voucher (opsional)</label>
+		{#if appliedVoucher}
+			<p class="ok-msg flex items-center justify-between gap-2">
+				<span><Icon name="receipt" size={15} class="inline-block align-[-2px]" /> Voucher {appliedVoucher.code} aktif — hemat {formatRupiah(appliedVoucher.discount)}</span>
+				<button type="button" class="shrink-0 font-extrabold underline" onclick={hapusVoucher}>
+					Hapus
+				</button>
+			</p>
+		{:else}
+			<div class="flex gap-2">
+				<input
+					id="voucher"
+					class="input uppercase"
+					type="text"
+					placeholder="Contoh: HEMAT10"
+					bind:value={voucherCode}
+					onkeydown={(e) => {
+						if (e.key === "Enter") {
+							e.preventDefault();
+							pakaiVoucher();
+						}
+					}}
+				/>
+				<button
+					type="button"
+					class="btn btn-sun shrink-0"
+					disabled={voucherApplying}
+					onclick={pakaiVoucher}
+				>
+					{voucherApplying ? "Memeriksa..." : "Pakai"}
+				</button>
+			</div>
+		{/if}
+		{#if voucherError}
+			<p class="err mt-2">{voucherError}</p>
+		{/if}
+		{#if voucherMsg}
+			<p class="ok-msg mt-2">{voucherMsg}</p>
+		{/if}
 	</div>
 
 	<div class="card mt-3 p-4">

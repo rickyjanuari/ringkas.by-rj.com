@@ -18,15 +18,17 @@ import {
 import { getEnv } from "./env.js";
 import type { ImageStorage } from "./storage.js";
 import { createQris, checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
-import { receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
+import { certificatePdf, receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
 import {
   background,
+  formatTanggal,
   getOrderEmailData,
   sendExpiredEmail,
   sendPaidEmail,
   sendPendingEmail,
   sendWelcomeEmail
 } from "./email.js";
+import { jobDate, runDailyJob, runWeeklyJob } from "./cron.js";
 // Modul seed dibuat agen lain (server/seed/study.ts belum ada saat berkas ini
 // ditulis) — abaikan error resolusi modul sampai modul itu tersedia.
 // @ts-ignore
@@ -44,6 +46,137 @@ interface OrderItem {
   product_id: string;
   title: string;
   price: number;
+  /** Baris anggota bundel (harga 0): produk ini termasuk dalam bundel. */
+  included_in_bundle?: string;
+}
+
+interface VoucherRow {
+  code: string;
+  type: string;
+  value: number;
+  max_uses: number | null;
+  uses: number;
+  min_total: number;
+  expires_at: string | null;
+  active: number;
+  created_at: string;
+}
+
+function publicVoucher(v: VoucherRow): Record<string, unknown> {
+  return {
+    code: v.code,
+    type: v.type,
+    value: v.value,
+    max_uses: v.max_uses,
+    uses: v.uses,
+    min_total: v.min_total,
+    expires_at: v.expires_at,
+    active: v.active,
+    created_at: v.created_at
+  };
+}
+
+function rupiah(n: number): string {
+  return `Rp${Math.trunc(n).toLocaleString("id-ID")}`;
+}
+
+/**
+ * Validasi voucher server-side (aktif, belum kedaluwarsa, kuota masih
+ * ada, total memenuhi min_total). Mengembalikan diskon (rupiah) bila
+ * valid. TIDAK mengubah uses — itu dilakukan saat order dibuat.
+ */
+async function validateVoucher(
+  db: Database,
+  codeRaw: string,
+  total: number
+): Promise<
+  | { ok: true; voucher: VoucherRow; discount: number }
+  | { ok: false; error: string }
+> {
+  const code = codeRaw.trim().toUpperCase();
+  if (!code) return { ok: false, error: "Kode voucher wajib diisi." };
+  const v = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+  if (!v) return { ok: false, error: "Kode voucher tidak ditemukan." };
+  if (v.active !== 1) return { ok: false, error: "Kode voucher sudah tidak aktif." };
+  if (v.expires_at && new Date(v.expires_at).getTime() <= Date.now()) {
+    return { ok: false, error: "Kode voucher sudah kedaluwarsa." };
+  }
+  if (v.max_uses !== null && v.uses >= v.max_uses) {
+    return { ok: false, error: "Kuota kode voucher sudah habis." };
+  }
+  if (total < v.min_total) {
+    return {
+      ok: false,
+      error: `Kode voucher ini berlaku untuk pembelian minimal ${rupiah(v.min_total)}.`
+    };
+  }
+  const discount =
+    v.type === "percent" ? Math.floor((total * v.value) / 100) : Math.min(v.value, total);
+  return { ok: true, voucher: v, discount };
+}
+
+/**
+ * Kembangkan produk bundel menjadi baris order: baris bundel (harga
+ * bundel) + baris anggota (harga 0, bertanda included_in_bundle).
+ * Kepemilikan tiap anggota jalan lewat jalur yang sudah ada
+ * (userHasPaidProduct memeriksa product_id di items).
+ */
+async function expandBundleItems(db: Database, products: Product[]): Promise<OrderItem[]> {
+  const items: OrderItem[] = [];
+  for (const p of products) {
+    items.push({ product_id: p.id, title: p.title, price: p.price });
+    const members = await db.all<{ product_id: string }>(
+      "SELECT product_id FROM bundle_members WHERE bundle_product_id = ? ORDER BY product_id",
+      p.id
+    );
+    for (const m of members) {
+      const mp = await db.get<Product>("SELECT * FROM products WHERE id = ?", m.product_id);
+      if (mp) {
+        items.push({
+          product_id: mp.id,
+          title: mp.title,
+          price: 0,
+          included_in_bundle: p.id
+        });
+      }
+    }
+  }
+  return items;
+}
+
+/** Bab pertama (sort_order terendah) sebuah produk — gratis untuk semua. */
+async function firstChapterId(db: Database, productId: string): Promise<string | null> {
+  const row = await db.get<{ id: string }>(
+    "SELECT id FROM chapters WHERE product_id = ? ORDER BY sort_order, id LIMIT 1",
+    productId
+  );
+  return row?.id ?? null;
+}
+
+/** Simulasi gratis = Paket A pertama tiap mapel dalam produk itu. */
+async function isFreeSimulation(db: Database, sim: Simulation): Promise<boolean> {
+  if (!sim.product_id || sim.paket !== "A") return false;
+  const first = await db.get<{ id: string }>(
+    "SELECT id FROM simulations WHERE product_id = ? AND subject = ? ORDER BY paket, id LIMIT 1",
+    sim.product_id,
+    sim.subject
+  );
+  return first?.id === sim.id;
+}
+
+async function canAccessSimulation(db: Database, userId: string, sim: Simulation): Promise<boolean> {
+  if (sim.product_id && (await userHasPaidProduct(db, userId, sim.product_id))) return true;
+  return isFreeSimulation(db, sim);
+}
+
+async function canAccessChapter(
+  db: Database,
+  userId: string,
+  chapter: Chapter
+): Promise<boolean> {
+  if (await userHasPaidProduct(db, userId, chapter.product_id)) return true;
+  const first = await firstChapterId(db, chapter.product_id);
+  return first === chapter.id;
 }
 
 interface PublicQuestion {
@@ -171,18 +304,23 @@ async function authUser(c: Context, db: Database): Promise<User | null> {
 async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unknown>> {
   const items = parseItems(o.items);
   const paid = o.status === "PAID";
+  // Baris anggota bundel (harga 0) disembunyikan dari klien — mereka
+  // hanya ada di items tersimpan untuk kepemilikan/unduhan; yang dibayar
+  // (baris bundel) tetap tampil.
   const itemsOut = await Promise.all(
-    items.map(async (it) => {
-      let externalUrl: string | null = null;
-      if (paid) {
-        const p = await db.get<Product>(
-          "SELECT external_url FROM products WHERE id = ?",
-          it.product_id
-        );
-        externalUrl = p?.external_url ?? null;
-      }
-      return { product_id: it.product_id, title: it.title, price: it.price, externalUrl };
-    })
+    items
+      .filter((it) => !it.included_in_bundle)
+      .map(async (it) => {
+        let externalUrl: string | null = null;
+        if (paid) {
+          const p = await db.get<Product>(
+            "SELECT external_url FROM products WHERE id = ?",
+            it.product_id
+          );
+          externalUrl = p?.external_url ?? null;
+        }
+        return { product_id: it.product_id, title: it.title, price: it.price, externalUrl };
+      })
   );
   return {
     id: o.id,
@@ -197,6 +335,8 @@ async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unkno
     expired_at: o.expired_at,
     idempotency_key: o.idempotency_key,
     whatsapp: o.whatsapp,
+    voucher_code: o.voucher_code ?? null,
+    discount_amount: o.discount_amount ?? 0,
     created_at: o.created_at,
     paid_at: o.paid_at
   };
@@ -447,8 +587,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       "SELECT chapter_id, earned_at FROM stickers WHERE user_id = ? ORDER BY earned_at",
       user.id
     );
-    const scores = await db.all<{ kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
-      "SELECT kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
+    const scores = await db.all<{ id: number; kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
+      "SELECT id, kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
       user.id
     );
     const badges = computeBadges(doneChapters.length, stickers.length, scores);
@@ -498,6 +638,17 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       "SELECT * FROM product_images WHERE product_id = ? ORDER BY id",
       product.id
     );
+    const memberRows = await db.all<{ product_id: string }>(
+      "SELECT product_id FROM bundle_members WHERE bundle_product_id = ? ORDER BY product_id",
+      product.id
+    );
+    const bundleItems = (
+      await Promise.all(
+        memberRows.map((m) => db.get<Product>("SELECT * FROM products WHERE id = ?", m.product_id))
+      )
+    )
+      .filter((p): p is Product => !!p)
+      .map((p) => ({ product_id: p.id, title: p.title, price: p.price }));
     return c.json({
       product: publicProduct(product),
       chapters: chapters.map((ch) => ({
@@ -510,7 +661,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         video_url: ch.video_url,
         video_duration: ch.video_duration
       })),
-      images: images.map((im) => ({ id: im.id, url: im.url, kind: im.kind }))
+      images: images.map((im) => ({ id: im.id, url: im.url, kind: im.kind })),
+      bundleItems
     });
   });
 
@@ -792,6 +944,115 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     return c.json({ chapter: updated });
   });
 
+  // ------------------------- Admin: voucher & cron -------------------------
+
+  app.get("/api/admin/vouchers", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const vouchers = await db.all<VoucherRow>("SELECT * FROM vouchers ORDER BY created_at DESC, code");
+    return c.json({ vouchers: vouchers.map(publicVoucher) });
+  });
+
+  app.post("/api/admin/vouchers", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const body = await readJson(c);
+    const code = asString(body.code).trim().toUpperCase();
+    const type = asString(body.type);
+    const value = asNumber(body.value);
+    if (!/^[A-Z0-9-]{3,20}$/.test(code)) {
+      return c.json({ error: "Kode voucher harus 3-20 karakter huruf/angka/strip." }, 400);
+    }
+    if (type !== "percent" && type !== "fixed") {
+      return c.json({ error: "Tipe voucher harus 'percent' atau 'fixed'." }, 400);
+    }
+    if (value === undefined || value <= 0 || (type === "percent" && value > 100)) {
+      return c.json({ error: "Nilai voucher tidak valid (persen 1-100, nominal > 0)." }, 400);
+    }
+    const maxUses = asNumber(body.max_uses);
+    if (maxUses !== undefined && (!Number.isInteger(maxUses) || maxUses < 1)) {
+      return c.json({ error: "Maksimal pemakaian harus bilangan bulat minimal 1." }, 400);
+    }
+    const minTotal = asNumber(body.min_total) ?? 0;
+    if (minTotal < 0) return c.json({ error: "Minimal belanja tidak valid." }, 400);
+    const expiresRaw = asString(body.expires_at).trim() || null;
+    let expiresAt: string | null = null;
+    if (expiresRaw) {
+      const d = new Date(expiresRaw);
+      if (Number.isNaN(d.getTime())) {
+        return c.json({ error: "Tanggal kedaluwarsa tidak valid." }, 400);
+      }
+      expiresAt = d.toISOString();
+    }
+    const existing = await db.get<VoucherRow>("SELECT code FROM vouchers WHERE code = ?", code);
+    if (existing) return c.json({ error: "Kode voucher sudah dipakai." }, 409);
+    await db.run(
+      "INSERT INTO vouchers (code, type, value, max_uses, uses, min_total, expires_at, active, created_at) VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?)",
+      code,
+      type,
+      value,
+      maxUses ?? null,
+      minTotal,
+      expiresAt,
+      nowIso()
+    );
+    const voucher = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+    return c.json({ voucher: voucher ? publicVoucher(voucher) : null }, 201);
+  });
+
+  app.post("/api/admin/vouchers/:code/active", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const code = c.req.param("code").toUpperCase();
+    const voucher = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+    if (!voucher) return c.json({ error: "Voucher tidak ditemukan." }, 404);
+    const body = await readJson(c);
+    const active = asNumber(body.active);
+    if (active !== 0 && active !== 1) {
+      return c.json({ error: "Nilai active harus 0 atau 1." }, 400);
+    }
+    await db.run("UPDATE vouchers SET active = ? WHERE code = ?", active, code);
+    const updated = await db.get<VoucherRow>("SELECT * FROM vouchers WHERE code = ?", code);
+    return c.json({ voucher: updated ? publicVoucher(updated) : null });
+  });
+
+  app.post("/api/admin/cron/run", async (c) => {
+    const admin = await authUser(c, db);
+    if (!admin) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
+    const body = await readJson(c);
+    const job = asString(body.job);
+    const date = jobDate(asString(body.date) || undefined);
+    if (job === "daily") return c.json(await runDailyJob(db, date));
+    if (job === "weekly") return c.json(await runWeeklyJob(db, date));
+    return c.json({ error: "job harus 'daily' atau 'weekly'." }, 400);
+  });
+
+  // ------------------------- Voucher (cek sebelum checkout) -------------------------
+
+  app.get("/api/voucher/validate", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const code = c.req.query("code") ?? "";
+    const total = Number(c.req.query("total") ?? 0);
+    if (!Number.isFinite(total) || total <= 0) {
+      return c.json({ error: "Total tidak valid." }, 400);
+    }
+    const v = await validateVoucher(db, code, total);
+    if (!v.ok) return c.json({ error: v.error }, 400);
+    return c.json({
+      valid: true,
+      code: v.voucher.code,
+      type: v.voucher.type,
+      value: v.voucher.value,
+      discount: v.discount,
+      total_after: Math.max(total - v.discount, 100)
+    });
+  });
+
   // ------------------------- Checkout & order -------------------------
 
   app.post("/api/checkout", async (c) => {
@@ -812,11 +1073,6 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       products.push(p);
     }
     const total = products.reduce((sum, p) => sum + p.price, 0);
-    const orderItems: OrderItem[] = products.map((p) => ({
-      product_id: p.id,
-      title: p.title,
-      price: p.price
-    }));
     const itemsKey = [...items].sort().join(",");
 
     // Nomor WA dari checkout (opsional): snapshot di order + perbarui akun.
@@ -831,7 +1087,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       }
     }
 
-    // Idempotensi: kunci sama, atau item + total sama dan masih PENDING.
+    // Idempotensi kunci: kunci sama selalu mengembalikan order yang sama
+    // (tanpa validasi voucher ulang — kuota sudah terpakai di percobaan
+    // pertama, jangan sampai retry gagal karena kuota habis).
     if (idempotencyKey) {
       const byKey = await db.get<OrderRow>(
         "SELECT * FROM orders WHERE user_id = ? AND idempotency_key = ?",
@@ -840,22 +1098,46 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       );
       if (byKey) return c.json({ order: await orderOut(db, byKey) });
     }
+
+    // Voucher (opsional): kodenya dinormalisasi dulu — dipakai untuk
+    // mencocokkan order PENDING yang sama di bawah (retry checkout
+    // dengan voucher yang sama harus mengembalikan order lama, bukan
+    // gagal karena kuotanya sudah terpakai oleh order itu sendiri).
+    const voucherCode = asString(body.voucher_code).trim().toUpperCase() || null;
+
+    // Idempotensi: item + kode voucher sama dan masih PENDING.
+    // Baris anggota bundel (harga 0) tidak dihitung sebagai item inti.
     const pending = await db.all<OrderRow>(
       "SELECT * FROM orders WHERE user_id = ? AND status = 'PENDING'",
       user.id
     );
     for (const o of pending) {
-      const oKey = parseItems(o.items).map((it) => it.product_id).sort().join(",");
+      const oKey = parseItems(o.items)
+        .filter((it) => !it.included_in_bundle)
+        .map((it) => it.product_id)
+        .sort()
+        .join(",");
       const notExpired = !o.expired_at || new Date(o.expired_at).getTime() > Date.now();
-      if (oKey === itemsKey && o.total === total && notExpired) {
+      if (oKey === itemsKey && (o.voucher_code ?? null) === voucherCode && notExpired) {
         return c.json({ order: await orderOut(db, o) });
       }
     }
 
+    // Voucher divalidasi server-side terhadap total SEBELUM diskon.
+    // Total akhir minimal Rp100 — tidak pernah negatif/nol.
+    let discount = 0;
+    if (voucherCode) {
+      const v = await validateVoucher(db, voucherCode, total);
+      if (!v.ok) return c.json({ error: v.error }, 400);
+      discount = v.discount;
+    }
+    const finalTotal = Math.max(total - discount, 100);
+
     const orderId = `RM-${randomAlphaNum(12)}`;
+    const orderItems = await expandBundleItems(db, products);
     let qris;
     try {
-      qris = await createQris(orderId, total, `Ringkas ${orderId}`);
+      qris = await createQris(orderId, finalTotal, `Ringkas ${orderId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("belum dikonfigurasi")) {
@@ -865,12 +1147,12 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       return c.json({ error: "Pembayaran QRIS gagal dibuat, silakan coba lagi." }, 503);
     }
     await db.run(
-      `INSERT INTO orders (id, user_id, items, total, status, klikqris_order_id, qris_url, direct_url, total_amount, expired_at, whatsapp, idempotency_key, created_at, paid_at)
-       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      `INSERT INTO orders (id, user_id, items, total, status, klikqris_order_id, qris_url, direct_url, total_amount, expired_at, whatsapp, idempotency_key, voucher_code, discount_amount, created_at, paid_at)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
       orderId,
       user.id,
       JSON.stringify(orderItems),
-      total,
+      finalTotal,
       orderId,
       qris.qris_url,
       qris.direct_url,
@@ -878,8 +1160,15 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       qris.expired_at,
       orderWhatsapp,
       idempotencyKey ?? `auto-${orderId}`,
+      voucherCode,
+      discount,
       nowIso()
     );
+    // Kuota voucher terpakai saat order dibuat (tidak kembali bila order
+    // kedaluwarsa — lihat migrasi 0005).
+    if (voucherCode) {
+      await db.run("UPDATE vouchers SET uses = uses + 1 WHERE code = ?", voucherCode);
+    }
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
     if (!order) return c.json({ error: "Gagal membuat order." }, 500);
     // Email menunggu bayar (template 02) — hanya untuk order BARU (jalur
@@ -1057,6 +1346,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         quizByChapter.set(key, list);
       }
     }
+    const owned = await userHasPaidProduct(db, user.id, product.id);
     const fullChapters = chapters.map((ch) => {
       const flashcards = flashcardsByChapter.get(ch.id) ?? [];
       const quiz = (quizByChapter.get(ch.id) ?? []).map((q): PublicQuestion => ({
@@ -1072,6 +1362,30 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       } catch {
         points = [];
       }
+      // Coba gratis: bab pertama tiap produk terbuka untuk semua akun
+      // login; bab lain terkunci bila produk belum dibeli (hanya metadata).
+      const free = chapters.length > 0 && ch.id === chapters[0].id;
+      const locked = !free && !owned;
+      if (locked) {
+        return {
+          id: ch.id,
+          product_id: ch.product_id,
+          title: ch.title,
+          subject: ch.subject,
+          grade: ch.grade,
+          semester: ch.semester,
+          summary: "",
+          points: [],
+          focus_text: "",
+          video_url: null,
+          video_duration: null,
+          sort_order: ch.sort_order,
+          flashcards: [],
+          quiz: [],
+          free: false,
+          locked: true
+        };
+      }
       return {
         id: ch.id,
         product_id: ch.product_id,
@@ -1086,28 +1400,44 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         video_duration: ch.video_duration,
         sort_order: ch.sort_order,
         flashcards: flashcards.map((f) => ({ front: f.front, back: f.back })),
-        quiz
+        quiz,
+        free,
+        locked: false
       };
     });
     const simulations = await db.all<Simulation>(
       "SELECT * FROM simulations WHERE product_id = ? ORDER BY subject, paket",
       product.id
     );
-    const externalUrl = (await userHasPaidProduct(db, user.id, product.id))
-      ? product.external_url
-      : null;
+    // Coba gratis: simulasi pertama tiap mapel (Paket A) terbuka untuk
+    // semua akun login; paket lain terkunci bila produk belum dibeli.
+    const simulationsOut = await Promise.all(
+      simulations.map(async (s) => {
+        const isFirstOfSubject =
+          (await db.get<{ id: string }>(
+            "SELECT id FROM simulations WHERE product_id = ? AND subject = ? ORDER BY paket, id LIMIT 1",
+            product.id,
+            s.subject
+          ))?.id === s.id;
+        const free = s.paket === "A" && isFirstOfSubject;
+        return {
+          id: s.id,
+          subject: s.subject,
+          grade: s.grade,
+          paket: s.paket,
+          title: s.title,
+          total_minutes: s.total_minutes,
+          max_points: s.max_points,
+          free,
+          locked: !free && !owned
+        };
+      })
+    );
+    const externalUrl = owned ? product.external_url : null;
     return c.json({
       product: publicProduct(product),
       chapters: fullChapters,
-      simulations: simulations.map((s) => ({
-        id: s.id,
-        subject: s.subject,
-        grade: s.grade,
-        paket: s.paket,
-        title: s.title,
-        total_minutes: s.total_minutes,
-        max_points: s.max_points
-      })),
+      simulations: simulationsOut,
       externalUrl,
       simLocked: await isSimLocked(db, user.id)
     });
@@ -1248,6 +1578,11 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (await isSimLocked(db, user.id)) {
       return c.json({ error: "Simulasi dikunci oleh orang tua." }, 403);
     }
+    // Coba gratis: simulasi pertama tiap mapel (Paket A) terbuka; yang
+    // lain hanya untuk pemilik produk yang sudah lunas.
+    if (!(await canAccessSimulation(db, user.id, sim))) {
+      return c.json({ error: "Simulasi ini hanya untuk pemilik produk. Beli produknya untuk membuka semua simulasi." }, 403);
+    }
     const questions = (await db.all<QuestionRow>(
         "SELECT * FROM questions WHERE simulation_id = ? ORDER BY sort_order, id",
         sim.id
@@ -1289,6 +1624,22 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (kind === "simulation" && await isSimLocked(db, user.id)) {
       return c.json({ error: "Simulasi dikunci oleh orang tua." }, 403);
     }
+    // Coba gratis: kuis bab pertama dan simulasi pertama tiap mapel
+    // terbuka; sisanya hanya untuk pemilik produk yang sudah lunas.
+    // Worksheet dan unduhan produk tetap di-gate di endpointnya sendiri.
+    if (kind === "quiz") {
+      const chapter = await db.get<Chapter>("SELECT * FROM chapters WHERE id = ?", refId);
+      if (!chapter) return c.json({ error: "Bab tidak ditemukan." }, 404);
+      if (!(await canAccessChapter(db, user.id, chapter))) {
+        return c.json({ error: "Bab ini hanya untuk pemilik produk. Beli produknya untuk membuka semua bab." }, 403);
+      }
+    } else if (kind === "simulation") {
+      const sim = await db.get<Simulation>("SELECT * FROM simulations WHERE id = ?", refId);
+      if (!sim) return c.json({ error: "Simulasi tidak ditemukan." }, 404);
+      if (!(await canAccessSimulation(db, user.id, sim))) {
+        return c.json({ error: "Simulasi ini hanya untuk pemilik produk. Beli produknya untuk membuka semua simulasi." }, 403);
+      }
+    }
 
     let gradeList: GradeInput[] = [];
     if (kind === "quiz") {
@@ -1327,7 +1678,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       review.push({ questionId: q.id, correct: result.correct, discussion: q.discussion });
     }
     const score = Math.round(totalEarned);
-    await db.run(
+    const inserted = await db.run(
       "INSERT INTO quiz_attempts (user_id, kind, ref_id, score, max_score, answers, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       user.id,
       kind,
@@ -1338,7 +1689,60 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       nowIso()
     );
     await markStudyDay(db, user.id);
-    return c.json({ score, max_score: maxScore, correct, review });
+    // Sertifikat: lulus simulasi SAS bila skor >= 70%.
+    const passed = kind === "simulation" && maxScore > 0 && score / maxScore >= 0.7;
+    return c.json({
+      score,
+      max_score: maxScore,
+      correct,
+      review,
+      attempt_id: Number(inserted.lastInsertRowid),
+      passed
+    });
+  });
+
+  // ------------------------- Sertifikat -------------------------
+
+  app.get("/api/certificate/:attemptId", async (c) => {
+    const user = await authUser(c, db);
+    if (!user) return c.json({ error: "Silakan login terlebih dahulu." }, 401);
+    const attemptId = Number(c.req.param("attemptId"));
+    if (!Number.isInteger(attemptId)) {
+      return c.json({ error: "ID attempt tidak valid." }, 400);
+    }
+    const attempt = await db.get<{
+      id: number; user_id: string; kind: string; ref_id: string;
+      score: number; max_score: number; created_at: string;
+    }>("SELECT * FROM quiz_attempts WHERE id = ?", attemptId);
+    if (!attempt) return c.json({ error: "Hasil simulasi tidak ditemukan." }, 404);
+    if (attempt.user_id !== user.id) {
+      return c.json({ error: "Sertifikat ini bukan milikmu." }, 403);
+    }
+    if (attempt.kind !== "simulation") {
+      return c.json({ error: "Sertifikat hanya untuk simulasi SAS." }, 400);
+    }
+    if (attempt.max_score <= 0 || attempt.score / attempt.max_score < 0.7) {
+      return c.json({ error: "Sertifikat hanya untuk simulasi yang lulus (skor minimal 70%)." }, 400);
+    }
+    const sim = await db.get<Simulation>("SELECT * FROM simulations WHERE id = ?", attempt.ref_id);
+    if (!sim) return c.json({ error: "Simulasi tidak ditemukan." }, 404);
+    const percent = Math.round((attempt.score / attempt.max_score) * 100);
+    const dateLabel = formatTanggal(attempt.created_at).replace(/, \d{2}:\d{2} WIB$/, "");
+    const pdf = await certificatePdf({
+      studentName: user.name,
+      subject: sim.subject,
+      grade: sim.grade,
+      simulationTitle: sim.title,
+      score: attempt.score,
+      maxScore: attempt.max_score,
+      percent,
+      dateLabel,
+      number: `SRT-${String(attempt.id).padStart(6, "0")}`
+    });
+    return c.body(Uint8Array.from(pdf), 200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="sertifikat-${attempt.id}.pdf"`
+    });
   });
 
   app.get("/api/study/:product_id/:chapter_id/worksheet", async (c) => {
@@ -1419,8 +1823,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
           "SELECT COUNT(*) AS n FROM tracker WHERE user_id = ?",
           child.id
         ))?.n ?? 0;
-        const scores = await db.all<{ kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
-          "SELECT kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
+        const scores = await db.all<{ id: number; kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
+          "SELECT id, kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
           child.id
         );
         return {
@@ -1546,8 +1950,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
           "SELECT COUNT(*) AS n FROM tracker WHERE user_id = ?",
           member.id
         ))?.n ?? 0;
-        const scores = await db.all<{ kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
-          "SELECT kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
+        const scores = await db.all<{ id: number; kind: string; ref_id: string; score: number; max_score: number; created_at: string }>(
+          "SELECT id, kind, ref_id, score, max_score, created_at FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC",
           member.id
         );
         return { id: member.id, name: member.name, done_chapters: doneCount, scores };

@@ -22,6 +22,7 @@ export interface ReceiptItem {
   product_id: string;
   title: string;
   price: number;
+  included_in_bundle?: string;
 }
 
 const PAGE_W = 595.28; // A4
@@ -208,12 +209,21 @@ export async function receiptPdf(order: ReceiptOrder, items: ReceiptItem[]): Pro
   doc.boldText("Produk", 11);
   doc.moveDown(0.25);
   for (const it of items) {
-    doc.leftRight(it.title, rupiah(it.price));
+    if (it.included_in_bundle) {
+      doc.text(`${it.title} (termasuk bundel)`, 10, GRAY);
+    } else {
+      doc.leftRight(it.title, rupiah(it.price));
+    }
     doc.moveDown(0.25);
   }
   doc.moveDown(0.5);
   const totalAmount = order.total_amount ?? order.total;
   const kodeUnik = totalAmount - order.total;
+  const discount = order.discount_amount ?? 0;
+  if (discount > 0) {
+    doc.keyValue("Subtotal:", rupiah(order.total + discount));
+    doc.keyValue(`Diskon (${order.voucher_code ?? "VOUCHER"}):`, `-${rupiah(discount)}`);
+  }
   doc.keyValue("Total produk:", rupiah(order.total));
   doc.keyValue("Kode unik:", rupiah(kodeUnik));
   doc.boldText(`Total bayar:  ${rupiah(totalAmount)}`, 12);
@@ -292,6 +302,57 @@ export async function worksheetPdf(chapter: Chapter, questions: QuestionRow[]): 
     doc.moveDown(0.5);
   });
   return doc.bytes();
+}
+
+/** Sertifikat kelulusan simulasi SAS (A4 landscape, gaya Ringkas). */
+export interface CertificateData {
+  studentName: string;
+  subject: string;
+  grade: number;
+  simulationTitle: string;
+  score: number;
+  maxScore: number;
+  percent: number;
+  dateLabel: string;
+  number: string;
+}
+
+export async function certificatePdf(data: CertificateData): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const W = 841.89; // A4 landscape
+  const H = 595.28;
+  const page = doc.addPage([W, H]);
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const EMERALD = rgb(0.09, 0.45, 0.27); // #177245
+  const MARIGOLD = rgb(0.95, 0.7, 0.24); // #f2b33d
+  const INK = rgb(0.13, 0.19, 0.16); // #22302a
+  const GRAY = rgb(0.45, 0.45, 0.45);
+  // Bingkai ganda: hijau tebal + kuning tipis.
+  page.drawRectangle({ x: 24, y: 24, width: W - 48, height: H - 48, borderColor: EMERALD, borderWidth: 3 });
+  page.drawRectangle({ x: 32, y: 32, width: W - 64, height: H - 64, borderColor: MARIGOLD, borderWidth: 1 });
+  const center = (text: string, y: number, size: number, font: PDFFont, color: ReturnType<typeof rgb>) => {
+    const clean = sanitize(text);
+    const w = font.widthOfTextAtSize(clean, size);
+    page.drawText(clean, { x: (W - w) / 2, y, size, font, color });
+  };
+  center("Ringkas", H - 100, 20, bold, EMERALD);
+  center("Rangkuman Materi SD, SMP, SMA", H - 124, 11, regular, GRAY);
+  page.drawLine({
+    start: { x: W / 2 - 60, y: H - 144 },
+    end: { x: W / 2 + 60, y: H - 144 },
+    thickness: 3,
+    color: MARIGOLD
+  });
+  center("SERTIFIKAT PENYELESAIAN", H - 184, 30, bold, INK);
+  center("Diberikan kepada", H - 218, 13, regular, GRAY);
+  center(data.studentName, H - 262, 34, bold, EMERALD);
+  center(`atas kelulusan ${data.simulationTitle}`, H - 296, 14, regular, INK);
+  center(`${data.subject} - Kelas ${data.grade}`, H - 320, 13, regular, GRAY);
+  center(`Skor ${data.score} dari ${data.maxScore}  (${data.percent}%)`, H - 362, 16, bold, INK);
+  center(`Nomor sertifikat: ${data.number}  -  ${data.dateLabel}`, H - 396, 11, regular, GRAY);
+  center("Terus belajar dan raih prestasi berikutnya!", H - 436, 12, regular, GRAY);
+  return doc.save();
 }
 
 /** PDF rangkuman produk: deskripsi + bab beserta poin intinya. */

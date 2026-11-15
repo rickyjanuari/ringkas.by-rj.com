@@ -43,10 +43,35 @@
 	let open = $state({
 		daily: false,
 		stickers: false,
+		skor: false,
 		laporan: false,
 		ortu: false,
 		kelas: false
 	});
+
+	// ---- Sertifikat simulasi ----
+	let certDownloading = $state<number | null>(null);
+	let certError = $state("");
+	let simScores = $derived((tracker?.scores ?? []).filter((s) => s.kind === "simulation"));
+
+	/** Lulus = skor/max_score >= 70%. */
+	function simLulus(s: { score: number; max_score: number }): boolean {
+		return s.max_score > 0 && s.score / s.max_score >= 0.7;
+	}
+
+	async function unduhSertifikat(attemptId: number) {
+		if (certDownloading !== null) return;
+		certDownloading = attemptId;
+		certError = "";
+		try {
+			const { blob } = await apiBlob(`/api/certificate/${attemptId}`);
+			downloadBlob(blob, `sertifikat-${attemptId}.pdf`);
+		} catch (e) {
+			certError = e instanceof Error ? e.message : "Gagal mengunduh sertifikat.";
+		} finally {
+			certDownloading = null;
+		}
+	}
 
 	// ---- Bottom sheet Bantuan & Info ----
 	type SheetKind = "blog" | "faq" | "update" | "privasi" | "syarat";
@@ -654,6 +679,65 @@
 							? "Belum ada stiker. Tandai bab selesai untuk dapat stiker!"
 							: "Kumpulkan 7 stiker untuk lencana Kolektor 7!"}
 					</p>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Skor Simulasi & Sertifikat -->
+		<div class="card overflow-hidden">
+			<button
+				type="button"
+				class="flex w-full items-center gap-3 p-4 text-left"
+				onclick={() => (open.skor = !open.skor)}
+			>
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="award" size={22} /></span>
+				<span class="flex-1 text-left">
+					<span class="block font-extrabold">Skor Simulasi & Sertifikat</span>
+					<span class="text-xs text-[#5f6b62]">
+						{tracker ? `${simScores.length} simulasi dikerjakan` : "Unduh sertifikat untuk simulasi yang lulus"}
+					</span>
+				</span>
+				<span><Icon name={open.skor ? "chevron-down" : "chevron-right"} size={18} /></span>
+			</button>
+			{#if open.skor}
+				<div class="border-t border-[#e7e2d2] p-4">
+					{#if !tracker}
+						<p class="text-sm text-[#5f6b62]">Memuat skor...</p>
+					{:else if simScores.length === 0}
+						<p class="text-sm text-[#5f6b62]">
+							Belum ada skor simulasi. Kerjakan simulasi SAS dari Ruang Belajar ya!
+						</p>
+					{:else}
+						<p class="text-xs text-[#5f6b62]">
+							Simulasi dengan nilai 70% ke atas bisa diunduh sertifikatnya.
+						</p>
+						<div class="mt-2 space-y-2">
+							{#each simScores as s (s.id)}
+								<div class="card !rounded-lg flex items-center gap-3 p-3">
+									<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"><Icon name="trophy" size={17} /></span>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-sm font-bold">{s.ref_id}</p>
+										<p class="text-xs text-[#5f6b62]">
+											Skor {s.score} / {s.max_score} • {formatTanggal(s.created_at)}
+										</p>
+									</div>
+									{#if simLulus(s)}
+										<button
+											type="button"
+											class="btn btn-sun shrink-0 !px-2.5 !py-1.5 text-xs"
+											disabled={certDownloading === s.id}
+											onclick={() => unduhSertifikat(s.id)}
+										>
+											{#if certDownloading === s.id}Mengunduh...{:else}<Icon name="award" size={14} /> Sertifikat{/if}
+										</button>
+									{/if}
+								</div>
+							{/each}
+						</div>
+						{#if certError}
+							<p class="err mt-2">{certError}</p>
+						{/if}
+					{/if}
 				</div>
 			{/if}
 		</div>
