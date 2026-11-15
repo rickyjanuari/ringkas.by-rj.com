@@ -26,7 +26,7 @@
 // ini harus tetap di app/static/ dan terdaftar dari /sw.js (scope "/").
 "use strict";
 
-const CACHE_VERSION = "ringkas-v1";
+const CACHE_VERSION = "ringkas-v2";
 const CACHE_NAME = CACHE_VERSION;
 
 const CORE_SHELL = [
@@ -137,4 +137,52 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 4) Sisanya (mis. /favicon.ico bila ada): jaringan apa adanya.
+});
+
+// ---------------------------------------------------------------------------
+// Push: pengingat jadwal belajar (FITUR 4).
+//
+// Server mengirim payload JSON {title, body, url} yang sudah dienkripsi
+// (RFC 8291) — browser mendekripsinya sebelum event ini jalan, jadi
+// event.data.json() sudah berisi teks notifikasi. Bila payload kosong
+// atau rusak, tampilkan notifikasi umum supaya pengingat tidak hilang
+// diam-diam.
+// ---------------------------------------------------------------------------
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const title = data.title || "Waktunya belajar di Ringkas";
+  const body = data.body || "Ayo buka Ringkas dan lanjutkan belajarmu hari ini.";
+  const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/belajar";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/logo/logo-ringkas-icon-1024.png",
+      badge: "/logo/favicon-192.png",
+      data: { url },
+      tag: "ringkas-jadwal-belajar"
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/belajar";
+  const target = new URL(url, self.location.origin).href;
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        for (const client of clients) {
+          if (client.url === target && "focus" in client) return client.focus();
+        }
+        if (self.clients.openWindow) return self.clients.openWindow(target);
+        return undefined;
+      })
+  );
 });

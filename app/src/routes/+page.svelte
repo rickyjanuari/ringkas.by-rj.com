@@ -296,6 +296,30 @@
 	</div>
 </section>
 
+<!-- Simulasi ANBK Kelas 5 -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="graduation-cap" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Simulasi ANBK Kelas 5</h2>
+			<p class="text-sm text-[#5f6b62]">Latihan Asesmen Nasional: Literasi dan Numerasi, 20 soal tiap paket, 60 menit.</p>
+		</div>
+		<a href="/anbk" class="btn btn-leaf shrink-0">Lihat ANBK</a>
+	</div>
+</section>
+
+<!-- Latihan Adaptif -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Latihan Adaptif">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Latihan Adaptif</h2>
+			<p class="text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
+		</div>
+		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+	</div>
+</section>
+
 <!-- Tryout Mendatang -->
 {#if tryoutBerikut.length > 0}
 	<section class="card mt-4 p-4 lg:p-5" aria-label="Tryout Mendatang">

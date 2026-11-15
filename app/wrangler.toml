@@ -66,4 +66,4 @@ TURNSTILE_SITE_KEY = ""
 #                  orang tua. Tanpa RESEND_API_KEY, cron jalan tapi email
 #                  dilewati + dicatat di log.
 [triggers]
-crons = ["0 0 * * *", "0 11 * * 0"]
+crons = ["0 0 * * *", "0 11 * * 0", "*/15 * * * *"]

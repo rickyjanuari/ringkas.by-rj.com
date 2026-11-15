@@ -21,6 +21,7 @@ import { openD1Database, type D1DatabaseBinding } from "./d1.js";
 import { setEnv } from "./env.js";
 import { UnavailableImageStorage } from "./storage.js";
 import { runDailyJob, runWeeklyJob } from "./cron.js";
+import { runStudySchedulePush } from "./push.js";
 
 export interface Env {
   DB: D1DatabaseBinding;
@@ -34,6 +35,9 @@ export interface Env {
   APP_URL?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_SITE_KEY?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 // Aplikasi dibuat sekali per isolate Worker, lalu dipakai ulang.
@@ -51,7 +55,10 @@ function initEnv(env: Env): void {
     resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: env.APP_URL ?? "https://ringkas.by-rj.com",
     turnstileSecretKey: env.TURNSTILE_SECRET_KEY ?? "",
-    turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? ""
+    turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? "",
+    vapidPublicKey: env.VAPID_PUBLIC_KEY ?? "",
+    vapidPrivateKey: env.VAPID_PRIVATE_KEY ?? "",
+    vapidSubject: env.VAPID_SUBJECT ?? ""
   });
   envReady = true;
 }
@@ -68,8 +75,9 @@ function getApp(env: Env): Hono {
 // Jadwal cron (lihat wrangler.toml [triggers]):
 //   "0 0 * * *"   → harian 07:00 WIB: pengingat + ucapan streak.
 //   "0 11 * * 0"  → Minggu 18:00 WIB: laporan mingguan orang tua.
-// Tanpa RESEND_API_KEY, pengiriman dilewati + dicatat di log (cron tetap
-// selesai dengan sukses, tidak melempar).
+//   "*/15 * * * *" → tiap 15 menit: pengingat push jadwal belajar.
+// Tanpa RESEND_API_KEY / kunci VAPID, pengiriman dilewati + dicatat di
+// log (cron tetap selesai dengan sukses, tidak melempar).
 async function runScheduled(env: Env, cron: string): Promise<void> {
   initEnv(env);
   const db = openD1Database(env.DB);
@@ -77,6 +85,9 @@ async function runScheduled(env: Env, cron: string): Promise<void> {
     if (cron === "0 11 * * 0") {
       const r = await runWeeklyJob(db, new Date());
       console.log(`[cron] weekly: terkirim ${r.sent}, dilewati ${r.skipped}, error ${r.errors.length}`);
+    } else if (cron === "*/15 * * * *") {
+      const r = await runStudySchedulePush(db, new Date());
+      console.log(`[cron] study-push: terkirim ${r.sent}, dilewati ${r.skipped}, error ${r.errors.length}`);
     } else {
       const r = await runDailyJob(db, new Date());
       console.log(`[cron] daily: terkirim ${r.sent}, dilewati ${r.skipped}, error ${r.errors.length}`);

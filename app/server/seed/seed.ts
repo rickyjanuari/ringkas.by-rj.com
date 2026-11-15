@@ -15,6 +15,7 @@ import {
   buildSimulationQuestions,
 } from "./study.js";
 import type { GeneratedQuestion } from "./study.js";
+import { ANBK_SIMULATIONS } from "./anbk.js";
 
 async function insertQuestion(
   db: DB,
@@ -211,5 +212,32 @@ export async function seedDatabase(db: DB): Promise<void> {
       buildMtkSdQuestions(),
       now
     );
+
+    // ---- Simulasi ANBK Kelas 5 (Literasi + Numerasi) ------------------
+    // Hanya jalan di DB baru (guard k1 di atas); DB yang sudah ter-seed
+    // memakai migrasi 0012 (id soal eksplisit 10000+ di sana).
+    // PENTING: migrasi 0012 juga jalan SEBELUM seed di database baru
+    // (dump-seed-sql menjalankan migrate() dulu), jadi lewati simulasi
+    // yang sudah ada — kalau tidak, INSERT menabrak UNIQUE simulations.id
+    // dan soal ANBK masuk dua kali (id migrasi 10000+ vs id auto seed).
+    for (const sim of ANBK_SIMULATIONS) {
+      const already = await db.get<{ id: string }>(
+        "SELECT id FROM simulations WHERE id = ?",
+        sim.id
+      );
+      if (already) continue;
+      await insertSimulation(
+        db,
+        sim.id,
+        sim.product_id,
+        sim.subject,
+        sim.grade,
+        sim.paket,
+        sim.title,
+        sim.total_minutes,
+        sim.questions,
+        now
+      );
+    }
   });
 }

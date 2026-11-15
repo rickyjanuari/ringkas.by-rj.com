@@ -60,6 +60,9 @@ Buka http://localhost:5173 (dev) atau http://localhost:8787 (setelah build).
 | `RESEND_FROM` | tidak | Alamat pengirim, mis. `halo@ringkas.by-rj.com`. |
 | `TURNSTILE_SECRET_KEY` | tidak | Secret key Cloudflare Turnstile (bila diisi, login/daftar memakai CAPTCHA; bila kosong, dilewati — lihat "Keamanan"). |
 | `TURNSTILE_SITE_KEY` | tidak | Site key Turnstile (bukan secret — di `[vars]` wrangler.toml, bukan `wrangler secret put`). |
+| `VAPID_PUBLIC_KEY` | tidak | Kunci publik VAPID untuk pengingat push (buat sekali dengan `node server/scripts/gen-vapid.mjs`; bila kosong, push dilewati — lihat "Belajar lanjutan"). |
+| `VAPID_PRIVATE_KEY` | tidak | Kunci privat VAPID (secret — `wrangler secret put VAPID_PRIVATE_KEY`). |
+| `VAPID_SUBJECT` | tidak | Subjek VAPID, isi `mailto:halo@ringkas.by-rj.com` (secret — `wrangler secret put VAPID_SUBJECT`). |
 
 Tidak ada default admin. Daftarkan satu akun, lalu:
 `npm run make-admin -- email@akun.id`. Jangan menyimpan `.env` atau
@@ -326,6 +329,55 @@ menampilkan judul halaman + nama admin yang login.
   pernah jalan setelah respons terkirim. Ditemukan saat verifikasi batch
   ini (webhook PAID membalik status tapi grant/voucher/email tidak
   muncul) dan sudah terverifikasi berfungsi setelah perbaikan.
+
+## Belajar lanjutan (2026-11-15, migrasi `0012_belajar_lanjutan.sql`)
+
+- **Simulasi ANBK Kelas 5** — dua paket, Literasi dan Numerasi,
+  masing-masing 20 soal, 60 menit, maks. 34 poin (bank orisinal di
+  `server/seed/anbk.ts`, bukan soal ANBK resmi). Pakai endpoint
+  simulasi yang sudah ada; gating = pemilik produk k5 (termasuk
+  anggota bundel + penerima hadiah). Attempt ANBK ikut prediksi SAS
+  dan berhak sertifikat ≥70%. Rute `/anbk` + `/anbk/[paket]`;
+  kartu di Beranda + tombol di halaman Belajar k5. Migrasi 0012
+  memasang simulasi + 40 soal (id soal 10000–10039); seed baru
+  dilewati bila simulasi sudah ada.
+- **Latihan Adaptif** — model heuristik sederhana, **BUKAN IRT**:
+  sesi 10 soal, mulai level 2 (Sedang); 2 benar beruntun → naik
+  1 level; 1 salah → turun 1 level. Pool dari bank soal yang sudah
+  ada: L1 = kuis bab, L2 = simulasi PG/B-S, L3 = simulasi PG
+  kompleks/uraian/menjodohkan. Server hanya menyediakan soal +
+  menilai; level dihitung di klien. Attempt tercatat sebagai
+  `kind='adaptive'` dan tidak memengaruhi prediksi SAS. Rute
+  `/latihan-adaptif`.
+- **Rekam Suara Baca Nyaring** — anak merekam via MediaRecorder
+  (maks. 60 detik, maks. 500 KB base64 — lebih dari itu ditolak
+  server); orang tua terhubung + guru kelas bisa mendengarkan dan
+  memberi bintang 1–5. Rekaman disimpan sebagai base64 di D1
+  (belum ada R2) — bukan untuk rekaman panjang. Rute `/rekam-suara`
+  (`?product=&chapter=`).
+- **Jadwal Belajar + Pengingat Push** — orang tua mengatur jadwal
+  mingguan anak (hari + jam) di `/jadwal-belajar`; pengingat dikirim
+  via Web Push. Kunci VAPID dibuat sekali:
+  ```
+  node server/scripts/gen-vapid.mjs
+  wrangler secret put VAPID_PUBLIC_KEY
+  wrangler secret put VAPID_PRIVATE_KEY
+  wrangler secret put VAPID_SUBJECT   # isi: mailto:halo@ringkas.by-rj.com
+  ```
+  Cron baru `*/15 * * * *` memeriksa jadwal tiap 15 menit dan
+  mengirim push pada waktunya (idempotensi per jadwal + hari + jam).
+  **Tanpa kunci VAPID, jadwal tetap tersimpan tapi push dilewati +
+  log** (graceful, seperti Turnstile) — fitur ini opt-in.
+- **Flashcard Printable (PDF)** — `GET
+  /api/study/:product_id/:chapter_id/flashcards.pdf`, hanya pemilik
+  LUNAS (seperti worksheet). Grid 2×4 per halaman, garis potong;
+  semua kartu dulu, lalu semua jawaban (nomor sama untuk dipasangkan
+  setelah dipotong). Tombol di halaman bab.
+- **Guru Buat Kuis Sendiri** — guru pemilik kelas merangkai kuis
+  1–30 soal dari bank soal produk kelasnya (bank menampilkan kunci
+  — hanya guru pemilik kelas yang boleh melihat); siswa kelas
+  mengerjakan sekali (server-side), guru melihat rekap per siswa.
+  Rute `/kuis-guru` + `/kuis-guru/[id]`.
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
@@ -614,7 +666,9 @@ idempotensi tidak berubah.
 **Cron** — jadwal di `wrangler.toml` (`[triggers] crons`):
 `0 0 * * *` (tiap hari 00:00 UTC = 07:00 WIB: pengingat + streak)
 dan `0 11 * * 0` (tiap Minggu 11:00 UTC = 18:00 WIB: laporan
-mingguan). Handler-nya di `server/worker.ts` (`scheduled`) dan logika
+mingguan) dan `*/15 * * * *` (tiap 15 menit: pengingat jadwal
+belajar via push, `server/push.ts` — butuh kunci VAPID, bila belum
+disetel dilewati + log). Handler-nya di `server/worker.ts` (`scheduled`) dan logika
 di `server/cron.ts`. Uji manual tanpa menunggu cron: admin dapat
 menjalankan `POST /api/admin/cron/run` dengan body
 `{job: "daily"|"weekly", date?: "YYYY-MM-DD"}` (tanggal opsional

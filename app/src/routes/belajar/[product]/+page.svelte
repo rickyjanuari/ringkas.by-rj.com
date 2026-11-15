@@ -364,6 +364,20 @@
 		<a href="/soal-sulitku" class="btn btn-outline">
 			<Icon name="target" size={16} /> Soal Sulitku
 		</a>
+		<a href="/latihan-adaptif" class="btn btn-outline">
+			<Icon name="zap" size={16} /> Latihan Adaptif
+		</a>
+		<a href="/kuis-guru" class="btn btn-outline">
+			<Icon name="school" size={16} /> Kuis Buatan Guru
+		</a>
+		<a href="/rekam-suara?product={productId}" class="btn btn-outline">
+			<Icon name="play" size={16} /> Rekam Suara
+		</a>
+		{#if productId === "k5"}
+			<a href="/anbk" class="btn btn-outline">
+				<Icon name="graduation-cap" size={16} /> Simulasi ANBK Kelas 5
+			</a>
+		{/if}
 		<a href="/rapor" class="btn btn-outline">
 			<Icon name="graduation-cap" size={16} /> Unduh Rapor Semester
 		</a>

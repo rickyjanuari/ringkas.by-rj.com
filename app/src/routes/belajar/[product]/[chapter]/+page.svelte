@@ -31,6 +31,7 @@
 	let noteOk = $state(false);
 	let marking = $state(false);
 	let downloadingWs = $state(false);
+	let downloadingFc = $state(false);
 
 	// Kuis.
 	let quizStarted = $state(false);
@@ -190,6 +191,21 @@
 		}
 	}
 
+	async function unduhFlashcard() {
+		downloadingFc = true;
+		notice = "";
+		try {
+			const { blob, filename } = await apiBlob(
+				`/api/study/${productId}/${chapterId}/flashcards.pdf`
+			);
+			downloadBlob(blob, filename || `flashcard-${chapterId}.pdf`);
+		} catch (e) {
+			notice = e instanceof Error ? e.message : "Gagal mengunduh flashcard.";
+		} finally {
+			downloadingFc = false;
+		}
+	}
+
 	function pilihJawaban(value: unknown) {
 		if (!currentQ) return;
 		answers = { ...answers, [String(currentQ.id)]: value };
@@ -252,6 +268,17 @@
 		>
 			{#if downloadingWs}Mengunduh...{:else}<Icon name="printer" size={15} /> Worksheet Printable (PDF){/if}
 		</button>
+		<button
+			type="button"
+			class="btn btn-ghost text-xs"
+			disabled={downloadingFc}
+			onclick={unduhFlashcard}
+		>
+			{#if downloadingFc}Mengunduh...{:else}<Icon name="layers" size={15} /> Unduh Flashcard (PDF){/if}
+		</button>
+		<a href="/rekam-suara?product={productId}&chapter={chapterId}" class="btn btn-ghost text-xs">
+			<Icon name="play" size={15} /> Rekam Suara Baca Nyaring
+		</a>
 		<button type="button" class="btn btn-leaf text-xs" disabled={marking} onclick={tandaiSelesai}>
 			{#if marking}...{:else}<Icon name="check" size={15} /> Tandai Selesai{/if}
 		</button>

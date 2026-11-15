@@ -24,6 +24,12 @@ export interface AppEnv {
   turnstileSecretKey: string;
   /** Site key publik Turnstile (boleh dikirim ke klien via /api/config). */
   turnstileSiteKey: string;
+  /** Kunci publik VAPID (base64url; boleh dikirim ke klien via /api/push/vapid-key). */
+  vapidPublicKey: string;
+  /** Kunci privat VAPID (base64url, RAHASIA — hanya via wrangler secret). */
+  vapidPrivateKey: string;
+  /** Subjek VAPID, mis. "mailto:halo@ringkas.by-rj.com". */
+  vapidSubject: string;
 }
 
 function fromProcessEnv(): AppEnv {
@@ -39,7 +45,10 @@ function fromProcessEnv(): AppEnv {
     resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: p.APP_URL ?? "https://ringkas.by-rj.com",
     turnstileSecretKey: p.TURNSTILE_SECRET_KEY ?? "",
-    turnstileSiteKey: p.TURNSTILE_SITE_KEY ?? ""
+    turnstileSiteKey: p.TURNSTILE_SITE_KEY ?? "",
+    vapidPublicKey: p.VAPID_PUBLIC_KEY ?? "",
+    vapidPrivateKey: p.VAPID_PRIVATE_KEY ?? "",
+    vapidSubject: p.VAPID_SUBJECT ?? ""
   };
 }
 

@@ -1132,6 +1132,34 @@
 			</div>
 		</div>
 
+		<!-- Jadwal Belajar + Pengingat -->
+		<div class="card p-4">
+			<div class="flex items-center gap-3">
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="alarm-clock" size={22} /></span>
+				<div class="min-w-0 flex-1">
+					<p class="font-extrabold">Jadwal Belajar + Pengingat</p>
+					<p class="text-xs text-[#5f6b62]">Atur jadwal belajar mingguan anak dan aktifkan pengingat push di perangkat.</p>
+				</div>
+				<a href="/jadwal-belajar" class="btn btn-leaf shrink-0 !px-3 !py-2 text-xs">
+					<Icon name="alarm-clock" size={14} /> Atur Jadwal
+				</a>
+			</div>
+		</div>
+
+		<!-- Kuis Buatan Guru -->
+		<div class="card p-4">
+			<div class="flex items-center gap-3">
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="school" size={22} /></span>
+				<div class="min-w-0 flex-1">
+					<p class="font-extrabold">Kuis Buatan Guru</p>
+					<p class="text-xs text-[#5f6b62]">Guru merangkai kuis dari bank soal untuk kelasnya; siswa mengerjakan dan hasilnya terlihat guru.</p>
+				</div>
+				<a href="/kuis-guru" class="btn btn-leaf shrink-0 !px-3 !py-2 text-xs">
+					<Icon name="school" size={14} /> Buka Kuis Guru
+				</a>
+			</div>
+		</div>
+
 		<!-- Stiker & Lencana -->
 		<div class="card overflow-hidden">
 			<button
