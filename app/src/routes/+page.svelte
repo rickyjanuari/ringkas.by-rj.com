@@ -182,6 +182,22 @@
 	</div>
 </section>
 
+<!-- Peta Belajar -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Peta Belajar">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="map" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Peta Belajar</h2>
+			<p class="text-sm text-[#5f6b62]">Ikuti jalur bab per kelas — node terbuka saat bab selesai.</p>
+		</div>
+	</div>
+	<div class="mt-3 flex flex-wrap gap-2">
+		{#each [1, 2, 3, 4, 5, 6] as g (g)}
+			<a href="/peta-belajar/k{g}" class="chip">Kelas {g}</a>
+		{/each}
+	</div>
+</section>
+
 <!-- Chip jenjang -->
 <div class="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-6">
 	{#each jenjangList as j (j)}

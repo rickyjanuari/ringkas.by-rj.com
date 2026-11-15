@@ -202,6 +202,19 @@ menampilkan judul halaman + nama admin yang login.
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 
+**Peta Belajar (2026-11-15):** satu peta visual per produk kelas (`k1`–`k6`)
+di rute `/peta-belajar/[product]` — bab-bab menjadi node di jalur SVG
+berkelok (sinus), dengan state dari tracker asli: selesai (emerald +
+centang), saat ini (marigold + denyut), belum (putih + nomor), terkunci
+(abu-abu + gembok, ketuk → pemberitahuan + "Beli untuk membuka", sama
+seperti di Ruang Belajar). Header peta: ringkasan "X dari N bab selesai"
++ bilah progres + tombol Lanjut ke bab saat ini. Label bab di sisi node
+(desktop) atau di bawah node (bila sempit). Pintu masuk: kartu "Peta
+Belajar" di Beranda (chip Kelas 1–6), tombol di halaman Belajar, kartu
+di Akun/tracker. Tidak ada endpoint/tabel/migrasi baru — peta memakai
+ulang `GET /api/study/:product_id` + `GET /api/tracker`. Tab bar bawah
+disembunyikan di rute ini (seperti halaman Belajar).
+
 **Sudah jalan dan dites:**
 - `npm run build` hijau (vite build + `tsc -p tsconfig.server.json --noEmit`).
 - Server boot, migrasi 0001–0005 teraplikasi, seed: **57 produk**

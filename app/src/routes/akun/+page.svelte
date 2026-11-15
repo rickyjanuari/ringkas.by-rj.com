@@ -648,6 +648,22 @@
 			{/if}
 		</div>
 
+		<!-- Peta Belajar -->
+		<div class="card p-4">
+			<div class="flex items-center gap-3">
+				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="map" size={22} /></span>
+				<div class="min-w-0 flex-1">
+					<p class="font-extrabold">Peta Belajar</p>
+					<p class="text-xs text-[#5f6b62]">Jalur bab per kelas — node terbuka saat bab selesai.</p>
+				</div>
+			</div>
+			<div class="mt-3 flex flex-wrap gap-2">
+				{#each [1, 2, 3, 4, 5, 6] as g (g)}
+					<a href="/peta-belajar/k{g}" class="chip">Kelas {g}</a>
+				{/each}
+			</div>
+		</div>
+
 		<!-- Stiker & Lencana -->
 		<div class="card overflow-hidden">
 			<button

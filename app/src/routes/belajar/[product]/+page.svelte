@@ -228,6 +228,10 @@
 		{pack.product.jenjang} • {pack.product.mapel} • {pack.chapters.length} bab
 	</p>
 
+	<a href="/peta-belajar/{productId}" class="btn btn-outline mt-3">
+		<Icon name="map" size={16} /> Lihat Peta Belajar
+	</a>
+
 	{#if pack.externalUrl}
 		<div class="card mt-3 p-4">
 			<p class="flex items-center gap-1.5 text-sm font-extrabold"><Icon name="link" size={15} /> Produk Eksternal</p>
