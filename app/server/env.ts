@@ -1,0 +1,45 @@
+// env.ts — akses kredensial/nilai konfigurasi dari SATU tempat.
+//
+// Lokal (Node): dibaca dari process.env saat modul dimuat. Nilai dari
+// berkas .env TIDAK otomatis terbaca — export manual di shell, atau
+// jalankan lewat `wrangler dev` yang membaca .dev.vars (lihat README).
+// Worker (Cloudflare): process tidak ada, jadi nilai awal kosong, lalu
+// server/worker.ts memanggil setEnv() dari binding/secrets Worker
+// (wrangler secret put) sebelum request pertama diproses.
+//
+// Aturan: JANGAN pernah membaca process.env langsung di handler atau
+// modul lain — selalu lewat getEnv(). Dengan begitu kredensial tidak
+// pernah tertulis di kode, dan satu kode jalan di Node maupun Workers.
+
+export interface AppEnv {
+  sessionSecret: string;
+  klikqrisApiKey: string;
+  klikqrisMerchantId: string;
+  klikqrisWebhookSecret: string;
+  resendApiKey: string;
+  resendFrom: string;
+}
+
+function fromProcessEnv(): AppEnv {
+  const p =
+    (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env ?? {};
+  return {
+    sessionSecret: p.SESSION_SECRET ?? "",
+    klikqrisApiKey: p.KLIKQRIS_API_KEY ?? "",
+    klikqrisMerchantId: p.KLIKQRIS_MERCHANT_ID ?? "",
+    klikqrisWebhookSecret: p.KLIKQRIS_WEBHOOK_SECRET ?? "",
+    resendApiKey: p.RESEND_API_KEY ?? "",
+    resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com"
+  };
+}
+
+let current: AppEnv = fromProcessEnv();
+
+export function getEnv(): AppEnv {
+  return current;
+}
+
+export function setEnv(patch: Partial<AppEnv>): void {
+  current = { ...current, ...patch };
+}

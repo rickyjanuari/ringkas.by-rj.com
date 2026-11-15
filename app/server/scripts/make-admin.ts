@@ -18,7 +18,7 @@ const dbPath = process.env.DATABASE_PATH ?? join(appDir, "data", "ringkas.db");
 const db = openDatabase(dbPath);
 db.migrate(join(__dirname, "..", "migrations"));
 
-const result = db.run("UPDATE users SET role = 'admin' WHERE email = ?", email);
+const result = await db.run("UPDATE users SET role = 'admin' WHERE email = ?", email);
 if (result.changes === 0) {
   console.error(`Pengguna dengan email ${email} tidak ditemukan.`);
   process.exit(1);

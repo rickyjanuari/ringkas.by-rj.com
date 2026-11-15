@@ -1,0 +1,12 @@
+# .dev.vars — nilai lokal untuk `wrangler dev` (ATAU JANGAN commit file ini;
+# salin dari .dev.vars.example, lalu isi. File .dev.vars sudah di .gitignore.)
+#
+# Wrangler membaca file ini otomatis saat `wrangler dev`, jadi tidak perlu
+# export manual. Nilai-nilai ini HANYA untuk pengembangan lokal.
+
+SESSION_SECRET=isi-string-acak-panjang-di-sini
+KLIKQRIS_API_KEY=isi-kunci-klikqris-di-sini
+KLIKQRIS_MERCHANT_ID=isi-merchant-id-di-sini
+KLIKQRIS_WEBHOOK_SECRET=isi-secret-webhook-bila-ada
+RESEND_API_KEY=isi-kunci-resend-bila-ada
+RESEND_FROM=halo@ringkas.by-rj.com

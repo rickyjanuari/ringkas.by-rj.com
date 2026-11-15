@@ -1,5 +1,7 @@
 # Rahasia — jangan commit file-file ini
 .env
+.dev.vars
+.wrangler/
 .env.*
 *.key
 *.pem

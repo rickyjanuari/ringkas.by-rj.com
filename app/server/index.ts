@@ -1,13 +1,17 @@
-import { Hono } from "hono";
-import { cors } from "hono/cors";
+// index.ts — entry point Node (dev lokal & `npm start`).
+// Untuk Cloudflare, entry point-nya server/worker.ts (lihat wrangler.toml).
+// Keduanya memakai factory yang sama (server/app.ts) — perilaku /api/...
+// identik di dua runtime.
+
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDatabase } from "./db.js";
-import { registerRoutes } from "./actions.js";
+import { createApp } from "./app.js";
 import { seedDatabase } from "./seed/seed.js";
+import { LocalImageStorage } from "./storage.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appDir = join(__dirname, "..");
@@ -20,20 +24,9 @@ const db = openDatabase(DATABASE_PATH);
 db.migrate(join(__dirname, "migrations"));
 await seedDatabase(db);
 
-const app = new Hono();
-
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"]
-  })
-);
-
-app.get("/api/health", (c) => c.json({ ok: true, app: "ringkas", time: new Date().toISOString() }));
-
-registerRoutes(app, db);
+const app = createApp(db, {
+  storage: new LocalImageStorage(join(appDir, "uploads"))
+});
 
 // Berkas upload (gambar produk) disajikan dari app/uploads/.
 app.use("/uploads/*", serveStatic({ root: appDir }));

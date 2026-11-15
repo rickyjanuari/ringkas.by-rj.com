@@ -1,16 +1,19 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getEnv } from "./env.js";
 
 // ---------------------------------------------------------------------------
-// KlikQRIS — semua kredensial hanya dari process.env. Tanpa kredensial,
+// KlikQRIS — semua kredensial hanya dari getEnv() (process.env saat Node,
+// secrets Worker saat Cloudflare — lihat server/env.ts). Tanpa kredensial,
 // createQris melempar Error "KlikQRIS belum dikonfigurasi" (jangan pernah
 // membuat QRIS palsu).
 // ---------------------------------------------------------------------------
 
 function creds(): { apiKey: string; merchantId: string; webhookSecret: string } {
+  const env = getEnv();
   return {
-    apiKey: process.env.KLIKQRIS_API_KEY ?? "",
-    merchantId: process.env.KLIKQRIS_MERCHANT_ID ?? "",
-    webhookSecret: process.env.KLIKQRIS_WEBHOOK_SECRET ?? ""
+    apiKey: env.klikqrisApiKey,
+    merchantId: env.klikqrisMerchantId,
+    webhookSecret: env.klikqrisWebhookSecret
   };
 }
 

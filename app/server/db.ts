@@ -1,121 +1,25 @@
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+// db.ts — implementasi Database lokal lewat node:sqlite (bawaan Node 22.5+).
+//
+// Dipakai HANYA di runtime Node (server/index.ts dan skrip CLI di
+// server/scripts/). Entry Worker (server/worker.ts) memakai D1Database
+// (server/d1.ts) dan TIDAK PERNAH mengimpor berkas ini — node:sqlite tidak
+// ada di Workers, jadi impor itu akan menggagalkan bundling wrangler.
+//
+// Semua metode di sini async (sesuai antarmuka Database) meskipun
+// node:sqlite sinkron: pembungkusnya ringan dan membuat handler di
+// actions.ts identik di Node maupun Workers.
+//
+// migrate() tetap sinkron dan hanya dipakai saat startup lokal — migrasi
+// di D1 diterapkan pemilik lewat `wrangler d1 migrations apply`.
+
+import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { Database, SQLInputValue } from "./database.js";
 
-// ---------------------------------------------------------------------------
-// Lapisan database: SQLite lewat node:sqlite (bawaan Node 22.5+, stabil di
-// Node 24). Tidak ada dependensi native, tidak ada file .db di repo.
-// ---------------------------------------------------------------------------
+export type { Database, DB } from "./database.js";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  password_hash: string;
-  whatsapp: string | null;
-  role: string;
-  created_at: string;
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  jenjang: string;
-  mapel: string;
-  price: number;
-  strikethrough_price: number | null;
-  pages: number;
-  cover_label: string;
-  cover_color: string;
-  badge: string | null;
-  active: number;
-  category: string;
-  description: string;
-  external_url: string | null;
-  created_at: string;
-}
-
-export interface ProductImage {
-  id: number;
-  product_id: string;
-  url: string;
-  kind: string;
-  created_at: string;
-}
-
-export interface Chapter {
-  id: string;
-  product_id: string;
-  title: string;
-  subject: string;
-  grade: number;
-  semester: number;
-  summary: string;
-  points: string; // JSON string[]
-  focus_text: string;
-  video_url: string | null;
-  video_duration: string | null;
-  sort_order: number;
-}
-
-export interface Flashcard {
-  id: number;
-  chapter_id: string;
-  front: string;
-  back: string;
-}
-
-export interface Simulation {
-  id: string;
-  product_id: string | null;
-  subject: string;
-  grade: number;
-  paket: string;
-  title: string;
-  total_minutes: number;
-  max_points: number;
-  created_at: string;
-}
-
-export interface QuestionRow {
-  id: number;
-  chapter_id: string | null;
-  simulation_id: string | null;
-  type: string; // pg | pg_kompleks | bs | menjodohkan | isian | uraian
-  question: string;
-  options: string | null; // JSON
-  answer: string; // lihat API_CONTRACT.md untuk arti per tipe
-  discussion: string;
-  subject: string;
-  grade: number;
-  points: number;
-  sort_order: number;
-}
-
-export interface Order {
-  id: string;
-  user_id: string;
-  items: string; // JSON [{product_id, title, price}]
-  total: number;
-  status: string; // PENDING | PAID | EXPIRED
-  klikqris_order_id: string | null;
-  qris_url: string | null;
-  direct_url: string | null;
-  total_amount: number | null;
-  signature: string | null;
-  whatsapp: string | null;
-  idempotency_key: string | null;
-  created_at: string;
-  paid_at: string | null;
-}
-
-export interface Session {
-  token: string;
-  user_id: string;
-  created_at: string;
-}
-
-export class DB {
+export class NodeDatabase implements Database {
   private sql: DatabaseSync;
 
   constructor(path: string) {
@@ -146,30 +50,33 @@ export class DB {
     }
   }
 
-  get<T>(sql: string, ...params: SQLInputValue[]): T | undefined {
+  async get<T>(sql: string, ...params: SQLInputValue[]): Promise<T | undefined> {
     return this.sql.prepare(sql).get(...params) as T | undefined;
   }
 
-  all<T>(sql: string, ...params: SQLInputValue[]): T[] {
+  async all<T>(sql: string, ...params: SQLInputValue[]): Promise<T[]> {
     return this.sql.prepare(sql).all(...params) as T[];
   }
 
-  run(
+  async run(
     sql: string,
     ...params: SQLInputValue[]
-  ): { changes: number; lastInsertRowid: number | bigint } {
+  ): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
     const info = this.sql.prepare(sql).run(...params);
     return { changes: Number(info.changes), lastInsertRowid: info.lastInsertRowid };
   }
 
-  exec(sql: string): void {
+  async exec(sql: string): Promise<void> {
     this.sql.exec(sql);
   }
 
-  transaction<T>(fn: () => T): T {
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    // Dipakai hanya seed saat startup (belum ada request bersamaan).
+    // Jangan dipakai di handler request: BEGIN...await...COMMIT di koneksi
+    // yang sama bisa tercampur dengan statement request lain.
     this.sql.exec("BEGIN");
     try {
-      const out = fn();
+      const out = await fn();
       this.sql.exec("COMMIT");
       return out;
     } catch (err) {
@@ -179,16 +86,6 @@ export class DB {
   }
 }
 
-export function openDatabase(path: string): DB {
-  return new DB(path);
-}
-
-export function nowIso(): string {
-  return new Date().toISOString();
-}
-
-export function newId(prefix: string): string {
-  const rand = Math.random().toString(36).slice(2, 10).toUpperCase();
-  const time = Date.now().toString(36).toUpperCase();
-  return `${prefix}-${time}${rand}`;
+export function openDatabase(path: string): NodeDatabase {
+  return new NodeDatabase(path);
 }

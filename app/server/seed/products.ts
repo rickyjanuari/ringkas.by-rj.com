@@ -4,7 +4,7 @@
 // adalah 13 SD + 38 non-SD = 51 produk. Semua 51 di-seed sesuai rincian;
 // bila yang dimaksud adalah 46, 5 produk non-SD perlu dicoret oleh admin.
 // Harga integer rupiah. Tanpa created_at (diisi seed.ts).
-import type { Product } from "../db.js";
+import type { Product } from "../database.js";
 
 type SeedProduct = Omit<Product, "created_at">;
 

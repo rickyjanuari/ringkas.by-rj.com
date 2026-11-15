@@ -1,4 +1,4 @@
-import type { DB, Order, Product, User } from "./db.js";
+import type { DB, Order, Product, User } from "./database.js";
 
 // ---------------------------------------------------------------------------
 // Variabel template email pesanan lunas (TIDAK ada pengiriman otomatis di v1).
@@ -45,15 +45,15 @@ function parseItems(raw: string): OrderItem[] {
   }
 }
 
-export function getOrderEmailData(db: DB, orderId: string): OrderEmailData {
-  const order = db.get<Order>("SELECT * FROM orders WHERE id = ?", orderId);
+export async function getOrderEmailData(db: DB, orderId: string): Promise<OrderEmailData> {
+  const order = await db.get<Order>("SELECT * FROM orders WHERE id = ?", orderId);
   if (!order) throw new Error("Order tidak ditemukan.");
   if (order.status !== "PAID") throw new Error("Order belum lunas.");
-  const user = db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
+  const user = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
   const items = parseItems(order.items);
   let url_produk = items.length > 0 ? `/belajar/${items[0].product_id}` : "/belajar";
   if (items.length > 0) {
-    const first = db.get<Product>("SELECT * FROM products WHERE id = ?", items[0].product_id);
+    const first = await db.get<Product>("SELECT * FROM products WHERE id = ?", items[0].product_id);
     if (first?.external_url) url_produk = first.external_url;
   }
   return {

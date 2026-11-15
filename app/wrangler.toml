@@ -1,0 +1,44 @@
+# wrangler.toml — konfigurasi deploy Cloudflare untuk Ringkas.
+#
+# Arsitektur (satu Worker, satu domain — lihat README bagian
+# "Deploy ke Cloudflare" untuk alasan pemilihannya):
+#   - Worker ini melayani API Hono (/api/*) dari server/worker.ts
+#     dengan database D1 (binding DB).
+#   - Aset statis SvelteKit (hasil `npm run build` → build/) disajikan
+#     di domain yang sama lewat [assets]; rute SPA yang tidak cocok
+#     dengan berkas apa pun jatuh ke index.html (single-page-application).
+#
+# YANG HARUS DIISI PEMILIK (sebelum deploy pertama):
+#   - database_id di bawah: jalankan `wrangler d1 create ringkas-db`,
+#     lalu ganti nilai dummy 00000000-... dengan database_id dari output.
+#   - secrets (JANGAN tulis nilainya di sini!): jalankan
+#       wrangler secret put SESSION_SECRET
+#       wrangler secret put KLIKQRIS_API_KEY
+#       wrangler secret put KLIKQRIS_MERCHANT_ID
+#       wrangler secret put KLIKQRIS_WEBHOOK_SECRET
+#       wrangler secret put RESEND_API_KEY
+#     (RESEND_FROM bukan secret — ada di [vars] bawah.)
+#
+# Perintah terkait:
+#   wrangler d1 migrations apply ringkas-db --remote   (sebelum deploy)
+#   npm run build && wrangler deploy                   (atau: npm run deploy)
+
+name = "ringkas"
+main = "server/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./build"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ringkas-db"
+database_id = "00000000-0000-0000-0000-000000000000" # TO-FILL: isi database_id dari `wrangler d1 create ringkas-db`
+migrations_dir = "server/migrations"
+
+[vars]
+# Bukan secret — alamat pengirim email (sudah publik).
+RESEND_FROM = "halo@ringkas.by-rj.com"

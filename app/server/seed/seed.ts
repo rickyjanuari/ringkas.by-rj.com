@@ -2,8 +2,8 @@
 // dan simulasi SAS dari ./products.ts dan ./study.ts.
 //
 // Idempotent: tidak berbuat apa-apa bila tabel products sudah berisi baris.
-import { nowIso } from "../db.js";
-import type { DB } from "../db.js";
+import { nowIso } from "../database.js";
+import type { DB } from "../database.js";
 import { PRODUCTS } from "./products.js";
 import {
   CHAPTERS,
@@ -16,7 +16,7 @@ import {
 } from "./study.js";
 import type { GeneratedQuestion } from "./study.js";
 
-function insertQuestion(
+async function insertQuestion(
   db: DB,
   q: GeneratedQuestion,
   sortOrder: number,
@@ -24,8 +24,8 @@ function insertQuestion(
   simulationId: string | null,
   subject: string,
   grade: number
-): void {
-  db.run(
+): Promise<void> {
+  await db.run(
     `INSERT INTO questions
        (chapter_id, simulation_id, type, question, options, answer, discussion, subject, grade, points, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -43,7 +43,7 @@ function insertQuestion(
   );
 }
 
-function insertSimulation(
+async function insertSimulation(
   db: DB,
   id: string,
   productId: string | null,
@@ -54,9 +54,9 @@ function insertSimulation(
   totalMinutes: number,
   questions: GeneratedQuestion[],
   now: string
-): void {
+): Promise<void> {
   const maxPoints = questions.reduce((sum, q) => sum + q.points, 0);
-  db.run(
+  await db.run(
     `INSERT INTO simulations
        (id, product_id, subject, grade, paket, title, total_minutes, max_points, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -70,18 +70,20 @@ function insertSimulation(
     maxPoints,
     now
   );
-  questions.forEach((q, i) => insertQuestion(db, q, i, null, id, subject, grade));
+  for (let i = 0; i < questions.length; i++) {
+    await insertQuestion(db, questions[i], i, null, id, subject, grade);
+  }
 }
 
 export async function seedDatabase(db: DB): Promise<void> {
-  const existing = db.get<{ n: number }>("SELECT COUNT(*) AS n FROM products");
+  const existing = await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM products");
   if (existing && existing.n > 0) return;
 
   const now = nowIso();
-  db.transaction(() => {
+  await db.transaction(async () => {
     // ---- Produk -----------------------------------------------------------
     for (const p of PRODUCTS) {
-      db.run(
+      await db.run(
         `INSERT INTO products
            (id, title, jenjang, mapel, price, strikethrough_price, pages,
             cover_label, cover_color, badge, active, category, description,
@@ -107,7 +109,7 @@ export async function seedDatabase(db: DB): Promise<void> {
 
     // ---- Bab + kartu + kuis bab -------------------------------------------
     for (const ch of CHAPTERS) {
-      db.run(
+      await db.run(
         `INSERT INTO chapters
            (id, product_id, title, subject, grade, semester, summary, points,
             focus_text, video_url, video_duration, sort_order)
@@ -126,14 +128,16 @@ export async function seedDatabase(db: DB): Promise<void> {
         ch.sort_order
       );
       for (const fc of ch.flashcards) {
-        db.run(
+        await db.run(
           "INSERT INTO flashcards (chapter_id, front, back) VALUES (?, ?, ?)",
           ch.id,
           fc.front,
           fc.back
         );
       }
-      ch.quiz.forEach((q, i) => insertQuestion(db, q, i, ch.id, null, ch.subject, ch.grade));
+      for (let i = 0; i < ch.quiz.length; i++) {
+        await insertQuestion(db, ch.quiz[i], i, ch.id, null, ch.subject, ch.grade);
+      }
     }
 
     // ---- Simulasi SAS produk k1–k6 (Paket A saja) -------------------------
@@ -141,7 +145,7 @@ export async function seedDatabase(db: DB): Promise<void> {
       const productId = `k${grade}`;
       for (const subject of SIM_SUBJECTS[grade]) {
         const simId = `sim-${productId}-${SUBJECT_SLUG[subject]}-a`;
-        insertSimulation(
+        await insertSimulation(
           db,
           simId,
           productId,
@@ -160,7 +164,7 @@ export async function seedDatabase(db: DB): Promise<void> {
     for (const subject of ["Matematika", "B. Indonesia", "Pancasila", "B. Inggris", "PJOK"]) {
       for (const paket of ["A", "B"] as const) {
         const simId = `sim-sas-k1-s1-${SUBJECT_SLUG[subject]}-${paket.toLowerCase()}`;
-        insertSimulation(
+        await insertSimulation(
           db,
           simId,
           "sas-k1-s1",
@@ -177,7 +181,7 @@ export async function seedDatabase(db: DB): Promise<void> {
 
     // ---- Simulasi mtk-sd (1 simulasi campuran Kelas 1–6) ------------------
     // grade 0 = campuran semua kelas SD (bukan satu kelas tertentu).
-    insertSimulation(
+    await insertSimulation(
       db,
       "sim-mtk-sd-a",
       "mtk-sd",
