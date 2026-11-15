@@ -270,8 +270,43 @@ wrangler secret put RESEND_API_KEY
 
 Setiap perintah meminta nilainya secara interaktif (tidak tertulis di
 terminal/history). Tanpa `KLIKQRIS_API_KEY` + `KLIKQRIS_MERCHANT_ID`,
-checkout menolak 503 — isi aplikasi lain tetap jalan. `RESEND_API_KEY`
-baru diperlukan bila email di-wire nanti.
+checkout menolak 503 — isi aplikasi lain tetap jalan.
+
+**`RESEND_API_KEY` wajib diisi agar email otomatis terkirim** (ambil
+dari resend.com → API Keys). Bila kunci ini belum ada, aplikasi tetap
+jalan normal, tapi setiap pengiriman email **dilewati dan dicatat di log**
+Worker (`[email] RESEND_API_KEY belum disetel …`) — tidak ada error yang
+terlihat pembeli, dan tidak ada email yang tertahan untuk dikirim ulang
+nanti; begitu kunci diisi, email berikutnya (register/checkout/lunas/
+kedaluwarsa) terkirim seperti biasa. Order yang sudah lunas sebelum kunci
+diisi tidak dikirimi email susulan.
+
+### Email otomatis (Resend)
+
+Template transaksional disalin ke `server/email-templates/` (01–04) dan
+ikut ter-bundle di Worker. Pengirim: `Ringkas <halo@ringkas.by-rj.com>`
+(var `RESEND_FROM` di `wrangler.toml`); domain `ringkas.by-rj.com`
+sudah terverifikasi di Resend. Pemicu:
+
+| Peristiwa | Template | Sekali per |
+|---|---|---|
+| Akun baru terdaftar | 01 selamat datang | pengguna |
+| Checkout berhasil, QRIS dibuat | 02 menunggu bayar | order |
+| PAID terdeteksi (webhook / polling status) | 03 lunas | order |
+| EXPIRED terdeteksi (pemeriksaan status) | 04 kedaluwarsa | order |
+
+Idempotensi dicatat di tabel `sent_emails` (migrasi `0004`): satu
+order tidak menerima email yang sama dua kali, walau webhook dan
+polling sama-sama mendeteksi PAID. **Template 05 (laporan mingguan
+orang tua) belum di-wire** — butuh cron/scheduler terpisah; data
+laporannya sudah tersedia di server (`/api/parent/children` +
+tracker). Bila migrasi `0004` belum diterapkan di D1 remote, jalankan
+`wrangler d1 migrations apply ringkas-db --remote` sebelum deploy
+(atau email gagal dicatat dan pemicu dilewati dengan log error).
+
+Cara menguji: setelah deploy + `RESEND_API_KEY` terisi, buat satu
+order tes nominal kecil dan bayar — email "menunggu bayar" terkirim
+saat checkout, email "lunas" terkirim saat status jadi PAID.
 
 ### Langkah 4 — Build & deploy
 

@@ -18,6 +18,8 @@ export interface AppEnv {
   klikqrisWebhookSecret: string;
   resendApiKey: string;
   resendFrom: string;
+  /** URL dasar situs, dipakai untuk tautan di email (bukan secret). */
+  appUrl: string;
 }
 
 function fromProcessEnv(): AppEnv {
@@ -30,7 +32,8 @@ function fromProcessEnv(): AppEnv {
     klikqrisMerchantId: p.KLIKQRIS_MERCHANT_ID ?? "",
     klikqrisWebhookSecret: p.KLIKQRIS_WEBHOOK_SECRET ?? "",
     resendApiKey: p.RESEND_API_KEY ?? "",
-    resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com"
+    resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com",
+    appUrl: p.APP_URL ?? "https://ringkas.by-rj.com"
   };
 }
 

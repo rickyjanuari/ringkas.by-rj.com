@@ -30,6 +30,7 @@ export interface Env {
   KLIKQRIS_WEBHOOK_SECRET?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM?: string;
+  APP_URL?: string;
 }
 
 // Aplikasi dibuat sekali per isolate Worker, lalu dipakai ulang.
@@ -43,7 +44,8 @@ function getApp(env: Env): Hono {
     klikqrisMerchantId: env.KLIKQRIS_MERCHANT_ID ?? "",
     klikqrisWebhookSecret: env.KLIKQRIS_WEBHOOK_SECRET ?? "",
     resendApiKey: env.RESEND_API_KEY ?? "",
-    resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com"
+    resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com",
+    appUrl: env.APP_URL ?? "https://ringkas.by-rj.com"
   });
   app = createApp(openD1Database(env.DB), {
     storage: new UnavailableImageStorage()

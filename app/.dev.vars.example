@@ -10,3 +10,4 @@ KLIKQRIS_MERCHANT_ID=isi-merchant-id-di-sini
 KLIKQRIS_WEBHOOK_SECRET=isi-secret-webhook-bila-ada
 RESEND_API_KEY=isi-kunci-resend-bila-ada
 RESEND_FROM=halo@ringkas.by-rj.com
+APP_URL=https://ringkas.by-rj.com

@@ -19,7 +19,14 @@ import { getEnv } from "./env.js";
 import type { ImageStorage } from "./storage.js";
 import { createQris, checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
 import { receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
-import { getOrderEmailData } from "./email.js";
+import {
+  background,
+  getOrderEmailData,
+  sendExpiredEmail,
+  sendPaidEmail,
+  sendPendingEmail,
+  sendWelcomeEmail
+} from "./email.js";
 // Modul seed dibuat agen lain (server/seed/study.ts belum ada saat berkas ini
 // ditulis) — abaikan error resolusi modul sampai modul itu tersedia.
 // @ts-ignore
@@ -382,6 +389,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (!user) return c.json({ error: "Gagal membuat akun." }, 500);
     const token = newToken();
     await db.run("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", token, id, nowIso());
+    // Email selamat datang (template 01) — fire-and-forget; bila kunci
+    // Resend belum disetel, pengiriman dilewati + dicatat di log.
+    background(c, sendWelcomeEmail(db, user));
     return c.json({ user: publicUser(user), token }, 201);
   });
 
@@ -872,6 +882,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     );
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
     if (!order) return c.json({ error: "Gagal membuat order." }, 500);
+    // Email menunggu bayar (template 02) — hanya untuk order BARU (jalur
+    // idempotensi di atas mengembalikan order lama tanpa email baru).
+    background(c, sendPendingEmail(db, order));
     return c.json({ order: await orderOut(db, order) }, 201);
   });
 
@@ -894,7 +907,17 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       }
     }
     const fresh = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id);
-    return c.json({ order: await orderOut(db, fresh ?? order) });
+    const current = fresh ?? order;
+    // Email lunas / kedaluwarsa — dipicu setiap kali endpoint ini melihat
+    // order berstatus terminal; pemeriksaan idempotensi di pengirim
+    // memastikan email yang sama tidak terkirim dua kali (juga bila
+    // status sudah berubah sebelum kunci Resend disetel).
+    if (current.status === "PAID") {
+      background(c, sendPaidEmail(db, current));
+    } else if (current.status === "EXPIRED") {
+      background(c, sendExpiredEmail(db, current));
+    }
+    return c.json({ order: await orderOut(db, current) });
   });
 
   app.post("/api/webhook/klikqris", async (c) => {
@@ -922,6 +945,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (!order) return c.json({ received: true, applied: false }, 200);
     if (order.status === "PAID") return c.json({ received: true, applied: false }, 200);
     await db.run("UPDATE orders SET status = 'PAID', paid_at = ? WHERE id = ?", nowIso(), order.id);
+    // Email lunas (template 03) — fire-and-forget, idempotensi per order.
+    const paid = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id);
+    if (paid) background(c, sendPaidEmail(db, paid));
     return c.json({ received: true, applied: true }, 200);
   });
 

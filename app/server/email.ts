@@ -1,8 +1,32 @@
 import type { DB, Order, Product, User } from "./database.js";
+import { newId, nowIso } from "./database.js";
+import { getEnv } from "./env.js";
+import { TEMPLATE_01_WELCOME_HTML } from "./email-templates/01-welcome.js";
+import { TEMPLATE_02_PENDING_HTML } from "./email-templates/02-pending.js";
+import { TEMPLATE_03_PAID_HTML } from "./email-templates/03-paid.js";
+import { TEMPLATE_04_EXPIRED_HTML } from "./email-templates/04-expired.js";
 
 // ---------------------------------------------------------------------------
-// Variabel template email pesanan lunas (TIDAK ada pengiriman otomatis di v1).
-// Hanya untuk order PAID — lempar Error bila order tidak ada / belum lunas.
+// Pengiriman email otomatis via Resend (gratis: 3.000/bln, maks 100/hari).
+//
+// Pemicu (fire-and-forget, lihat server/actions.ts):
+//   register → welcome | checkout (QRIS dibuat) → pending
+//   PAID terdeteksi (webhook / polling status) → paid
+//   EXPIRED terdeteksi (pemeriksaan status) → expired
+// Template laporan mingguan orang tua (05) BELUM di-wire — butuh cron,
+// lihat README bagian "Email otomatis".
+//
+// Aturan keras:
+//   - RESEND_API_KEY tidak ada di repo. Bila kunci belum disetel, kirim
+//     dilewati + dicatat di log; alur utama (register/checkout/bayar)
+//     TIDAK PERNAH gagal karena email.
+//   - Semua placeholder {{...}} HARUS terisi dari data asli (order/user/
+//     database). Render melempar Error bila ada yang kosong.
+//   - Idempotensi lewat tabel sent_emails (migrasi 0004): baris klaim
+//     disisipkan SEBELUM kirim; gagal kirim → klaim dihapus (bisa coba
+//     lagi); klaim basi > 10 menit tanpa resend_id boleh direbut ulang.
+//   - Setiap panggilan Resend WAJIB membawa header User-Agent — tanpa
+//     itu API mengembalikan 403 code 1010.
 // ---------------------------------------------------------------------------
 
 export interface OrderEmailProduct {
@@ -26,6 +50,79 @@ interface OrderItem {
   price: number;
 }
 
+/** Subset kolom order yang dipakai pengiriman email. */
+export interface OrderForEmail {
+  id: string;
+  user_id: string;
+  items: string; // JSON [{product_id, title, price}]
+  total: number;
+  status: string;
+  total_amount: number | null;
+  expired_at: string | null;
+  paid_at: string | null;
+}
+
+export type EmailTemplateKey = "welcome" | "pending" | "paid" | "expired";
+
+export interface SendEmailResult {
+  sent: boolean;
+  resendId?: string;
+  skipped?: "no-key" | "already-sent";
+  error?: string;
+}
+
+const TEMPLATES: Record<EmailTemplateKey, string> = {
+  welcome: TEMPLATE_01_WELCOME_HTML,
+  pending: TEMPLATE_02_PENDING_HTML,
+  paid: TEMPLATE_03_PAID_HTML,
+  expired: TEMPLATE_04_EXPIRED_HTML
+};
+
+/** URL dasar situs untuk tautan di email (bisa diubah lewat var APP_URL). */
+export function appUrl(): string {
+  return (getEnv().appUrl ?? "").trim() || "https://ringkas.by-rj.com";
+}
+
+/** "Rp29.331" — sama seperti formatRupiah di frontend. */
+export function formatRupiah(n: number): string {
+  return "Rp" + new Intl.NumberFormat("id-ID").format(Math.trunc(n));
+}
+
+const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const NAMA_BULAN = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
+/**
+ * "Minggu, 15 November 2026, 13:10 WIB".
+ * Menerima ISO ("2026-11-15T06:10:29.813Z" = 06:10 UTC → 13:10 WIB)
+ * maupun format KlikQRIS "2026-11-15 15:09:39" (sudah waktu dinding WIB).
+ * Mengembalikan "—" bila null/tidak bisa diurai.
+ */
+export function formatTanggal(value: string | null): string {
+  if (!value) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(value);
+  if (!m) return value;
+  const [, y, mo, d, h, mi, s, tz] = m;
+  const sec = Number(s ?? 0);
+  let ms = Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), sec);
+  if (tz) {
+    // ISO berzona: instans absolut — geser ke WIB (+7 jam).
+    if (tz !== "Z") {
+      const sign = tz.startsWith("-") ? -1 : 1;
+      const parts = tz.replace(/^[+-]/, "").split(":");
+      const offMin = Number(parts[0]) * 60 + Number(parts[1] ?? 0);
+      ms -= sign * offMin * 60000;
+    }
+    ms += 7 * 3600 * 1000;
+  }
+  // Tanpa zona: komponen sudah waktu dinding WIB — dipakai apa adanya.
+  const dt = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${NAMA_HARI[dt.getUTCDay()]}, ${dt.getUTCDate()} ${NAMA_BULAN[dt.getUTCMonth()]} ${dt.getUTCFullYear()}, ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} WIB`;
+}
+
 function parseItems(raw: string): OrderItem[] {
   try {
     const v: unknown = JSON.parse(raw);
@@ -43,6 +140,302 @@ function parseItems(raw: string): OrderItem[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Render template: ganti semua {{kunci}}; lempar Error bila ada kunci
+ * yang tidak ada di `variables`. Diekspor supaya bisa diuji.
+ */
+export function renderEmailTemplate(
+  template: EmailTemplateKey,
+  variables: Record<string, string>
+): string {
+  const html = TEMPLATES[template];
+  const missing = [...new Set([...html.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))]
+    .filter((k) => !(k in variables));
+  if (missing.length > 0) {
+    throw new Error(`placeholder email belum terisi: ${missing.join(", ")}`);
+  }
+  let out = html;
+  for (const [key, value] of Object.entries(variables)) {
+    out = out.split(`{{${key}}}`).join(value);
+  }
+  if (out.includes("{{")) {
+    throw new Error("masih ada placeholder {{...}} yang belum terisi");
+  }
+  return out;
+}
+
+function absoluteUrl(u: string): string {
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = appUrl().replace(/\/+$/, "");
+  return base + (u.startsWith("/") ? u : `/${u}`);
+}
+
+interface SentEmailRow {
+  id: string;
+  resend_id: string | null;
+  created_at: string;
+}
+
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+
+async function alreadySent(
+  db: DB,
+  template: EmailTemplateKey,
+  orderId: string | null,
+  userId: string | null
+): Promise<boolean> {
+  const row = orderId
+    ? await db.get<SentEmailRow>(
+        "SELECT id, resend_id, created_at FROM sent_emails WHERE order_id = ? AND template = ?",
+        orderId,
+        template
+      )
+    : await db.get<SentEmailRow>(
+        "SELECT id, resend_id, created_at FROM sent_emails WHERE user_id = ? AND template = ?",
+        userId,
+        template
+      );
+  if (!row) return false;
+  if (row.resend_id) return true;
+  // Klaim tanpa resend_id yang sudah basi → anggap gagal, boleh direbut.
+  if (Date.now() - new Date(row.created_at).getTime() > STALE_CLAIM_MS) {
+    await db.run("DELETE FROM sent_emails WHERE id = ?", row.id).catch(() => undefined);
+    return false;
+  }
+  return true;
+}
+
+async function claimSlot(
+  db: DB,
+  template: EmailTemplateKey,
+  orderId: string | null,
+  userId: string | null
+): Promise<string | null> {
+  const id = newId("eml");
+  const result = await db.run(
+    "INSERT OR IGNORE INTO sent_emails (id, order_id, user_id, template, resend_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
+    id,
+    orderId,
+    userId,
+    template,
+    nowIso()
+  );
+  return result.changes === 1 ? id : null;
+}
+
+/**
+ * Kirim satu email template. TIDAK PERNAH melempar — kegagalan
+ * dikembalikan sebagai { sent: false } supaya alur utama tetap jalan.
+ * Idempotensi: satu (order, template) atau (user, template) hanya
+ * terkirim sekali; panggilan kedua mengembalikan skipped: "already-sent".
+ * Bila RESEND_API_KEY belum disetel: log + skipped: "no-key" (tanpa klaim
+ * yang tertinggal, jadi percobaan berikut tetap bisa mengirim).
+ */
+export async function sendTemplatedEmail(
+  db: DB,
+  opts: {
+    template: EmailTemplateKey;
+    to: string;
+    subject: string;
+    variables: Record<string, string>;
+    orderId?: string | null;
+    userId?: string | null;
+  }
+): Promise<SendEmailResult> {
+  const { template, to, subject, variables } = opts;
+  const orderId = opts.orderId ?? null;
+  const userId = opts.userId ?? null;
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    console.warn(`[email] alamat tujuan tidak valid (${template}) — dilewati.`);
+    return { sent: false, error: "Alamat email tujuan tidak valid." };
+  }
+  let html: string;
+  try {
+    html = renderEmailTemplate(template, variables);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Template gagal di-render.";
+    console.error(`[email] ${msg} (${template} ke ${to}) — tidak dikirim.`);
+    return { sent: false, error: msg };
+  }
+  const env = getEnv();
+  if (!env.resendApiKey) {
+    console.warn(
+      `[email] RESEND_API_KEY belum disetel — email ${template} ke ${to} dilewati. ` +
+        `Isi dengan: wrangler secret put RESEND_API_KEY`
+    );
+    return { sent: false, skipped: "no-key" };
+  }
+  try {
+    if (await alreadySent(db, template, orderId, userId)) {
+      return { sent: false, skipped: "already-sent" };
+    }
+    const claimId = await claimSlot(db, template, orderId, userId);
+    if (!claimId) {
+      return { sent: false, skipped: "already-sent" };
+    }
+    let resendId: string;
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.resendApiKey}`,
+          // WAJIB: tanpa User-Agent, Resend mengembalikan 403 code 1010.
+          "User-Agent": "Ringkas/1.0 (ringkas.by-rj.com)"
+        },
+        body: JSON.stringify({
+          from: `Ringkas <${env.resendFrom || "halo@ringkas.by-rj.com"}>`,
+          to,
+          subject,
+          html
+        })
+      });
+      const body: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg =
+          body && typeof body === "object" && typeof (body as { message?: unknown }).message === "string"
+            ? (body as { message: string }).message
+            : `Resend gagal (HTTP ${res.status})`;
+        throw new Error(msg);
+      }
+      const id =
+        body && typeof body === "object" && typeof (body as { id?: unknown }).id === "string"
+          ? (body as { id: string }).id
+          : "";
+      if (!id) throw new Error("Resend tidak mengembalikan id email.");
+      resendId = id;
+    } catch (err) {
+      // Kirim gagal → hapus klaim supaya percobaan berikut bisa mengirim.
+      await db.run("DELETE FROM sent_emails WHERE id = ?", claimId).catch(() => undefined);
+      throw err;
+    }
+    await db.run("UPDATE sent_emails SET resend_id = ? WHERE id = ?", resendId, claimId);
+    console.log(`[email] terkirim ${template} ke ${to} (resend ${resendId})`);
+    return { sent: true, resendId };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Gagal mengirim email.";
+    console.error(`[email] gagal mengirim ${template} ke ${to}: ${msg}`);
+    return { sent: false, error: msg };
+  }
+}
+
+/** Jalankan janji di background tanpa menggagalkan response. */
+export function background(
+  c: { executionCtx?: { waitUntil(p: Promise<unknown>): void } },
+  promise: Promise<unknown>
+): void {
+  try {
+    c.executionCtx?.waitUntil(promise);
+  } catch {
+    // Bukan runtime Workers — lanjut tanpa waitUntil.
+  }
+  promise.catch((err) => console.error("[email] gagal (background):", err));
+}
+
+// ---------------------------------------------------------------------------
+// Pengirim per pemicu — semua mengembalikan SendEmailResult, tidak melempar.
+// ---------------------------------------------------------------------------
+
+/** Register berhasil → template 01 (sekali per user). */
+export async function sendWelcomeEmail(db: DB, user: User): Promise<SendEmailResult> {
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "welcome",
+    to: user.email,
+    subject: "Selamat datang di Ringkas!",
+    variables: {
+      nama: user.name,
+      email: user.email,
+      url_katalog: `${base}/katalog`,
+      url_aplikasi: base
+    },
+    userId: user.id
+  });
+}
+
+/**
+ * Checkout berhasil membuat tagihan QRIS (PENDING) → template 02.
+ * Dipanggil HANYA saat order baru dibuat (bukan saat order lama yang
+ * masih PENDING dikembalikan karena idempotensi checkout).
+ */
+export async function sendPendingEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+  const user = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
+  if (!user) return { sent: false, error: "Pengguna order tidak ditemukan." };
+  const items = parseItems(order.items);
+  const produk = items.map((it) => it.title).join(", ") || "Rangkuman Ringkas";
+  const totalAmount = order.total_amount ?? order.total;
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "pending",
+    to: user.email,
+    subject: `Pesananmu menunggu pembayaran — ${order.id}`,
+    variables: {
+      nama: user.name,
+      email: user.email,
+      order_id: order.id,
+      produk,
+      harga: formatRupiah(order.total),
+      kode_unik: formatRupiah(Math.max(0, totalAmount - order.total)),
+      total: formatRupiah(totalAmount),
+      batas_bayar: formatTanggal(order.expired_at),
+      url_pesanan: `${base}/pesanan`
+    },
+    orderId: order.id
+  });
+}
+
+/** PAID terdeteksi (webhook / polling) → template 03 (sekali per order). */
+export async function sendPaidEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+  if (order.status !== "PAID") return { sent: false, error: "Order belum lunas." };
+  const data = await getOrderEmailData(db, order.id);
+  const items = parseItems(order.items);
+  const first = items[0];
+  const base = appUrl();
+  const urlBelajar = first ? `${base}/belajar/${first.product_id}` : `${base}/pesanan`;
+  return sendTemplatedEmail(db, {
+    template: "paid",
+    to: data.email,
+    subject: `Pembayaran lunas — ${(first?.title ?? "produkmu")} sudah terbuka!`,
+    variables: {
+      nama: data.nama,
+      email: data.email,
+      order_id: data.order_id,
+      produk: data.produk.map((p) => p.judul).join(", ") || "Rangkuman Ringkas",
+      tanggal_bayar: formatTanggal(data.tanggal_bayar),
+      total: formatRupiah(order.total_amount ?? order.total),
+      url_belajar: urlBelajar,
+      // Struk diunduh dari halaman Pesanan Saya (endpoint struk butuh login).
+      url_struk: `${base}/pesanan`,
+      url_produk: absoluteUrl(data.url_produk)
+    },
+    orderId: order.id
+  });
+}
+
+/** EXPIRED terdeteksi (pemeriksaan status) → template 04 (sekali per order). */
+export async function sendExpiredEmail(db: DB, order: OrderForEmail): Promise<SendEmailResult> {
+  const user = await db.get<User>("SELECT * FROM users WHERE id = ?", order.user_id);
+  if (!user) return { sent: false, error: "Pengguna order tidak ditemukan." };
+  const items = parseItems(order.items);
+  const produk = items.map((it) => it.title).join(", ") || "Rangkuman Ringkas";
+  const base = appUrl();
+  return sendTemplatedEmail(db, {
+    template: "expired",
+    to: user.email,
+    subject: `Pembayaranmu kedaluwarsa — ${order.id}`,
+    variables: {
+      nama: user.name,
+      email: user.email,
+      order_id: order.id,
+      produk,
+      total: formatRupiah(order.total_amount ?? order.total),
+      batas_bayar: formatTanggal(order.expired_at),
+      url_katalog: `${base}/katalog`
+    },
+    orderId: order.id
+  });
 }
 
 export async function getOrderEmailData(db: DB, orderId: string): Promise<OrderEmailData> {

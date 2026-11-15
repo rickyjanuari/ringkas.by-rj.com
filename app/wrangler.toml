@@ -42,3 +42,5 @@ migrations_dir = "server/migrations"
 [vars]
 # Bukan secret — alamat pengirim email (sudah publik).
 RESEND_FROM = "halo@ringkas.by-rj.com"
+# Bukan secret — URL dasar situs, dipakai untuk tautan di email otomatis.
+APP_URL = "https://ringkas.by-rj.com"
