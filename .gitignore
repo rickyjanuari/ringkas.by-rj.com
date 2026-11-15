@@ -1,0 +1,14 @@
+# Rahasia — jangan commit file-file ini
+.env
+.env.*
+*.key
+*.pem
+*.db
+*.sqlite
+*.sqlite3
+node_modules/
+dist/
+.DS_Store
+credentials.json
+*secret*
+*token*

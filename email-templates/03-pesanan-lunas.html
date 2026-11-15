@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pembayaran lunas — selamat belajar!</title>
+<style>
+  body{margin:0;background:#f6f9fe;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:#1c2b3a}
+  .wrap{max-width:560px;margin:0 auto;padding:24px 16px}
+  .card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(21,154,104,.12)}
+  .head{background:#159a68;color:#fff;padding:28px}
+  .head h1{margin:0;font-size:22px}
+  .head p{margin:6px 0 0;opacity:.93}
+  .body{padding:24px 28px}
+  .body p{line-height:1.7;margin:0 0 14px}
+  .box{background:#f6f9fe;border-radius:12px;padding:16px 18px;margin:0 0 14px}
+  .box table{width:100%;border-collapse:collapse;font-size:14px}
+  .box td{padding:5px 0;vertical-align:top}
+  .box td:last-child{text-align:right;font-weight:700}
+  .total td{border-top:1px solid #dbe7f5;padding-top:10px;font-size:16px}
+  .badge{display:inline-block;background:#e7f7ef;color:#0f7a4e;font-weight:700;font-size:12px;padding:4px 10px;border-radius:999px;margin-bottom:10px}
+  .btn{display:inline-block;background:#2273d8;color:#fff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:999px;margin:4px 8px 14px 0}
+  .btn2{display:inline-block;background:#ffc531;color:#1c2b3a;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:999px;margin:4px 0 14px}
+  .foot{padding:0 28px 24px;color:#7a8a9a;font-size:12px;line-height:1.6}
+</style></head>
+<body><div class="wrap"><div class="card">
+  <div class="head"><h1>Pembayaran lunas! 🎉</h1><p>Materimu sudah terbuka. Selamat belajar, {{nama}}!</p></div>
+  <div class="body">
+    <span class="badge">✓ LUNAS</span>
+    <div class="box"><table>
+      <tr><td>Nomor pesanan</td><td>{{order_id}}</td></tr>
+      <tr><td>Produk</td><td>{{produk}}</td></tr>
+      <tr><td>Tanggal bayar</td><td>{{tanggal_bayar}}</td></tr>
+      <tr><td>Metode</td><td>QRIS (KlikQRIS)</td></tr>
+      <tr class="total"><td>Total dibayar</td><td>{{total}}</td></tr>
+    </table></div>
+    <p>📎 <strong>Link produkmu:</strong> <a href="{{url_produk}}">{{url_produk}}</a><br><span style="color:#5a6b7d;font-size:13px">Buka link di atas untuk mengunduh/membuka materinya (Google Drive, Canva, atau link lain dari Ringkas). Simpan link ini baik-baik dan jangan dibagikan ke orang lain.</span></p>
+    <p>Yang sudah bisa kamu buka sekarang:</p>
+    <p>📚 Rangkuman per bab &nbsp;•&nbsp; ✏️ Kuis per bab &nbsp;•&nbsp; 📝 Simulasi SAS &nbsp;•&nbsp; 🃏 Flashcard &nbsp;•&nbsp; 🖨️ Worksheet per bab</p>
+    <a class="btn" href="{{url_belajar}}">Mulai Belajar →</a>
+    <a class="btn2" href="{{url_struk}}">Unduh Struk (PDF)</a>
+    <p>Tips: kerjakan <strong>Latihan Harian 5 Menit</strong> setiap hari supaya streak belajarmu terus jalan dan stiker digitalmu bertambah.</p>
+    <p>Selamat belajar!<br><strong>Tim Ringkas</strong></p>
+  </div>
+  <div class="foot">Struk resmi tersedia di aplikasi Ringkas → Pesanan → {{order_id}}. Email ini dikirim ke {{email}}.</div>
+</div></div></body></html>
