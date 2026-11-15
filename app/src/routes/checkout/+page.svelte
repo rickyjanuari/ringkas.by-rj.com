@@ -31,6 +31,7 @@
 		is_gift?: boolean;
 		gift_recipient_email?: string | null;
 		gift_recipient_name?: string | null;
+		donated?: boolean;
 	};
 	let order = $state<OrderGift | null>(null);
 	let createError = $state("");
@@ -43,6 +44,9 @@
 	let voucherError = $state("");
 	let appliedVoucher = $state<{ code: string; discount: number; total_after: number } | null>(null);
 
+	// ---- Beli 1, donasi 1 ----
+	let donateOn = $state(false);
+
 	let items = $derived(
 		$cart
 			.map((id) => catalog.find((p) => p.id === id))
@@ -50,6 +54,9 @@
 	);
 	let total = $derived(items.reduce((s, p) => s + p.price, 0));
 	let totalBayar = $derived(appliedVoucher ? appliedVoucher.total_after : total);
+	// Donasi = 1× harga produk SEBELUM diskon voucher (bukan setelah diskon).
+	let donationAmount = $derived(donateOn ? total : 0);
+	let grandTotal = $derived(totalBayar + donationAmount);
 	let loggedIn = $derived(Boolean(getToken()));
 
 	async function loadOrder(id: string) {
@@ -161,6 +168,7 @@
 					idempotency_key: newIdempotencyKey(),
 					whatsapp: whatsapp.trim() || undefined,
 					voucher_code: appliedVoucher?.code ?? undefined,
+					...(donateOn ? { donate: true } : {}),
 					...(giftOn
 						? {
 								gift_recipient_email: giftEmail.trim(),
@@ -261,6 +269,12 @@
 					</span>
 				</p>
 			{/if}
+			{#if order.donated}
+				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+					<Icon name="thumbs-up" size={16} class="shrink-0" />
+					<span>Kamu mendonasikan 1 akses produk ini.</span>
+				</p>
+			{/if}
 			{#if order.discount_amount}
 				<p class="mt-1 text-sm font-bold text-[#065f46]">
 					Diskon voucher{#if order.voucher_code} ({order.voucher_code}){/if}: -{formatRupiah(
@@ -323,8 +337,14 @@
 		</div>
 		<div class="mt-3 flex justify-between border-t border-dashed border-[#e7e2d2] pt-3">
 			<span class="font-extrabold">Total Bayar</span>
-			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(totalBayar)}</span>
+			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(grandTotal)}</span>
 		</div>
+		{#if donateOn}
+			<div class="mt-2 flex justify-between text-sm font-bold text-[#065f46]">
+				<span>Donasi 1 akses</span>
+				<span>{formatRupiah(donationAmount)}</span>
+			</div>
+		{/if}
 		{#if appliedVoucher}
 			<div class="mt-2 flex justify-between text-sm font-bold text-[#065f46]">
 				<span>Diskon ({appliedVoucher.code})</span>
@@ -449,6 +469,27 @@
 		{/if}
 		{#if giftError}
 			<p class="err mt-2">{giftError}</p>
+		{/if}
+	</div>
+
+	<!-- Beli 1, donasi 1 -->
+	<div class="card mt-3 p-4">
+		<label class="flex cursor-pointer items-start gap-2.5">
+			<input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-[#177245]" bind:checked={donateOn} />
+			<span>
+				<span class="flex items-center gap-1.5 font-extrabold">
+					<Icon name="thumbs-up" size={17} /> Beli 1, donasi 1
+				</span>
+				<span class="mt-0.5 block text-xs text-[#5f6b62]">
+					Berbagi satu akses belajar untuk anak yang membutuhkan.
+				</span>
+			</span>
+		</label>
+		{#if donateOn}
+			<p class="mt-3 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm text-[#22302a]">
+				Kamu membayar 2× harga produk: 1 untukmu, 1 didonasikan ke anak yang membutuhkan.
+				Donasi masuk pool dan ditetapkan admin ke penerima.
+			</p>
 		{/if}
 	</div>
 

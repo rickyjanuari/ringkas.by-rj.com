@@ -3,6 +3,12 @@
 	import { goto } from "$app/navigation";
 	import { api, formatRupiah, getToken, type ProductPublic } from "$lib/api";
 	import { auth, cart } from "$lib/store";
+	import {
+		applyCachedSettings,
+		loadSettings,
+		saveSettings,
+		type UserSettings
+	} from "$lib/settings";
 	import Avatar from "$lib/Avatar.svelte";
 	import Icon from "$lib/Icon.svelte";
 
@@ -10,6 +16,25 @@
 	let loading = $state(true);
 	let error = $state("");
 	let jenjang = $state("Semua");
+
+	// ---- Saklar cepat aksesibilitas & hemat data (hanya bila login) ----
+	let homeSettings = $state<UserSettings | null>(null);
+	let togglingKey = $state<keyof UserSettings | null>(null);
+
+	async function togglePengaturan(key: keyof UserSettings) {
+		if (!homeSettings || togglingKey) return;
+		const lama = homeSettings[key];
+		const baru = (lama === 1 ? 0 : 1) as 0 | 1;
+		homeSettings = { ...homeSettings, [key]: baru };
+		togglingKey = key;
+		try {
+			homeSettings = await saveSettings({ [key]: baru });
+		} catch {
+			homeSettings = { ...homeSettings, [key]: lama };
+		} finally {
+			togglingKey = null;
+		}
+	}
 
 	// ---- Tryout mendatang (dari /api/tryouts, gagal diam-diam) ----
 	interface TryoutRingkas {
@@ -154,6 +179,17 @@
 	}
 
 	onMount(() => {
+		// Saklar cepat: baca cache dulu, lalu sinkronkan dari server.
+		if (getToken()) {
+			homeSettings = applyCachedSettings();
+			loadSettings()
+				.then((s) => {
+					homeSettings = s;
+				})
+				.catch(() => {
+					/* tetap pakai cache */
+				});
+		}
 		timer = setInterval(() => {
 			if (!paused) nextSlide();
 			nowMs = Date.now();
@@ -371,6 +407,66 @@
 		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai Latihan</a>
 	</div>
 </section>
+
+<!-- Latihan Tanpa Habis -->
+<section class="card mt-4 p-4 lg:p-5" aria-label="Latihan Tanpa Habis">
+	<div class="flex items-center gap-3">
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="refresh" size={24} /></span>
+		<div class="min-w-0 flex-1">
+			<h2 class="text-base font-extrabold">Latihan Tanpa Habis</h2>
+			<p class="text-sm text-[#5f6b62]">Soal hitung dengan angka yang selalu baru — tidak pernah habis, kapan pun kamu mau latihan.</p>
+		</div>
+		<a href="/latihan-tanpa-habis" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+	</div>
+</section>
+
+<!-- Portofolioku (hanya bila login) -->
+{#if $auth.user}
+	<section class="card mt-4 p-4 lg:p-5" aria-label="Portofolioku">
+		<div class="flex items-center gap-3">
+			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="pen" size={24} /></span>
+			<div class="min-w-0 flex-1">
+				<h2 class="text-base font-extrabold">Portofolioku</h2>
+				<p class="text-sm text-[#5f6b62]">Pamerkan karyamu — orang tua dan gurumu bisa memberi bintang dan komentar.</p>
+			</div>
+			<a href="/portofolio" class="btn btn-leaf shrink-0">Lihat Karya</a>
+		</div>
+	</section>
+
+	<!-- Saklar cepat aksesibilitas & hemat data -->
+	{#if homeSettings}
+		<section class="card mt-4 p-4 lg:p-5" aria-label="Aksesibilitas dan Hemat Data">
+			<div class="flex items-center gap-3">
+				<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="eye" size={24} /></span>
+				<div class="min-w-0 flex-1">
+					<h2 class="text-base font-extrabold">Aksesibilitas &amp; Hemat Data</h2>
+					<p class="text-sm text-[#5f6b62]">Atur tampilan supaya lebih nyaman dibaca dan lebih ringan.</p>
+				</div>
+				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Semua Pengaturan</a>
+			</div>
+			<div class="mt-3 flex flex-wrap gap-2">
+				<button
+					type="button"
+					class="chip"
+					class:active={homeSettings.readable_font === 1}
+					disabled={togglingKey !== null}
+					onclick={() => togglePengaturan("readable_font")}
+				>
+					<Icon name="book-open" size={14} /> Font ramah baca
+				</button>
+				<button
+					type="button"
+					class="chip"
+					class:active={homeSettings.data_saver === 1}
+					disabled={togglingKey !== null}
+					onclick={() => togglePengaturan("data_saver")}
+				>
+					<Icon name="zap" size={14} /> Mode hemat data
+				</button>
+			</div>
+		</section>
+	{/if}
+{/if}
 
 <!-- Level & XP mini (hanya bila login) -->
 {#if $auth.user}

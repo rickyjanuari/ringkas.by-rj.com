@@ -103,7 +103,7 @@
 	<!-- Cover besar -->
 	<div class="card mt-3 overflow-hidden">
 		{#if featureImage}
-			<img src={featureImage} alt={product.title} class="h-44 w-full object-cover lg:h-80" />
+			<img src={featureImage} alt={product.title} class="datasaver-hide h-44 w-full object-cover lg:h-80" />
 		{:else}
 			<div
 				class="flex h-44 items-center justify-center px-6 text-center text-lg font-extrabold text-white lg:h-80"
@@ -147,7 +147,7 @@
 				<img
 					src={img.url}
 					alt=""
-					class="h-20 w-28 shrink-0 rounded-xl border border-[#e7e2d2] object-cover"
+					class="datasaver-hide h-20 w-28 shrink-0 rounded-xl border border-[#e7e2d2] object-cover"
 				/>
 			{/each}
 		</div>

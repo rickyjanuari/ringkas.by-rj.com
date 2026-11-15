@@ -15,7 +15,7 @@
 	} from "$lib/api";
 	import { auth } from "$lib/store";
 
-	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit" | "tryout" | "tanya-jawab" | "tanggal-sas";
+	type Tab = "ringkasan" | "pesanan" | "produk" | "pengguna" | "video" | "voucher" | "cron" | "pengumuman" | "audit" | "tryout" | "tanya-jawab" | "tanggal-sas" | "donasi";
 	let tab = $state<Tab>("ringkasan");
 	let isAdmin = $state(false);
 	let checking = $state(true);
@@ -27,6 +27,7 @@
 	const MENU: { id: Tab; label: string; icon: string }[] = [
 		{ id: "ringkasan", label: "Ringkasan", icon: "chart" },
 		{ id: "pesanan", label: "Pesanan", icon: "shopping-cart" },
+		{ id: "donasi", label: "Donasi", icon: "thumbs-up" },
 		{ id: "produk", label: "Produk", icon: "package" },
 		{ id: "voucher", label: "Voucher", icon: "receipt" },
 		{ id: "pengguna", label: "Pengguna", icon: "users" },
@@ -42,6 +43,7 @@
 	const TAB_TITLE: Record<Tab, string> = {
 		ringkasan: "Ringkasan",
 		pesanan: "Pesanan",
+		donasi: "Donasi",
 		produk: "Produk",
 		voucher: "Voucher",
 		pengguna: "Pengguna & Role",
@@ -1037,6 +1039,7 @@
 		if (t === "voucher" && vouchers.length === 0) loadVouchers();
 		if (t === "ringkasan" && !stats && !statsLoading) loadStats();
 		if (t === "pesanan" && !ordersLoaded) loadOrders(1);
+		if (t === "donasi" && !donationsLoaded) loadDonations();
 		if (t === "pengumuman" && !settingsLoaded) loadSettings();
 		if (t === "audit" && !auditLoaded) loadAudit(1);
 		if (t === "tryout" && adminTryouts.length === 0) loadTryouts();
@@ -1095,6 +1098,86 @@
 			notice = e instanceof Error ? e.message : "Gagal mengubah status voucher.";
 		} finally {
 			vToggling = null;
+		}
+	}
+
+	// ---- Donasi (Beli 1, donasi 1) ----
+	type AdminDonation = {
+		id: string;
+		order_id: string;
+		product_title: string;
+		donor_name: string | null;
+		donor_email: string | null;
+		amount: number;
+		status: string;
+		recipient_name: string | null;
+		recipient_email: string | null;
+		created_at: string;
+		assigned_at: string | null;
+	};
+	let donations = $state<AdminDonation[]>([]);
+	let donationsLoading = $state(false);
+	let donationsError = $state("");
+	let donationsLoaded = $state(false);
+	let assignEmails = $state<Record<string, string>>({});
+	let assignErrors = $state<Record<string, string>>({});
+	let assigningId = $state<string | null>(null);
+
+	function labelStatusDonasi(status: string): string {
+		if (status === "available") return "Tersedia di pool";
+		if (status === "assigned") return "Sudah ditetapkan";
+		return status;
+	}
+
+	function badgeDonasi(status: string): string {
+		return status === "available" ? "badge badge-sun" : "badge badge-leaf";
+	}
+
+	async function loadDonations() {
+		donationsLoading = true;
+		donationsError = "";
+		try {
+			const data = await api<{ donations: AdminDonation[] }>("/api/admin/donations");
+			donations = data.donations ?? [];
+			donationsLoaded = true;
+		} catch (e) {
+			donationsError =
+				e instanceof Error ? e.message : "Gagal memuat donasi. Coba muat ulang ya.";
+		} finally {
+			donationsLoading = false;
+		}
+	}
+
+	async function tetapkanDonasi(d: AdminDonation) {
+		const email = (assignEmails[d.id] ?? "").trim().toLowerCase();
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			assignErrors = {
+				...assignErrors,
+				[d.id]: "Masukkan email penerima yang valid dulu ya."
+			};
+			return;
+		}
+		assigningId = d.id;
+		assignErrors = { ...assignErrors, [d.id]: "" };
+		try {
+			await api(`/api/admin/donations/${d.id}/assign`, {
+				method: "POST",
+				body: JSON.stringify({ email })
+			});
+			donations = donations.map((x) =>
+				x.id === d.id
+					? { ...x, status: "assigned", recipient_email: email, assigned_at: new Date().toISOString() }
+					: x
+			);
+			assignEmails = { ...assignEmails, [d.id]: "" };
+			notice = `Donasi "${d.product_title}" ditetapkan ke ${email}.`;
+		} catch (e) {
+			assignErrors = {
+				...assignErrors,
+				[d.id]: e instanceof Error ? e.message : "Gagal menetapkan penerima."
+			};
+		} finally {
+			assigningId = null;
 		}
 	}
 
@@ -3035,6 +3118,125 @@
 						</button>
 					{/if}
 				</div>
+			{:else if tab === "donasi"}
+				<div class="card mt-4 p-4">
+					<p class="flex items-center gap-2 text-sm font-extrabold">
+						<Icon name="thumbs-up" size={17} /> Pool Donasi — Beli 1, donasi 1
+					</p>
+					<p class="mt-1 text-xs text-[#5f6b62]">
+						Setiap donasi adalah 1 akses produk dari pembeli yang memilih "Beli 1, donasi 1".
+						Tetapkan email penerima supaya aksesnya masuk ke akun anak yang membutuhkan.
+					</p>
+					<div class="mt-3 flex items-center justify-between gap-2">
+						<p class="text-sm font-bold text-[#3f4a42]">
+							{donations.filter((d) => d.status === "available").length} tersedia di pool
+							• {donations.length} donasi total
+						</p>
+						<button
+							type="button"
+							class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+							disabled={donationsLoading}
+							onclick={loadDonations}
+						>
+							<Icon name="refresh" size={15} /> {donationsLoading ? "Memuat..." : "Muat ulang"}
+						</button>
+					</div>
+				</div>
+				{#if donationsLoading && !donationsLoaded}
+					<p class="mt-4 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+				{:else if donationsError && !donationsLoaded}
+					<p class="err mt-4">{donationsError}</p>
+					<button type="button" class="btn btn-primary mt-3" onclick={loadDonations}>Coba lagi</button>
+				{:else if donations.length === 0}
+					<p class="mt-4 text-sm text-[#5f6b62]">Belum ada donasi di pool.</p>
+				{:else}
+					{#if donationsError}
+						<p class="err mt-4">{donationsError}</p>
+					{/if}
+					<div class="card mt-3 overflow-x-auto p-0">
+						<table class="w-full min-w-[760px] text-left text-xs">
+							<thead>
+								<tr class="border-b border-[#e7e2d2] text-[#3f4a42]">
+									<th class="px-3 py-2.5 font-extrabold">Produk</th>
+									<th class="px-3 py-2.5 font-extrabold">Pendonor</th>
+									<th class="px-3 py-2.5 font-extrabold">Jumlah</th>
+									<th class="px-3 py-2.5 font-extrabold">Status</th>
+									<th class="px-3 py-2.5 font-extrabold">Penerima</th>
+									<th class="px-3 py-2.5 font-extrabold">Tanggal</th>
+									<th class="px-3 py-2.5 font-extrabold">Tetapkan Penerima</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each donations as d (d.id)}
+									<tr class="border-b border-[#f0ede2] align-top last:border-0">
+										<td class="px-3 py-2.5">
+											<p class="font-extrabold">{d.product_title}</p>
+											<p class="text-[#5f6b62]">Order {d.order_id}</p>
+										</td>
+										<td class="px-3 py-2.5">
+											<p class="font-bold">{d.donor_name ?? "-"}</p>
+											<p class="text-[#5f6b62]">{d.donor_email ?? "-"}</p>
+										</td>
+										<td class="px-3 py-2.5 font-bold">{formatRupiah(d.amount)}</td>
+										<td class="px-3 py-2.5">
+											<span class={badgeDonasi(d.status)}>{labelStatusDonasi(d.status)}</span>
+										</td>
+										<td class="px-3 py-2.5">
+											{#if d.recipient_email}
+												<p class="font-bold">{d.recipient_name ?? "-"}</p>
+												<p class="text-[#5f6b62]">{d.recipient_email}</p>
+												{#if d.assigned_at}
+													<p class="text-[#5f6b62]">{formatTanggal(d.assigned_at)}</p>
+												{/if}
+											{:else}
+												-
+											{/if}
+										</td>
+										<td class="px-3 py-2.5">{formatTanggal(d.created_at)}</td>
+										<td class="px-3 py-2.5">
+											{#if d.status === "available"}
+												<div class="flex min-w-52 gap-1.5">
+													<input
+														class="input !px-2 !py-1.5 text-xs"
+														type="email"
+														placeholder="email@penerima.id"
+														aria-label={`Email penerima untuk donasi ${d.product_title}`}
+														value={assignEmails[d.id] ?? ""}
+														oninput={(e) => {
+															assignEmails = {
+																...assignEmails,
+																[d.id]: e.currentTarget.value
+															};
+														}}
+														onkeydown={(e) => {
+															if (e.key === "Enter") {
+																e.preventDefault();
+																tetapkanDonasi(d);
+															}
+														}}
+													/>
+													<button
+														type="button"
+														class="btn btn-primary shrink-0 !px-2.5 !py-1.5 text-xs"
+														disabled={assigningId === d.id}
+														onclick={() => tetapkanDonasi(d)}
+													>
+														{assigningId === d.id ? "Menyimpan..." : "Tetapkan"}
+													</button>
+												</div>
+												{#if assignErrors[d.id]}
+													<p class="err mt-1">{assignErrors[d.id]}</p>
+												{/if}
+											{:else}
+												<span class="text-[#5f6b62]">Sudah ditetapkan</span>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			{/if}
 		</div>
 	</div>

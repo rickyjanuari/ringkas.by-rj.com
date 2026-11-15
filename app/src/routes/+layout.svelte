@@ -6,12 +6,13 @@
 	import { goto } from "$app/navigation";
 	import { auth, cartCount } from "$lib/store";
 	import { api, getToken, type User } from "$lib/api";
+	import { applyCachedSettings, loadSettings, applySettings, settingsStore } from "$lib/settings";
 	import Icon from "$lib/Icon.svelte";
 
 	let { children }: { children?: Snippet } = $props();
 
 	// Halaman layar penuh tanpa tab bar.
-	const NO_TAB_PREFIXES = ["/produk/", "/checkout", "/belajar", "/admin", "/peta-belajar", "/soal-sulitku", "/soal-cerita", "/cerita", "/anbk", "/latihan-adaptif", "/rekam-suara", "/jadwal-belajar", "/kuis-guru"];
+	const NO_TAB_PREFIXES = ["/produk/", "/checkout", "/belajar", "/admin", "/peta-belajar", "/soal-sulitku", "/soal-cerita", "/cerita", "/anbk", "/latihan-adaptif", "/latihan-tanpa-habis", "/rekam-suara", "/jadwal-belajar", "/kuis-guru"];
 	let hideTabs = $derived(
 		NO_TAB_PREFIXES.some((p) => $page.url.pathname.startsWith(p))
 	);
@@ -22,7 +23,16 @@
 	});
 
 	// Bila ada token tapi profil belum dimuat, ambil dari server.
+	// Pengaturan aksesibilitas/hemat data: terapkan cache dulu (instan),
+	// lalu sinkronkan dari server bila sudah masuk. Label header memakai
+	// store agar ikut berubah bila pengaturan diubah di halaman lain.
+	let dataSaver = $derived($settingsStore.data_saver === 1);
 	onMount(async () => {
+		applyCachedSettings();
+		if (getToken()) {
+			const settings = await loadSettings();
+			applySettings(settings);
+		}
 		if (getToken() && !$auth.user) {
 			try {
 				const { user } = await api<{ user: User }>("/api/auth/me");
@@ -56,13 +66,18 @@
 					alt="Logo Ringkas"
 					width="24"
 					height="24"
-					class="h-6 w-6 shrink-0"
+					class="datasaver-hide h-6 w-6 shrink-0"
 				/>
 				<span class="text-[19px] font-extrabold tracking-tight text-[#22302a]">Ringkas</span>
 			</a>
 			<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-bold text-[#92400e] sm:inline">
 				Teman Belajar
 			</span>
+			{#if dataSaver}
+				<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-bold text-[#115c39]">
+					<Icon name="zap" size={12} /> Mode Hemat Data
+				</span>
+			{/if}
 			<div class="ml-auto flex items-center gap-2">
 				{#if $auth.user}
 					<a href="/akun" class="flex items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-bold text-[#177245]">
@@ -84,12 +99,17 @@
 					alt="Logo Ringkas"
 					width="24"
 					height="24"
-					class="h-6 w-6 shrink-0"
+					class="datasaver-hide h-6 w-6 shrink-0"
 				/>
 				<span class="text-[19px] font-extrabold tracking-tight text-[#22302a]">Ringkas</span>
 				<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-bold text-[#92400e] xl:inline">
 					Teman Belajar
 				</span>
+				{#if dataSaver}
+					<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-bold text-[#115c39]">
+						<Icon name="zap" size={12} /> Mode Hemat Data
+					</span>
+				{/if}
 			</a>
 			<nav class="flex shrink-0 items-center gap-1 text-sm font-bold" aria-label="Menu utama">
 				<a href="/" class="navlink" class:active={tabActive("/")}>Beranda</a>
@@ -143,7 +163,7 @@
 						alt=""
 						width="22"
 						height="22"
-						class="h-[22px] w-[22px] shrink-0"
+						class="datasaver-hide h-[22px] w-[22px] shrink-0"
 					/>
 					<span>Ringkas</span>
 				</p>

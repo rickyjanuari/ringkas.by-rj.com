@@ -367,6 +367,9 @@
 		<a href="/latihan-adaptif" class="btn btn-outline">
 			<Icon name="zap" size={16} /> Latihan Adaptif
 		</a>
+		<a href="/latihan-tanpa-habis" class="btn btn-outline">
+			<Icon name="refresh" size={16} /> Latihan Tanpa Habis
+		</a>
 		<a href="/kuis-guru" class="btn btn-outline">
 			<Icon name="school" size={16} /> Kuis Buatan Guru
 		</a>

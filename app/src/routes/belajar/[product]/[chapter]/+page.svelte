@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
+	import BottomSheet from "$lib/BottomSheet.svelte";
 	import NumberLine from "$lib/tools/NumberLine.svelte";
 	import MultiplicationTable from "$lib/tools/MultiplicationTable.svelte";
 	import FractionCalculator from "$lib/tools/FractionCalculator.svelte";
@@ -123,6 +124,64 @@
 		return "badge badge-gray";
 	}
 
+	// Glosarium: istilah di Teks Fokus bisa diketuk untuk melihat artinya.
+	interface GlossaryTerm {
+		term: string;
+		meaning: string;
+	}
+	let glossary = $state<GlossaryTerm[]>([]);
+	let selectedTerm = $state<GlossaryTerm | null>(null);
+	let glossaryOpen = $state(false);
+
+	async function muatGlossary() {
+		if (!chapter) return;
+		try {
+			const data = await api<{ terms: GlossaryTerm[] }>(
+				`/api/study/${productId}/${chapterId}/glossary`
+			);
+			glossary = (data.terms ?? []).filter((t) => t.term?.trim() && t.meaning?.trim());
+		} catch {
+			// Best-effort: gagal memuat glosarium bukan error halaman.
+			glossary = [];
+		}
+	}
+
+	function bukaIstilah(t: GlossaryTerm) {
+		selectedTerm = t;
+		glossaryOpen = true;
+	}
+
+	// Bagi Teks Fokus menjadi potongan teks biasa + kemunculan pertama tiap
+	// istilah glosarium (cocok case-insensitive pada batas kata). Teks asli
+	// tidak diubah selain penanda ini.
+	type FocusSegment =
+		| { kind: "text"; text: string }
+		| { kind: "term"; text: string; term: GlossaryTerm };
+	let focusSegments = $derived.by((): FocusSegment[] => {
+		const text = chapter?.focus_text ?? "";
+		if (!text || glossary.length === 0) return [{ kind: "text", text }];
+		const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const sorted = [...glossary].sort((a, b) => b.term.length - a.term.length);
+		const pattern = new RegExp(`\\b(${sorted.map((t) => escapeRe(t.term)).join("|")})\\b`, "gi");
+		const byLower = new Map(sorted.map((t) => [t.term.toLowerCase(), t]));
+		const seen = new Set<string>();
+		const out: FocusSegment[] = [];
+		let last = 0;
+		for (const m of text.matchAll(pattern)) {
+			const matched = m[0] ?? "";
+			const idx = m.index ?? 0;
+			const key = matched.toLowerCase();
+			const term = byLower.get(key);
+			if (!term || seen.has(key)) continue;
+			seen.add(key);
+			if (idx > last) out.push({ kind: "text", text: text.slice(last, idx) });
+			out.push({ kind: "term", text: matched, term });
+			last = idx + matched.length;
+		}
+		if (last < text.length) out.push({ kind: "text", text: text.slice(last) });
+		return out;
+	});
+
 	onMount(async () => {
 		if (!getToken()) {
 			goto("/akun");
@@ -134,6 +193,7 @@
 			if (!found) throw new Error("Bab tidak ditemukan.");
 			chapter = found;
 			void muatQa();
+			void muatGlossary();
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Gagal memuat bab.";
 		} finally {
@@ -347,7 +407,7 @@
 				</button>
 			</div>
 		</div>
-		<p class="mt-2 whitespace-pre-line {fontSizes[fontStep]}">{chapter.focus_text}</p>
+		<p class="mt-2 whitespace-pre-line {fontSizes[fontStep]}">{#each focusSegments as seg, i (i)}{#if seg.kind === "term"}<button type="button" class="glossary-term" onclick={() => bukaIstilah(seg.term)}>{seg.text}</button>{:else}{seg.text}{/if}{/each}</p>
 	</div>
 
 	<!-- Catatan pribadi -->
@@ -595,4 +655,15 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Glosarium: arti istilah yang diketuk di Teks Fokus -->
+	<BottomSheet
+		open={glossaryOpen}
+		title={selectedTerm?.term ?? "Istilah"}
+		onClose={() => (glossaryOpen = false)}
+	>
+		{#if selectedTerm}
+			<p class="text-sm leading-relaxed">{selectedTerm.meaning}</p>
+		{/if}
+	</BottomSheet>
 {/if}

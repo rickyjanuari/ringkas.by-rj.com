@@ -235,3 +235,113 @@ label.lbl {
 	background: #dcefe2;
 	color: #115c39;
 }
+
+/* --- Aksesibilitas & hemat data (diaktifkan lewat atribut di <html>) --- */
+
+/* Font mudah dibaca (Atkinson Hyperlegible): hanya bila diaktifkan. */
+[data-a11y-font="1"] body,
+[data-a11y-font="1"] h1,
+[data-a11y-font="1"] h2,
+[data-a11y-font="1"] h3 {
+	font-family: "Atkinson Hyperlegible", "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+	letter-spacing: 0.01em;
+}
+[data-a11y-font="1"] p,
+[data-a11y-font="1"] li,
+[data-a11y-font="1"] span,
+[data-a11y-font="1"] label {
+	letter-spacing: 0.01em;
+}
+[data-a11y-font="1"] p {
+	line-height: 1.7;
+}
+
+/* Kontras tinggi: latar putih, teks nyaris hitam, tombol tetap emerald. */
+[data-a11y-contrast="1"] body {
+	background-color: #ffffff;
+	background-image: none;
+	color: #111111;
+}
+[data-a11y-contrast="1"] .card {
+	background: #ffffff;
+	border-color: rgb(0 0 0 / 0.2);
+}
+[data-a11y-contrast="1"] .btn-primary,
+[data-a11y-contrast="1"] .btn-leaf {
+	background: #0f5c33;
+}
+[data-a11y-contrast="1"] .btn-primary:hover {
+	background: #0a4526;
+}
+[data-a11y-contrast="1"] .btn-outline {
+	border-color: #0f5c33;
+	color: #0f5c33;
+}
+[data-a11y-contrast="1"] .muted,
+[data-a11y-contrast="1"] label.lbl {
+	color: #111111;
+}
+[data-a11y-contrast="1"] a {
+	color: #0b4d29;
+}
+[data-a11y-contrast="1"] .input {
+	border-color: rgb(0 0 0 / 0.4);
+	color: #111111;
+}
+[data-a11y-contrast="1"] .chip {
+	border-color: rgb(0 0 0 / 0.4);
+	color: #111111;
+}
+
+/* Teks besar: naik satu tingkat dari ukuran dasar. */
+[data-a11y-large="1"] {
+	font-size: 112.5%;
+}
+
+/* Mode hemat data: sembunyikan gambar sampul/fitur + matikan animasi. */
+[data-saver="1"] .datasaver-hide {
+	display: none !important;
+}
+[data-saver="1"] *,
+[data-saver="1"] *::before,
+[data-saver="1"] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
+}
+
+/* Istilah glosarium di Teks Fokus: ketuk untuk melihat artinya. */
+.glossary-term {
+	display: inline;
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font: inherit;
+	color: #177245;
+	font-weight: 800;
+	text-decoration: underline dotted;
+	text-underline-offset: 3px;
+}
+.glossary-term:hover {
+	color: #115c39;
+}
+
+/* Hormati preferensi sistem: kurangi gerakan. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+	.map-ping,
+	.animate-pulse {
+		animation: none !important;
+	}
+	.btn,
+	.tablink {
+		transition: none !important;
+	}
+}

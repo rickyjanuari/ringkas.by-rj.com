@@ -21,6 +21,11 @@ import { registerXpRoutes } from "./xp.js";
 import { registerJournalRoutes } from "./journal.js";
 import { registerExamRoutes } from "./exam.js";
 import { registerStoriesRoutes } from "./stories.js";
+import { registerSettingsRoutes } from "./settings.js";
+import { registerPortfolioRoutes } from "./portfolio.js";
+import { registerEndlessRoutes } from "./endless.js";
+import { registerGlossaryRoutes } from "./glossary.js";
+import { registerDonationRoutes } from "./donations.js";
 import type { Database } from "./database.js";
 import type { ImageStorage } from "./storage.js";
 
@@ -58,6 +63,11 @@ export function createApp(db: Database, opts: AppOptions): Hono {
   registerJournalRoutes(app, db);
   registerExamRoutes(app, db);
   registerStoriesRoutes(app, db);
+  registerSettingsRoutes(app, db);
+  registerPortfolioRoutes(app, db);
+  registerEndlessRoutes(app, db);
+  registerGlossaryRoutes(app, db);
+  registerDonationRoutes(app, db);
 
   return app;
 }

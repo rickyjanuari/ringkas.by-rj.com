@@ -24,6 +24,7 @@
 		gift_claimed?: boolean;
 		is_gift_received?: boolean;
 		gift_from_name?: string | null;
+		donated?: boolean;
 	};
 
 	let orders = $state<OrderGift[]>([]);
@@ -170,6 +171,12 @@
 					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
 						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
 						<span>Hadiah dari {o.gift_from_name ?? "seseorang"} — selamat belajar!</span>
+					</p>
+				{/if}
+				{#if o.donated}
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+						<Icon name="thumbs-up" size={16} class="mt-0.5 shrink-0" />
+						<span>Kamu mendonasikan 1 akses</span>
 					</p>
 				{/if}
 

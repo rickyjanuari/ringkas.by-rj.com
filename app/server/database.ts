@@ -144,6 +144,41 @@ export interface Session {
   created_at: string;
 }
 
+/** Pengaturan akses akun (migrasi 0014) — semua saklar 0/1. */
+export interface UserSettings {
+  user_id: string;
+  readable_font: number;
+  high_contrast: number;
+  large_text: number;
+  data_saver: number;
+  updated_at: string | null;
+}
+
+/** Satu karya di portofolio anak (migrasi 0014). */
+export interface PortfolioItem {
+  id: number;
+  user_id: string;
+  title: string;
+  caption: string | null;
+  /** Data URL gambar (data:image/jpeg;base64,... atau png), maks. 200 KB. */
+  image: string;
+  created_at: string;
+}
+
+/** Satu donasi "beli 1, donasi 1" (migrasi 0014). */
+export interface Donation {
+  id: string;
+  order_id: string;
+  product_id: string;
+  donor_user_id: string;
+  amount: number;
+  /** 'pending' (order dibuat) | 'available' (order LUNAS) | 'assigned' (sudah ditugaskan). */
+  status: string;
+  recipient_user_id: string | null;
+  assigned_at: string | null;
+  created_at: string;
+}
+
 export function nowIso(): string {
   return new Date().toISOString();
 }

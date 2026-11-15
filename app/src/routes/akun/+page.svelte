@@ -23,6 +23,11 @@
 		type TrackerData
 	} from "$lib/api";
 	import { auth } from "$lib/store";
+	import {
+		loadSettings,
+		saveSettings,
+		type UserSettings
+	} from "$lib/settings";
 
 	// ---- Auth form ----
 	let mode = $state<"login" | "register">("login");
@@ -389,6 +394,8 @@
 			await loadXp();
 			await loadJournal();
 			await loadExamDates();
+			await loadAccSettings();
+			await loadPortfolioCount();
 		} catch {
 			/* belum login — api() sudah menghapus token */
 		}
@@ -400,6 +407,50 @@
 			hardTotal = data.total ?? 0;
 		} catch {
 			hardTotal = null;
+		}
+	}
+
+	// ---- Aksesibilitas & Hemat Data + Portofolioku ----
+	const OPSI_AKSES: { key: keyof UserSettings; label: string; desc: string }[] = [
+		{ key: "readable_font", label: "Font ramah baca", desc: "Huruf Atkinson Hyperlegible, spasi lebih lega" },
+		{ key: "high_contrast", label: "Kontras tinggi", desc: "Teks lebih tegas di atas latar putih" },
+		{ key: "large_text", label: "Huruf besar", desc: "Ukuran teks naik satu tingkat" },
+		{ key: "data_saver", label: "Mode hemat data", desc: "Sembunyikan gambar berat; video hanya dimuat saat diketuk" }
+	];
+	let accSettings = $state<UserSettings | null>(null);
+	let accSaving = $state<keyof UserSettings | null>(null);
+	let accError = $state("");
+	let portfolioCount = $state<number | null>(null);
+
+	async function loadAccSettings() {
+		try {
+			accSettings = await loadSettings();
+		} catch {
+			accSettings = null;
+		}
+	}
+	async function loadPortfolioCount() {
+		try {
+			const data = await api<{ items: unknown[] }>("/api/portfolio");
+			portfolioCount = data.items?.length ?? 0;
+		} catch {
+			portfolioCount = null;
+		}
+	}
+	async function toggleAcc(key: keyof UserSettings) {
+		if (!accSettings || accSaving) return;
+		const lama = accSettings[key];
+		const baru = (lama === 1 ? 0 : 1) as 0 | 1;
+		accSettings = { ...accSettings, [key]: baru };
+		accSaving = key;
+		accError = "";
+		try {
+			accSettings = await saveSettings({ [key]: baru });
+		} catch (e) {
+			accSettings = { ...accSettings, [key]: lama };
+			accError = e instanceof Error ? e.message : "Gagal menyimpan pengaturan.";
+		} finally {
+			accSaving = null;
 		}
 	}
 
@@ -1164,6 +1215,59 @@
 		{/if}
 	</div>
 
+	<!-- Aksesibilitas & Hemat Data -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="eye" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Aksesibilitas &amp; Hemat Data</p>
+				<p class="text-xs text-[#5f6b62]">Atur tampilan supaya lebih nyaman dibaca dan lebih ringan. Tersimpan di akunmu.</p>
+			</div>
+		</div>
+		{#if accSettings}
+			<div class="mt-3 space-y-2">
+				{#each OPSI_AKSES as t (t.key)}
+					<label class="flex cursor-pointer items-center gap-3 rounded-xl bg-[#f7f5ef] px-3 py-2.5">
+						<input
+							type="checkbox"
+							class="h-5 w-5 shrink-0 accent-[#177245]"
+							checked={accSettings[t.key] === 1}
+							disabled={accSaving !== null}
+							onchange={() => toggleAcc(t.key)}
+						/>
+						<span class="min-w-0 flex-1">
+							<span class="block text-sm font-extrabold">{t.label}</span>
+							<span class="block text-xs text-[#5f6b62]">{t.desc}</span>
+						</span>
+					</label>
+				{/each}
+			</div>
+		{:else}
+			<p class="mt-3 text-sm text-[#5f6b62]">Memuat pengaturan...</p>
+		{/if}
+		{#if accError}
+			<p class="err mt-3">{accError}</p>
+		{/if}
+	</div>
+
+	<!-- Portofolioku -->
+	<div class="card mt-3 p-4">
+		<div class="flex items-center gap-3">
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="pen" size={22} /></span>
+			<div class="min-w-0 flex-1">
+				<p class="font-extrabold">Portofolioku</p>
+				<p class="text-xs text-[#5f6b62]">
+					{#if portfolioCount === null}
+						Karyamu — orang tua dan gurumu bisa memberi bintang dan komentar.
+					{:else}
+						Kamu punya {portfolioCount} karya. Orang tua dan gurumu bisa memberi bintang dan komentar.
+					{/if}
+				</p>
+			</div>
+			<a href="/portofolio" class="btn btn-leaf shrink-0 !px-3 !py-2 text-xs"><Icon name="pen" size={14} /> Buka Portofolio</a>
+		</div>
+	</div>
+
 	<!-- Hitung Mundur SAS -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center gap-3">
@@ -1772,6 +1876,12 @@
 												<Icon name="book-open" size={14} /> Jurnal {c.name}
 												<Icon name={childJ(c.id).open ? "chevron-down" : "chevron-right"} size={14} />
 											</button>
+											<a
+												href={`/portofolio?anak=${encodeURIComponent(c.id)}`}
+												class="btn btn-ghost !px-2.5 !py-1.5 text-xs"
+											>
+												<Icon name="pen" size={14} /> Portofolio {c.name.split(" ")[0]}
+											</a>
 											{#if childJ(c.id).open}
 												{#if childJ(c.id).loading}
 													<p class="mt-2 text-sm text-[#5f6b62]">Memuat jurnal...</p>
@@ -1868,6 +1978,12 @@
 							>
 								<Icon name="download" size={15} /> Unduh Rekap (CSV)
 							</button>
+							<a
+								href={`/portofolio?kelas=${encodeURIComponent(classDetail.class.id)}`}
+								class="btn btn-ghost mt-2 ml-2 text-xs"
+							>
+								<Icon name="pen" size={15} /> Portofolio Murid
+							</a>
 						</div>
 					{/if}
 				</div>

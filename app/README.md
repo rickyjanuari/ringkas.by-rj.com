@@ -154,6 +154,7 @@ sudah terverifikasi mengembalikan PDF valid di keduanya).
 - Order: `GET /api/orders`, `GET /api/orders/:id/receipt` (PDF), `GET /api/orders/:id/download/:product_id` (PDF), `GET /api/order-email-data/:order_id`
 - Belajar: `GET /api/study/:product_id` (bab/simulasi membawa `free`/`locked` — Coba Gratis), `GET /api/simulations/:id/questions`, `POST /api/quiz/submit` (balasan membawa `attempt_id` + `passed` + `focus_switches`; kind baru `"story"`), `GET /api/certificate/:attemptId` (PDF sertifikat, lulus ≥ 70%), `POST /api/study/chapter-done`, `POST /api/bookmark|note`, `GET /api/search`, `GET /api/daily`, `GET /api/tracker`, `GET /api/stickers`, `GET /api/prediction` (prediksi nilai SAS), `GET /api/study/:product_id/:chapter_id/worksheet`
 - Soal Sulitku & Cerita: `GET /api/hard-bank`, `POST /api/hard-bank/practice`, `GET /api/story/:grade/:subject` (`:subject` = `matematika` | `bahasa-indonesia`)
+- Akses & dampak: `GET/POST /api/settings/me`, `POST/GET /api/portfolio`, `GET /api/portfolio/:id`, `POST /api/portfolio/:id/star|comment`, `GET /api/parent/children/:id/portfolio`, `GET /api/classes/:id/portfolio`, `GET /api/endless/:grade`, `POST /api/endless/:grade/submit`, `GET /api/study/:product/:chapter/glossary`, `GET /api/admin/donations`, `POST /api/admin/donations/:id/assign`; checkout menerima `donate: true` (tagihan = finalTotal + harga produk, `order` membawa `donated`)
 - Keluarga & kelas: `POST /api/parent/link|redeem`, `GET /api/parent/children`, `POST /api/parent/lock|target`, `POST /api/class`, `POST /api/class/join`, `GET /api/class/:id`, `GET /api/class/:id/recap` (CSV)
 - Admin statistik: `GET /api/admin/stats` (hanya admin) — kartu Ringkasan + 10 order terbaru
 
@@ -454,6 +455,74 @@ menampilkan judul halaman + nama admin yang login.
   nomor orang tua harus diawali `62` (bukan `08`) dan tersimpan di
   profil orang tua — nomor yang salah format membuat kirim dilewati
   (`skipped: 'no-number'`, tercatat di log cron, bukan error).
+
+## Akses & dampak (2026-11-15, migrasi `0014_akses_dampak.sql`)
+
+- **Pengaturan Akun** — `GET /api/settings/me` (Bearer) →
+  `{settings: {readable_font, high_contrast, large_text, data_saver}}`
+  (semua 0 bila belum pernah disimpan); `POST /api/settings/me`
+  (Bearer) body parsial (hanya nilai 0/1 diterima, field lain
+  diabaikan) → UPSERT ke `user_settings` + `{settings}` yang
+  tersimpan. Font ramah disleksia, kontras tinggi, huruf besar, dan
+  mode hemat data.
+- **Portofolio Karya Anak** — anak mengunggah foto karyanya
+  (`POST /api/portfolio`, judul maks. 100 karakter, keterangan maks.
+  300 karakter, gambar JPEG/PNG data URL **maks. 200 KB** — lebih →
+  413 — **maks. 20 karya per anak** — lebih → 400) → 201 `{item}`
+  (lengkap termasuk image). `GET /api/portfolio` → `{items}` milik
+  sendiri, terbaru dulu, tiap item membawa `stars_avg` (1 desimal
+  atau null), `stars_count`, `comments_count`. `GET
+  /api/portfolio/:id` → `{item, stars: [{by_name, stars}], comments:
+  [{by_name, text, created_at}]}` — boleh dilihat pemilik, orang tua
+  terhubung, atau guru kelasnya (selain itu 403). Bintang
+  (`POST /api/portfolio/:id/star {stars 1–5}`, UPSERT per pemberi)
+  dan komentar (`POST /api/portfolio/:id/comment {text 1–300}`)
+  HANYA untuk orang tua terhubung / guru kelasnya — pemilik sendiri
+  → 403. `GET /api/parent/children/:id/portfolio` (orang tua
+  terhubung) dan `GET /api/classes/:id/portfolio` (guru pemilik kelas;
+  tiap item membawa `owner_name`). Nama pemberi = nama depan +
+  inisial (pola rekaman suara).
+- **Latihan Tanpa Habis** — `GET /api/endless/:grade` (Bearer, kelas
+  1–6) → `{set_id, grade, questions: [{id, question, options: [4],
+  points: 1}]}`: 5 soal aritmetika SEGAR tiap panggilan (angka acak,
+  tanpa seed), TANPA jawaban. Rentang per kelas: **K1** tambah/kurang
+  hasil ≤ 20; **K2** tambah/kurang s.d. 100; **K3** perkalian 2–9;
+  **K4** perkalian s.d. 12 + pembagian hasil bulat; **K5** pecahan
+  sederhana (tambah/kurang penyebut sama, hasil disederhanakan) +
+  desimal 1 angka (`2,5`); **K6** operasi campuran 2 langkah,
+  bilangan s.d. 100. `POST /api/endless/:grade/submit {set_id,
+  answers}` → dinilai server-side → `{score, max, reviews: [{id,
+  question, correct, answer, given, discussion}]}` (pembahasan
+  teman-belajar, mis. `"Benar! 7 + 5 = 12."`). Attempt tercatat
+  kind `'endless'` — prediksi SAS hanya memakai kind
+  `'simulation'`, jadi TIDAK memengaruhi prediksi.
+- **Glosarium Ketuk-Kata** — `GET
+  /api/study/:product/:chapter/glossary` (Bearer) → `{terms:
+  [{term, meaning}]}` dari flashcard bab itu (front → istilah, back
+  → arti, urut id). TIDAK ada contoh (flashcard tidak punya contoh).
+  Gating sama seperti Ruang Belajar: bab pertama gratis, bab lain
+  butuh LUNAS (terkunci → 403); bab tidak ada → 404.
+- **Beli 1, Donasi 1** — checkout dengan `donate: true` menagih
+  **2× tagihan (harga produk + donasi penuh)**: yang dibayar ke
+  KlikQRIS = harga setelah diskon voucher + jumlah harga produk
+  SEBELUM diskon. Satu baris `donations` per order (status
+  `pending` → `available` saat order LUNAS → `assigned` saat admin
+  menugaskan). `orderOut` membawa `donated: boolean`. Admin: `GET
+  /api/admin/donations` → `{donations: [{id, order_id,
+  product_title, donor_name, donor_email, amount, status,
+  recipient_name, recipient_email, created_at, assigned_at}]}`;
+  `POST /api/admin/donations/:id/assign {email}` → akun tidak ada
+  404 `"Akun tidak ditemukan"`; donasi harus `'available'`; akses
+  produk penerima dicatat di `gift_grants` (gating LUNAS yang sudah
+  ada langsung mengenalinya); tercatat `logAdminAction
+  "donation_assign"`; → `{ok: true}`. Batasan jujur: donasi merujuk
+  ke SATU produk per order (baris berbayar pertama; bila checkout
+  berisi bundel, itu id bundelnya); struk/`orders.total` tetap
+  menampilkan harga setelah diskon (tanpa baris donasi) — total yang
+  benar-benar dibayar tercatat di `total_amount`.
+- **Deploy**: `git pull` → `wrangler d1 migrations apply ringkas-db
+  --remote` (0014 SEBELUM deploy) → `npm run build && wrangler
+  deploy`.
 
 ## Status jujur (v1, diverifikasi 2026-11-15)
 

@@ -43,6 +43,7 @@ import {
 } from "./email.js";
 import { jobDate, runDailyJob, runWeeklyJob } from "./cron.js";
 import { awardXp } from "./xp.js";
+import { fulfillDonationOrder, orderHasDonation, recordDonation } from "./donations.js";
 // Modul seed dibuat agen lain (server/seed/study.ts belum ada saat berkas ini
 // ditulis) — abaikan error resolusi modul sampai modul itu tersedia.
 // @ts-ignore
@@ -534,6 +535,9 @@ async function handlePaidOrder(db: Database, order: OrderRow): Promise<void> {
   } catch (err) {
     console.error("[paid] tindak lanjut order gagal:", err);
   }
+  // Donasi "beli 1, donasi 1": baris 'pending' order ini menjadi
+  // 'available' (siap ditugaskan admin). Tidak pernah melempar.
+  await fulfillDonationOrder(db, order);
   await grantReferralRewards(db, order);
 }
 
@@ -803,6 +807,9 @@ async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unkno
     created_at: o.created_at,
     paid_at: o.paid_at,
     is_gift: isGift,
+    // Donasi "beli 1, donasi 1": true bila order ini punya baris
+    // donations (migrasi 0014). Bentuk respons lain tidak berubah.
+    donated: await orderHasDonation(db, o.id),
     gift_recipient_email: o.gift_recipient_email ?? null,
     gift_recipient_name: o.gift_recipient_name ?? null,
     gift_message: o.gift_message ?? null,
@@ -2718,6 +2725,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       : [];
     if (items.length === 0) return c.json({ error: "Keranjang masih kosong." }, 400);
     const idempotencyKey = asString(body.idempotency_key).trim() || null;
+    // Donasi "beli 1, donasi 1" (migrasi 0014): default false — alur
+    // checkout normal tidak berubah bila flag ini tidak dikirim.
+    const donate = body.donate === true;
 
     const products: Product[] = [];
     for (const pid of items) {
@@ -2811,7 +2821,10 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       const notExpired = !o.expired_at || new Date(o.expired_at).getTime() > Date.now();
       // Order hadiah hanya cocok dengan order hadiah ke penerima yang sama.
       const sameGift = (o.gift_recipient_email ?? null) === giftEmail;
-      if (oKey === itemsKey && (o.voucher_code ?? null) === voucherCode && sameGift && notExpired) {
+      // Order donasi hanya cocok dengan order donasi (dan sebaliknya):
+      // order lama punya baris donations ⇔ checkout ini donate.
+      const sameDonate = (await orderHasDonation(db, o.id)) === donate;
+      if (oKey === itemsKey && (o.voucher_code ?? null) === voucherCode && sameGift && sameDonate && notExpired) {
         return c.json({ order: await orderOut(db, o) });
       }
     }
@@ -2825,12 +2838,20 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       discount = v.discount;
     }
     const finalTotal = Math.max(total - discount, 100);
+    // Donasi: jumlahnya = total harga produk SEBELUM diskon voucher
+    // (anggota bundel berharga 0, jadi tidak mengubah jumlah); yang
+    // ditagih ke KlikQRIS = finalTotal + donationAmount (donasi = 2×
+    // tagihan: harga produk + donasi penuh). Kolom orders.total tetap
+    // menyimpan finalTotal (harga setelah diskon, tanpa donasi) —
+    // total yang benar-benar dibayar tercatat di total_amount.
+    const donationAmount = donate ? total : 0;
+    const chargeTotal = finalTotal + donationAmount;
 
     const orderId = `RM-${randomAlphaNum(12)}`;
     const orderItems = await expandBundleItems(db, products);
     let qris;
     try {
-      qris = await createQris(orderId, finalTotal, `Ringkas ${orderId}`);
+      qris = await createQris(orderId, chargeTotal, `Ringkas ${orderId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("belum dikonfigurasi")) {
@@ -2878,6 +2899,14 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
           orderId
         )
         .catch((err) => console.error("[checkout] hadiah gagal disimpan:", err));
+    }
+    // Donasi disimpan terpisah dari INSERT utama (best-effort, pola
+    // yang sama seperti hadiah): bila tabel donations belum ada
+    // (migrasi 0014 belum diterapkan), order tetap jadi sebagai
+    // order biasa, bukan gagal checkout. product_id = baris berbayar
+    // pertama (produk inti; bila bundel, id bundelnya).
+    if (donate) {
+      await recordDonation(db, orderId, products[0]?.id ?? "", user.id, total);
     }
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
     if (!order) return c.json({ error: "Gagal membuat order." }, 500);
