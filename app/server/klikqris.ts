@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import QRCode from "qrcode";
 import { getEnv } from "./env.js";
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,33 @@ function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null
   return null;
 }
 
+/** Benar bila nilainya menunjuk berkas gambar (data URI atau URL berekstensi gambar). */
+function isImageHref(v: string | null): boolean {
+  if (!v) return false;
+  if (v.startsWith("data:image/")) return true;
+  try {
+    const u = new URL(v, "https://contoh.id");
+    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/** Base64/data-URI gambar QR -> data URI siap pakai di <img>; null bila bukan gambar. */
+function normalizeQrImage(v: string | null): string | null {
+  if (!v) return null;
+  const t = v.trim().replace(/\s+/g, "");
+  if (!t) return null;
+  if (t.startsWith("data:image/")) return t;
+  if (/^[A-Za-z0-9+/=]{100,}$/.test(t)) return `data:image/png;base64,${t}`;
+  return null;
+}
+
+/** String payload QRIS (EMVCo) selalu diawali 000201. */
+function isQrPayload(v: string | null): v is string {
+  return !!v && v.startsWith("000201");
+}
+
 export async function createQris(
   orderId: string,
   amount: number,
@@ -72,8 +100,47 @@ export async function createQris(
     const msg = pickString(data, ["message", "error"]) ?? pickString(root, ["message", "error"]);
     throw new Error(msg ? `KlikQRIS gagal: ${msg}` : `KlikQRIS gagal (HTTP ${res.status})`);
   }
-  const qris_url = pickString(data, ["qris_url", "qr_url", "qris", "qr_image_url", "image_url"]);
-  const direct_url = pickString(data, ["direct_url", "payment_url", "checkout_url", "url"]);
+  // Bentuk respons KlikQRIS berubah-ubah; yang disimpan sebagai qris_url
+  // HARUS berupa sumber gambar (<img>), bukan URL halaman bayar:
+  //  1) qris_image (base64/data URI) — gambar QR langsung dari API.
+  //  2) string payload QRIS (000201...) — gambar dibuat sendiri dari
+  //     payload (QRCode.toString svg; cara yang sama sudah dipakai
+  //     untuk QR TOTP di Worker). Isi QR-nya identik dengan payload.
+  //  3) URL yang memang menunjuk berkas gambar (berekstensi .png/dll).
+  // URL halaman bayar (tanpa ekstensi gambar) disimpan sebagai
+  // direct_url, supaya tombol "Lanjutkan bayar" tetap jalan.
+  // (Sebelumnya: qris_url diambil mentah-mentah, sehingga URL halaman
+  // bayar tersimpan sebagai "gambar" — isImageUrl di checkout menolaknya
+  // dan gambar QR tidak pernah tampil.)
+  let qris_url = normalizeQrImage(
+    pickString(data, [
+      "qris_image",
+      "qr_image",
+      "qris_image_base64",
+      "qr_image_base64",
+      "image_base64",
+      "image"
+    ])
+  );
+  if (!qris_url) {
+    const payload = pickString(data, ["qr_string", "qris_string", "qris", "qr_content", "payload"]);
+    if (isQrPayload(payload)) {
+      try {
+        const svg = await QRCode.toString(payload, { type: "svg" });
+        qris_url = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+      } catch (err) {
+        console.error("[klikqris] gagal membuat gambar QR dari payload:", err);
+      }
+    }
+  }
+  if (!qris_url) {
+    const imgUrl = pickString(data, ["qris_url", "qr_url", "qr_image_url", "image_url", "qris_image"]);
+    if (isImageHref(imgUrl)) qris_url = imgUrl;
+  }
+  const pageUrl =
+    pickString(data, ["direct_url", "payment_url", "checkout_url", "url"]) ??
+    pickString(data, ["qris_url", "qr_url"]);
+  const direct_url = pageUrl && !isImageHref(pageUrl) ? pageUrl : null;
   if (!qris_url && !direct_url) {
     throw new Error("KlikQRIS tidak mengembalikan kode QR");
   }

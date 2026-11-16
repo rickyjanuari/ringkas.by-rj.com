@@ -36,6 +36,13 @@
 	let order = $state<OrderGift | null>(null);
 	let createError = $state("");
 	let statusMsg = $state("");
+	// Sumber gambar QR: hanya dipakai bila benar-benar berupa gambar
+	// (data URI atau URL berekstensi gambar). Bila gambar gagal dimuat,
+	// tampilkan pemberitahuan + tombol lanjut bayar, jangan biarkan
+	// area QR kosong — dan jangan pernah menampilkan URL/payload mentah.
+	let qrFailedFor = $state<string | null>(null);
+	let qrSrc = $derived(order?.qris_url && isImageUrl(order.qris_url) ? order.qris_url : null);
+	let showQr = $derived(qrSrc !== null && qrFailedFor !== order?.id);
 
 	// ---- Voucher ----
 	let voucherCode = $state("");
@@ -248,15 +255,31 @@
 		{:else}
 			<p class="text-lg font-semibold">Scan QRIS untuk membayar</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">Nomor order: <b class="font-semibold">{order.id}</b></p>
-			{#if order.qris_url && isImageUrl(order.qris_url)}
-				<img
-					src={order.qris_url}
-					alt="Kode QRIS pembayaran"
-					class="mx-auto mt-4 h-60 w-60 rounded-2xl border border-[#e7e2d2] object-contain"
-				/>
-			{:else if order.qris_url}
-				<p class="mt-4 break-all rounded-xl bg-[#f7f5ef] p-3 text-xs">{order.qris_url}</p>
-			{/if}
+			{#key order.id}
+				{#if showQr}
+					<img
+						src={qrSrc}
+						alt="Kode QRIS pembayaran"
+						onerror={() => (qrFailedFor = order?.id ?? null)}
+						class="mx-auto mt-4 h-60 w-60 rounded-2xl border border-[#e7e2d2] bg-white object-contain"
+					/>
+				{:else}
+					<div class="mx-auto mt-4 max-w-sm rounded-2xl border border-[#e7e2d2] bg-[#f7f5ef] p-4 text-left">
+						<p class="text-sm font-semibold">Kode QR tidak tampil</p>
+						{#if order.direct_url}
+							<p class="mt-1 text-sm text-[#5f6b62]">
+								Lanjutkan pembayaran lewat tombol "Lanjutkan bayar" di bawah — kode QR-nya ada di
+								halaman pembayaran.
+							</p>
+						{:else}
+							<p class="mt-1 text-sm text-[#5f6b62]">
+								Silakan buat pembayaran baru dari keranjang untuk mendapatkan kode QR yang baru.
+							</p>
+							<a href="/keranjang" class="btn btn-primary mt-3 w-full">Kembali ke keranjang</a>
+						{/if}
+					</div>
+				{/if}
+			{/key}
 			<p class="mt-3 text-2xl font-semibold tabular-nums text-[#177245]">
 				{formatRupiah(order.total_amount ?? order.total)}
 			</p>
