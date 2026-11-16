@@ -1,15 +1,8 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { api, formatRupiah, getToken, type ProductPublic } from "$lib/api";
-	import { auth, cart } from "$lib/store";
-	import {
-		applyCachedSettings,
-		loadSettings,
-		saveSettings,
-		type UserSettings
-	} from "$lib/settings";
-	import Avatar from "$lib/Avatar.svelte";
+	import { api, formatRupiah, type ProductPublic } from "$lib/api";
+	import { cart } from "$lib/store";
 	import Icon from "$lib/Icon.svelte";
 	import { gradeLabel, gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 
@@ -18,185 +11,64 @@
 	let error = $state("");
 	let jenjang = $state("Semua");
 
-	// ---- Saklar cepat aksesibilitas & hemat data (hanya bila login) ----
-	let homeSettings = $state<UserSettings | null>(null);
-	let togglingKey = $state<keyof UserSettings | null>(null);
-
-	async function togglePengaturan(key: keyof UserSettings) {
-		if (!homeSettings || togglingKey) return;
-		const lama = homeSettings[key];
-		const baru = (lama === 1 ? 0 : 1) as 0 | 1;
-		homeSettings = { ...homeSettings, [key]: baru };
-		togglingKey = key;
-		try {
-			homeSettings = await saveSettings({ [key]: baru });
-		} catch {
-			homeSettings = { ...homeSettings, [key]: lama };
-		} finally {
-			togglingKey = null;
-		}
-	}
-
-	// ---- Tryout mendatang (dari /api/tryouts, gagal diam-diam) ----
-	interface TryoutRingkas {
-		id: string;
-		grade: number;
-		title: string;
-		starts_at: string;
-		ends_at: string;
-		duration_minutes: number;
-		question_count: number;
-		is_free: number;
-		phase: "upcoming" | "live" | "ended";
-		participants: number;
-		registered?: boolean;
-	}
-	let tryouts = $state<TryoutRingkas[]>([]);
-	let nowMs = $state(Date.now());
-
-	function hitungMundurTryout(t: TryoutRingkas): string {
-		const start = new Date(t.starts_at).getTime();
-		const end = new Date(t.ends_at).getTime();
-		if (nowMs >= start && nowMs <= end) return "Sedang berlangsung";
-		const sisa = start - nowMs;
-		if (sisa <= 0) return "Sudah berakhir";
-		const h = Math.floor(sisa / 3600000);
-		const d = Math.floor(h / 24);
-		const m = Math.floor((sisa % 3600000) / 60000);
-		if (d > 0) return `Mulai dalam ${d} hari ${h % 24} jam`;
-		if (h > 0) return `Mulai dalam ${h} jam ${m} mnt`;
-		return `Mulai dalam ${m} mnt`;
-	}
-
-	/** Tryout berikutnya per kelas (mendatang/berlangsung), maks. 6 kartu. */
-	let tryoutBerikut = $derived(
-		[1, 2, 3, 4, 5, 6]
-			.map((g) => tryouts.filter((t) => t.grade === g && t.phase !== "ended").sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at))[0])
-			.filter((t): t is TryoutRingkas => !!t)
-	);
-
-	// ---- Level & XP + Hitung mundur SAS (gagal diam-diam) ----
-	type XpMini = {
-		totalXp: number;
-		level: number;
-		xpIntoLevel: number;
-		xpForNextLevel: number;
-		stage: number;
-		stageName: string;
-	};
-	type ExamDateHome = { grade: number; date: string | null; label: string; daysLeft: number | null };
-	let homeXp = $state<XpMini | null>(null);
-	let homeExam = $state<ExamDateHome[] | null>(null);
-	let homeExamFailed = $state(false);
-
-	/** Tanggal ISO (YYYY-MM-DD) ke format Indonesia, tanpa geser zona waktu. */
-	function formatTanggalId(iso: string): string {
-		const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
-		if (Number.isNaN(d.getTime())) return iso;
-		return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-	}
-
-	/** Tanggal SAS terdekat yang sudah diatur (paling sedikit hari lagi, belum lewat). */
-	let homeExamNext = $derived(
-		(homeExam ?? [])
-			.filter((d) => d.date !== null && d.daysLeft !== null && (d.daysLeft as number) >= 0)
-			.sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number))[0] ?? null
-	);
-
-	function homeExamLabel(d: ExamDateHome): string {
-		if (d.daysLeft === 0) return `SAS Kelas ${d.grade} — Hari ini (${formatTanggalId(d.date as string)})`;
-		if (d.daysLeft === 1) return `SAS Kelas ${d.grade} — Besok (${formatTanggalId(d.date as string)})`;
-		return `SAS Kelas ${d.grade} — ${d.daysLeft} hari lagi (${formatTanggalId(d.date as string)})`;
-	}
-
-	// ---- Pengumuman & promo (dari /api/announcement, gagal diam-diam) ----
+	// ---- Pengumuman (dari /api/announcement, gagal diam-diam) ----
 	let announcementText = $state("");
 	let announcementShown = $state(false);
 	let bannerClosed = $state(false);
-	let promoText = $state("");
 
-	// ---- Carousel promo ----
-	const slides = [
+	// ---- Sampul fitur SAS (gambar asli di app/static/) ----
+	const SAS_COVER: Record<string, string> = {
+		"sas-k1-s1": "/feature-sas-kelas-1.png",
+		"sas-k2": "/feature-sas-kelas-2.png",
+		"sas-k3": "/feature-sas-kelas-3.png",
+		"sas-k4": "/feature-sas-kelas-4.png",
+		"sas-k5": "/feature-sas-kelas-5.png",
+		"sas-k6": "/feature-sas-kelas-6.png"
+	};
+
+	// ---- Tumpukan sampul hero: 6 sampul mengipas ----
+	const FAN_COVERS = [1, 2, 3, 4, 5, 6];
+	const FAN_SPREAD = [
+		{ x: -38, r: -10, y: 0 },
+		{ x: -23, r: -6, y: 6 },
+		{ x: -8, r: -2, y: 10 },
+		{ x: 8, r: 2, y: 10 },
+		{ x: 23, r: 6, y: 6 },
+		{ x: 38, r: 10, y: 0 }
+	];
+	function fanStyle(i: number): string {
+		const f = FAN_SPREAD[i];
+		return `left: 50%; transform: translateX(-50%) translateX(${f.x}%) translateY(${f.y}px) rotate(${f.r}deg); z-index: ${i + 1};`;
+	}
+
+	// ---- FAQ (teks persis FaqContent.svelte) ----
+	const FAQ = [
 		{
-			icon: "book-open",
-			kicker: "Belajar jadi ringan",
-			title: "Rangkuman materi SD kelas 1–6",
-			text: "Teman belajar kamu: rangkuman kilat, kuis seru, dan simulasi SAS — semuanya ringkas dan mudah dipahami.",
-			cta: "Cari materi",
-			ctaIcon: "search",
-			href: "/katalog",
-			bg: "#177245"
+			q: "Apa itu Ringkas?",
+			a: "Ringkas adalah teman belajar untuk anak SD: rangkuman materi per bab yang ringkas, kuis per bab, flashcard, dan simulasi SAS per mata pelajaran. Tagline kami: Rangkuman Materi SD, SMP, SMA — saat ini fokus ke SD dulu."
 		},
 		{
-			icon: "trophy",
-			kicker: "Simulasi SAS per mapel",
-			title: "Latihan SAS sesuai struktur baku",
-			text: "Kelas 1–2: 25 soal • Kelas 3: 35 soal • Kelas 4: 38 soal • Kelas 5: 39 soal • Kelas 6: 40 soal. Ada pilihan ganda, benar/salah, menjodohkan, isian, dan uraian.",
-			cta: "Coba simulasi",
-			ctaIcon: "target",
-			href: "/katalog",
-			bg: "#115c39"
+			q: "Bagaimana cara membeli produk?",
+			a: "Pilih produk di Katalog, masukkan ke Keranjang, lalu checkout. Pembayaran hanya lewat KlikQRIS: scan kode QR yang muncul, dan pesananmu berubah menjadi LUNAS setelah pembayaran terkonfirmasi. Satu produk dibeli sekali, tanpa langganan."
 		},
 		{
-			icon: "receipt",
-			kicker: "Paket SAS kelas 1–6",
-			title: "Paket SAS Rp17–21 ribu",
-			text: "Satu paket per kelas, beli sekali lewat KlikQRIS, langsung bisa dipakai latihan di Ruang Belajar.",
-			cta: "Lihat paket SAS",
-			ctaIcon: "shopping-cart",
-			href: "/katalog",
-			bg: "#f2b33d"
+			q: "Di mana materi saya setelah membayar?",
+			a: "Buka tab Pesanan — pesanan LUNAS punya tombol Belajar dan unduhan PDF. Ada juga link produk eksternal (misalnya Google Drive) bila tersedia untuk produk itu."
+		},
+		{
+			q: "Apa itu simulasi SAS?",
+			a: "Simulasi Sumatif Akhir Semester per mata pelajaran, dengan jumlah soal dan waktu sesuai struktur baku per kelas: Kelas 1–2 sebanyak 25 soal (60 menit), Kelas 3 sebanyak 35 soal (70 menit), Kelas 4 sebanyak 38 soal (80 menit), Kelas 5 sebanyak 39 soal (90 menit), dan Kelas 6 sebanyak 40 soal (90 menit)."
+		},
+		{
+			q: "Apakah progres belajar saya tersimpan?",
+			a: "Ya, bila kamu masuk dengan akun. Bab yang selesai, streak harian, stiker, dan nilai kuis tersimpan di Akun, bagian Tracker Belajar. Catatan dan bookmark yang kamu buat juga tersimpan di akunmu."
+		},
+		{
+			q: "Bagaimana cara menghubungi admin?",
+			a: "Lewat tombol WhatsApp di halaman produk atau di Pesanan saya. Pesan WhatsApp terbuka dengan teks siap kirim — bukan pengiriman otomatis dari server."
 		}
 	];
-	let slideIdx = $state(0);
-	let paused = $state(false);
-	let timer: ReturnType<typeof setInterval> | undefined;
-	let touchX: number | null = null;
-
-	function nextSlide() {
-		slideIdx = (slideIdx + 1) % slides.length;
-	}
-	function prevSlide() {
-		slideIdx = (slideIdx - 1 + slides.length) % slides.length;
-	}
-	function pauseAuto(ms: number) {
-		paused = true;
-		setTimeout(() => {
-			paused = false;
-		}, ms);
-	}
-	function onTouchStart(e: TouchEvent) {
-		pauseAuto(4000);
-		touchX = e.touches[0].clientX;
-	}
-	function onTouchEnd(e: TouchEvent) {
-		if (touchX === null) return;
-		const dx = e.changedTouches[0].clientX - touchX;
-		if (Math.abs(dx) > 40) {
-			if (dx < 0) nextSlide();
-			else prevSlide();
-		}
-		touchX = null;
-	}
-
-	onMount(() => {
-		// Saklar cepat: baca cache dulu, lalu sinkronkan dari server.
-		if (getToken()) {
-			homeSettings = applyCachedSettings();
-			loadSettings()
-				.then((s) => {
-					homeSettings = s;
-				})
-				.catch(() => {
-					/* tetap pakai cache */
-				});
-		}
-		timer = setInterval(() => {
-			if (!paused) nextSlide();
-			nowMs = Date.now();
-		}, 5000);
-		return () => clearInterval(timer);
-	});
+	let faqOpen = $state<number | null>(0);
 
 	let jenjangList = $derived(["Semua", ...new Set(products.map((p) => p.jenjang))]);
 	let shown = $derived(
@@ -204,44 +76,16 @@
 	);
 
 	onMount(async () => {
-		// XP mini + tanggal SAS: gagal diam-diam, tidak boleh memperlambat katalog.
-		if (getToken()) {
-			api<XpMini>("/api/xp")
-				.then((d) => {
-					homeXp = d;
-				})
-				.catch(() => {
-					/* kartu XP diam-diam tidak tampil */
-				});
-		}
-		api<{ dates: ExamDateHome[] }>("/api/exam-dates")
-			.then((d) => {
-				homeExam = d.dates ?? [];
-			})
-			.catch(() => {
-				homeExamFailed = true;
-			});
-		// Tryout mendatang: gagal diam-diam, tidak boleh memperlambat katalog.
-		api<{ tryouts: TryoutRingkas[] }>("/api/tryouts")
-			.then((d) => {
-				tryouts = d.tryouts ?? [];
-			})
-			.catch(() => {
-				/* kartu tryout diam-diam tidak tampil */
-			});
 		// Pengumuman tidak boleh memperlambat katalog: muat paralel, gagal diam-diam.
 		api<{
 			announcement_text: string | null;
 			announcement_enabled: number | boolean;
-			promo_text: string | null;
-			promo_enabled: number | boolean;
 		}>("/api/announcement")
 			.then((d) => {
 				if (d.announcement_enabled && d.announcement_text) {
 					announcementText = d.announcement_text;
 					announcementShown = true;
 				}
-				if (d.promo_enabled && d.promo_text) promoText = d.promo_text;
 			})
 			.catch(() => {
 				/* banner diam-diam tidak tampil */
@@ -282,419 +126,191 @@
 	</div>
 {/if}
 
-<!-- Carousel promo -->
-<section class="card overflow-hidden" aria-label="Promo Ringkas">
+<!-- Hero -->
+<section class="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-10" aria-label="Tentang Ringkas">
+	<div>
+		<p class="flex flex-wrap gap-1.5">
+			<span class="badge badge-leaf">Sekali bayar</span>
+			<span class="badge badge-sun">Simulasi SAS</span>
+			<span class="badge badge-leaf">Kelas 1–6 SD</span>
+		</p>
+		<h1 class="mt-3 text-3xl font-semibold leading-tight lg:text-[2.75rem] lg:leading-[1.15]">
+			Rangkuman <span class="u-pencil">materi</span> SD kelas 1–6
+		</h1>
+		<p class="mt-2 max-w-xl text-sm text-[#5f6b62] lg:text-base">
+			Teman belajar kamu: rangkuman kilat, kuis seru, dan simulasi SAS — semuanya ringkas dan mudah
+			dipahami.
+		</p>
+		<div class="mt-4 flex flex-wrap items-center gap-2">
+			<a href="#katalog" class="btn btn-primary"><Icon name="search" size={16} /> Lihat katalog</a>
+			<a href="/belajar/k1" class="btn btn-outline"><Icon name="play" size={16} /> Coba gratis</a>
+		</div>
+		<p class="mt-2 text-xs font-medium text-[#5f6b62]">
+			Bab 1 Kelas 1 gratis untuk akun yang sudah masuk.
+		</p>
+		<ul class="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+			<li class="flex items-start gap-1.5 text-sm font-medium text-[#3f4a42]">
+				<Icon name="check" size={18} class="mt-0.5 shrink-0 text-[#177245]" />
+				Sekali bayar, tanpa langganan
+			</li>
+			<li class="flex items-start gap-1.5 text-sm font-medium text-[#3f4a42]">
+				<Icon name="check" size={18} class="mt-0.5 shrink-0 text-[#177245]" />
+				Simulasi SAS sesuai struktur baku
+			</li>
+			<li class="flex items-start gap-1.5 text-sm font-medium text-[#3f4a42]">
+				<Icon name="check" size={18} class="mt-0.5 shrink-0 text-[#177245]" />
+				Rangkuman per bab + kuis
+			</li>
+			<li class="flex items-start gap-1.5 text-sm font-medium text-[#3f4a42]">
+				<Icon name="check" size={18} class="mt-0.5 shrink-0 text-[#177245]" />
+				Progres tersimpan di akun
+			</li>
+		</ul>
+	</div>
+
+	<!-- Tumpukan sampul produk mengipas -->
 	<div
-		class="relative overflow-hidden"
-		role="region"
-		aria-label="Carousel promo"
-		ontouchstart={onTouchStart}
-		ontouchend={onTouchEnd}
-		onmouseenter={() => (paused = true)}
-		onmouseleave={() => (paused = false)}
+		class="relative mx-auto h-[240px] w-full max-w-[440px] sm:h-[280px] lg:h-[320px]"
+		aria-label="Sampul Paket SAS kelas 1 sampai 6"
 	>
-		<div
-			class="flex transition-transform duration-500 ease-signature"
-			style="transform: translateX(-{slideIdx * 100}%)"
+		{#each FAN_COVERS as g, i (g)}
+			<img
+				src="/feature-sas-kelas-{g}.png"
+				alt="Sampul Paket SAS Kelas {g}"
+				width="1080"
+				height="1080"
+				loading="lazy"
+				class="absolute top-0 w-[46%] rounded-xl border border-[#e7e2d2] bg-[#fffdf7] shadow-[0_10px_24px_rgb(0_0_0/0.18)]"
+				style={fanStyle(i)}
+			/>
+		{/each}
+		<p
+			class="absolute -bottom-1 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#22302a] px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
 		>
-			{#each slides as s, i (s.title)}
-				<div class="relative w-full shrink-0 px-5 py-6 lg:px-10 lg:py-10 {i === 2 ? 'text-[#22302a]' : 'text-white'}" style="background: {s.bg}">
-					{#if i === 0}
-						<!-- Scene hero (unslop pass 8): foto memenuhi slide, headline duduk di ruang kosong atas yang tenang. -->
-						<img
-							src="/hero-scene.webp"
-							alt="Buku tulis anak yang terbuka di atas meja kayu dalam cahaya pagi, dengan pulpen tinta hijau, stabilo kuning, dan pot kecil berisi tunas"
-							width="2048"
-							height="1152"
-							fetchpriority="high"
-							class="hero-scene absolute inset-0 h-full w-full object-cover"
-							style="mask-image: linear-gradient(180deg, #000 86%, transparent 100%)"
-						/>
-						<!-- Scrim tipis di belakang blok teks saja, menghilang ke bawah supaya foto tetap hidup. -->
-						<div
-							class="pointer-events-none absolute inset-0"
-							style="background: linear-gradient(180deg, rgba(8, 26, 18, 0.45) 0%, rgba(8, 26, 18, 0.18) 45%, rgba(8, 26, 18, 0) 65%)"
-							aria-hidden="true"
-						></div>
-					{/if}
-					{#if i === 1}
-						<!-- Kartu contoh soal: momen produk di slide 2, hanya desktop. -->
-						<div
-							class="datasaver-hide absolute bottom-6 right-6 z-10 hidden w-60 -rotate-2 rounded-xl border border-[#e7e2d2] bg-[#fffdf7] p-3 text-[#22302a] shadow-[0_10px_24px_rgb(0_0_0/0.25)] lg:block"
-							aria-hidden="true"
-						>
-							<p class="text-[11px] font-bold tracking-wide text-[#177245]">Contoh soal</p>
-							<p class="mt-1 text-sm font-semibold">7 × 8 = …</p>
-							<p class="mt-1.5 flex gap-1.5 text-xs font-semibold">
-								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">A. 54</span>
-								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">B. 56</span>
-								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">C. 64</span>
-							</p>
-						</div>
-					{:else if i === 2}
-						<!-- Tumpukan sampul paket di slide 3, hanya desktop. -->
-						<div class="datasaver-hide absolute bottom-6 right-8 z-10 hidden lg:block" aria-hidden="true">
-							<div
-								class="w-44 rotate-2 rounded-xl border border-[#e7e2d2] bg-[#fffdf7] p-3 text-[#22302a] shadow-[0_10px_24px_rgb(0_0_0/0.2)]"
-							>
-								<p class="h-1.5 w-10 rounded-full bg-[#f2b33d]"></p>
-								<p class="mt-2 text-sm font-semibold leading-snug">Paket SAS</p>
-								<p class="text-xs font-medium text-[#5f6b62]">Kelas 1–6 • 25–40 soal</p>
-							</div>
-						</div>
-					{/if}
-					<div class="relative z-10 {i > 0 ? 'lg:pr-64' : ''}">
-						<p class="flex items-center gap-1.5 text-xs font-semibold {i === 2 ? 'text-[#22302a]' : 'text-[#fbeecd]'}">
-							<Icon name={s.icon} size={16} /> {s.kicker}
-						</p>
-						<h1 class="mt-1 text-2xl font-semibold leading-snug lg:text-4xl">{#if i === 0}Rangkuman <span class="u-pencil">materi</span> SD kelas 1–6{:else}{s.title}{/if}</h1>
-						<p class="mt-1 max-w-2xl text-sm lg:text-base {i === 2 ? 'text-[#22302a]/80' : 'text-white/90'}">{i === 2 && promoText ? promoText : s.text}</p>
-						<a href={s.href} class="btn {i === 2 ? 'btn-primary' : 'btn-sun'} mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
-					</div>
-				</div>
-			{/each}
-		</div>
-		<button
-			type="button"
-			class="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-white"
-			aria-label="Slide sebelumnya"
-			onclick={() => {
-				prevSlide();
-				pauseAuto(8000);
-			}}
-		>
-			<Icon name="chevron-left" size={18} />
-		</button>
-		<button
-			type="button"
-			class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-white"
-			aria-label="Slide berikutnya"
-			onclick={() => {
-				nextSlide();
-				pauseAuto(8000);
-			}}
-		>
-			<Icon name="chevron-right" size={18} />
-		</button>
-		<div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5 {slideIdx === 0 ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]' : ''}">
-			{#each slides as _, i (i)}
-				<button
-					type="button"
-					class="h-2 rounded-full transition-colors {i === slideIdx ? (slideIdx === 2 ? 'w-5 bg-[#22302a]' : 'w-5 bg-white') : slideIdx === 2 ? 'w-2 bg-[#22302a]/30' : 'w-2 bg-white/50'}"
-					aria-label="Ke slide {i + 1}"
-					onclick={() => {
-						slideIdx = i;
-						pauseAuto(8000);
-					}}
-				></button>
-			{/each}
-		</div>
-	</div>
-	<div class="flex divide-x divide-[#e7e2d2] text-center text-xs font-medium text-[#3f4a42]">
-		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="check" size={16} class="text-[#177245]" /> Rangkuman kilat
-		</div>
-		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="gamepad-2" size={16} class="text-[#177245]" /> Kuis interaktif
-		</div>
-		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="trophy" size={16} class="text-[#177245]" /> Simulasi SAS
-		</div>
+			Paket SAS Rp17–21 ribu
+		</p>
 	</div>
 </section>
 
-<!-- Peta belajar — section unggulan: pita hijau + kartu kertas bertumpuk + jalur simpul kelas -->
-<section class="home-band home-band-leaf mt-8 lg:mt-10" aria-label="Peta belajar">
-	<p class="home-kicker">Mulai dari sini</p>
-	<h2 class="home-h2 mt-1">Peta belajar</h2>
-	<p class="mt-1 text-sm text-[#5f6b62] lg:text-base">Ikuti jalur bab per kelas — node terbuka saat bab selesai.</p>
-	<div class="card home-stack mt-4 p-4 lg:p-5">
-		<div class="home-path grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-6">
-			{#each [1, 2, 3, 4, 5, 6] as g (g)}
-				{@const gtChip = gradeTheme(g)}
-				<a href="/peta-belajar/k{g}" class="home-path-node flex flex-col items-center gap-1.5 text-center">
-					<span
-						class="flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-bold"
-						style="background: {gtChip.soft}; border-color: {gtChip.accent}; color: {gtChip.text}"
-					>
-						K{g}
-					</span>
-					<span class="text-xs font-semibold text-[#3f4a42]">Kelas {g}</span>
-				</a>
-			{/each}
-		</div>
-	</div>
-</section>
-
-<!-- Cara berlatih — grid fitur 2 kolom (1 kolom di HP), ubin Soal cerita lebih lebar -->
-<section class="mt-12 lg:mt-14" aria-label="Cara berlatih">
-	<p class="home-kicker">Fitur belajar</p>
-	<h2 class="home-h2 mt-1">Cara berlatih</h2>
-	<div class="mt-4 grid gap-3 sm:grid-cols-2 lg:gap-4">
-		<!-- Soal cerita sehari-hari -->
-		<section class="card p-4 sm:col-span-2 lg:p-5" aria-label="Soal cerita sehari-hari">
-			<div class="flex items-start gap-3">
-				<span class="home-tint-sun flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="message" size={24} /></span>
-				<div class="min-w-0 flex-1">
-					<h3 class="text-base font-semibold">Soal cerita sehari-hari</h3>
-					<p class="mt-0.5 text-sm text-[#5f6b62]">Soal Matematika dan Bahasa Indonesia dari situasi nyata — belanja di warung, berbagi kue, antrean.</p>
-					<a href="/soal-cerita" class="btn btn-leaf mt-3">Mulai latihan</a>
-				</div>
-			</div>
-		</section>
-
-		<!-- Simulasi ANBK Kelas 5 -->
-		<section class="card p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
-			<span class="home-tint-teal flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="graduation-cap" size={24} /></span>
-			<h3 class="mt-3 text-base font-semibold">Simulasi ANBK Kelas 5</h3>
-			<p class="mt-0.5 text-sm text-[#5f6b62]">Latihan Asesmen Nasional: Literasi dan Numerasi, 20 soal tiap paket, 60 menit.</p>
-			<a href="/anbk" class="btn btn-leaf mt-3">Lihat ANBK</a>
-		</section>
-
-		<!-- Latihan adaptif -->
-		<section class="card p-4 lg:p-5" aria-label="Latihan adaptif">
-			<span class="home-tint-blue flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="target" size={24} /></span>
-			<h3 class="mt-3 text-base font-semibold">Latihan adaptif</h3>
-			<p class="mt-0.5 text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
-			<a href="/latihan-adaptif" class="btn btn-leaf mt-3">Mulai latihan</a>
-		</section>
-
-		<!-- Latihan tanpa habis -->
-		<section class="card p-4 lg:p-5" aria-label="Latihan tanpa habis">
-			<span class="home-tint-orange flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="refresh" size={24} /></span>
-			<h3 class="mt-3 text-base font-semibold">Latihan tanpa habis</h3>
-			<p class="mt-0.5 text-sm text-[#5f6b62]">Soal hitung dengan angka yang selalu baru — tidak pernah habis, kapan pun kamu mau latihan.</p>
-			<a href="/latihan-tanpa-habis" class="btn btn-leaf mt-3">Mulai latihan</a>
-		</section>
-	</div>
-</section>
-
-<!-- Portofolioku (hanya bila login) -->
-{#if $auth.user}
-	<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Portofolioku">
-		<div class="flex items-center gap-3">
-			<span class="home-tint-sand flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="pen" size={24} /></span>
-			<div class="min-w-0 flex-1">
-				<h2 class="text-lg font-semibold lg:text-xl">Portofolioku</h2>
-				<p class="text-sm text-[#5f6b62]">Pamerkan karyamu — orang tua dan gurumu bisa memberi bintang dan komentar.</p>
-			</div>
-			<a href="/portofolio" class="btn btn-leaf shrink-0">Lihat karya</a>
-		</div>
-	</section>
-
-	<!-- Saklar cepat aksesibilitas & hemat data -->
-	{#if homeSettings}
-		<section class="home-band home-band-sand mt-12" aria-label="Aksesibilitas dan Hemat Data">
-			<div class="card p-4 lg:p-5">
-			<div class="flex items-center gap-3">
-				<span class="home-tint-leaf flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="eye" size={24} /></span>
-				<div class="min-w-0 flex-1">
-					<h2 class="text-lg font-semibold lg:text-xl">Aksesibilitas &amp; hemat data</h2>
-					<p class="text-sm text-[#5f6b62]">Atur tampilan supaya lebih nyaman dibaca dan lebih ringan.</p>
-				</div>
-				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Semua pengaturan</a>
-			</div>
-			<div class="mt-3 flex flex-wrap gap-2">
-				<button
-					type="button"
-					class="chip"
-					class:active={homeSettings.readable_font === 1}
-					disabled={togglingKey !== null}
-					onclick={() => togglePengaturan("readable_font")}
-				>
-					<Icon name="book-open" size={16} /> Font ramah baca
-				</button>
-				<button
-					type="button"
-					class="chip"
-					class:active={homeSettings.data_saver === 1}
-					disabled={togglingKey !== null}
-					onclick={() => togglePengaturan("data_saver")}
-				>
-					<Icon name="zap" size={16} /> Mode hemat data
-				</button>
-			</div>
-			</div>
-		</section>
-	{/if}
-{/if}
-
-<!-- Level & XP mini (hanya bila login) -->
-{#if $auth.user}
-	<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Level dan XP">
-		<div class="flex items-center gap-3">
-			{#if homeXp}
-				<Avatar stage={homeXp.stage} size={48} />
-			{:else}
-				<span class="home-tint-sun flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"><Icon name="sprout" size={24} /></span>
-			{/if}
-			<div class="min-w-0 flex-1">
-				<h2 class="text-lg font-semibold lg:text-xl">Level &amp; XP</h2>
-				{#if homeXp}
-					<p class="text-sm tabular-nums text-[#5f6b62]">Level {homeXp.level} • {homeXp.totalXp} XP • {homeXp.stageName}</p>
-					<div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
-						<div
-							class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature"
-							style="transform: scaleX({homeXp.xpForNextLevel > 0
-								? Math.min(100, Math.round((homeXp.xpIntoLevel / homeXp.xpForNextLevel) * 100)) / 100
-								: 1})"
-						></div>
-					</div>
-				{:else}
-					<p class="text-sm text-[#5f6b62]">Kumpulkan XP dari bab, kuis, dan cerita.</p>
-				{/if}
-			</div>
-			<a href="/akun" class="btn btn-leaf shrink-0">Lihat akun</a>
-		</div>
-	</section>
-{/if}
-
-<!-- Hitung mundur SAS — pita marigold pucat -->
-<section class="home-band home-band-sun mt-12" aria-label="Hitung mundur SAS">
-	<p class="home-kicker">Jangan sampai terlewat</p>
-	<h2 class="home-h2 mt-1">Hitung mundur SAS</h2>
-	<div class="card mt-3 p-4 lg:p-5">
-		<div class="flex items-center gap-3">
-			<span class="home-tint-orange flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="calendar" size={24} /></span>
-			<div class="min-w-0 flex-1">
-				{#if homeExamFailed}
-					<p class="text-sm text-[#5f6b62]">Tanggal SAS belum bisa dimuat.</p>
-				{:else if homeExam === null}
-					<p class="text-sm text-[#5f6b62]">Memuat tanggal SAS...</p>
-				{:else if homeExamNext}
-					<p class="text-sm font-semibold text-[#22302a]">{homeExamLabel(homeExamNext)}</p>
-				{:else}
-					<p class="text-sm text-[#5f6b62]">Tanggal SAS belum diatur.</p>
-				{/if}
-			</div>
-			<a href="/akun" class="btn btn-leaf shrink-0">Detail</a>
-		</div>
-	</div>
-</section>
-
-<!-- Cerita edukasi -->
-<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Cerita edukasi">
-	<div class="flex items-center gap-3">
-		<span class="home-tint-teal flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="book-open" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-lg font-semibold lg:text-xl">Cerita edukasi</h2>
-			<p class="text-sm text-[#5f6b62]">Baca cerita pendek, lalu jawab kuis pemahamannya dan kumpulkan XP.</p>
-		</div>
-		<a href="/cerita" class="btn btn-leaf shrink-0">Baca cerita</a>
-	</div>
-</section>
-
-<!-- Tryout mendatang -->
-{#if tryoutBerikut.length > 0}
-	<section class="mt-12" aria-label="Tryout mendatang">
-		<div class="flex items-start justify-between gap-3">
-			<div class="min-w-0">
-				<p class="home-kicker">Ujian bersama</p>
-				<h2 class="home-h2 mt-1">Tryout mendatang</h2>
-				<p class="mt-1 text-sm text-[#5f6b62]">Ujian bersama per kelas — daftar, kerjakan saat waktunya tiba, dan lihat peringkatmu.</p>
-			</div>
-			<a href="/tryout" class="btn btn-outline mt-1 shrink-0 text-xs">Semua tryout</a>
-		</div>
-		<div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-			{#each tryoutBerikut as t (t.id)}
-				<a href="/tryout/{t.id}" class="card !rounded-lg p-3">
-					<p class="flex flex-wrap items-center gap-1.5">
-						<span class="badge {t.phase === 'live' ? 'badge-leaf' : 'badge-sun'}">
-							{t.phase === "live" ? "Berlangsung" : "Mendatang"}
-						</span>
-						{#if t.is_free}<span class="badge badge-leaf">Gratis</span>{/if}
-					</p>
-					<p class="mt-1.5 text-sm font-semibold leading-snug">{t.title}</p>
-					<p class="mt-0.5 text-xs font-medium tabular-nums text-[#5f6b62]">
-						Kelas {t.grade} • {t.question_count} soal • {t.duration_minutes} menit • {t.participants} peserta
-					</p>
-					<p class="mt-1 text-xs font-medium text-[#177245]">
-						<Icon name="clock" size={16} class="inline-block align-[-2px]" /> {hitungMundurTryout(t)}
-					</p>
-				</a>
-			{/each}
-		</div>
-	</section>
-{/if}
-
-<!-- Katalog — judul section + chip jenjang -->
-<div class="mt-12 lg:mt-14">
+<!-- Katalog -->
+<section id="katalog" class="mt-12 scroll-mt-20 lg:mt-14" aria-label="Katalog">
 	<p class="home-kicker">Katalog</p>
 	<h2 class="home-h2 mt-1">Materi dan paket SAS</h2>
-</div>
-<div class="mt-4 flex gap-2 overflow-x-auto pb-1">
-	{#each jenjangList as j (j)}
-		<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
-			{#if j === "Semua"}
-				<Icon name="sparkles" size={16} /> Semua
-			{:else}
-				<Icon name="backpack" size={16} /> {j}
-			{/if}
-		</button>
-	{/each}
-</div>
+	<div class="mt-4 flex gap-2 overflow-x-auto pb-1">
+		{#each jenjangList as j (j)}
+			<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
+				{#if j === "Semua"}
+					<Icon name="sparkles" size={16} /> Semua
+				{:else}
+					<Icon name="backpack" size={16} /> {j}
+				{/if}
+			</button>
+		{/each}
+	</div>
 
-{#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
-{:else if error}
-	<p class="err mt-6">{error}</p>
-{:else if shown.length === 0}
-	<p class="mt-6 text-center text-sm text-[#5f6b62]">Belum ada produk untuk jenjang ini.</p>
-{:else}
-	<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:mt-4 lg:grid-cols-4 lg:gap-4">
-		{#each shown as p (p.id)}
-			{@const gt = gradeTheme(gradeOfProduct(p.id))}
-			<div
-				class="card home-product cursor-pointer overflow-hidden"
-				onclick={() => buka(p.id)}
-				onkeydown={(e) => e.key === "Enter" && buka(p.id)}
-				role="button"
-				tabindex="0"
-			>
-				<div class="h-1.5 shrink-0" style="background: {gt.accent}" aria-hidden="true"></div>
+	{#if loading}
+		<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+	{:else if error}
+		<p class="err mt-6">{error}</p>
+	{:else if shown.length === 0}
+		<p class="mt-6 text-center text-sm text-[#5f6b62]">Belum ada produk untuk jenjang ini.</p>
+	{:else}
+		<div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:mt-4 lg:grid-cols-4 lg:gap-4">
+			{#each shown as p (p.id)}
+				{@const gt = gradeTheme(gradeOfProduct(p.id))}
 				<div
-					class="flex h-24 items-center justify-center px-3 text-center text-sm font-semibold text-white shadow-[inset_0_-12px_20px_-12px_rgb(0_0_0/0.35)] lg:h-36 lg:text-base"
-					style="background: {p.cover_color}"
+					class="card home-product cursor-pointer overflow-hidden"
+					onclick={() => buka(p.id)}
+					onkeydown={(e) => e.key === "Enter" && buka(p.id)}
+					role="button"
+					tabindex="0"
 				>
-					<span class="leading-tight">{p.cover_label}</span>
-				</div>
-				<div class="p-3">
-					{#if p.badge || gradeLabel(p.id)}
-						<p class="flex flex-wrap items-center gap-1.5">
-							{#if p.badge}
-								<span class="badge badge-sun">{p.badge}</span>
-							{/if}
-							{#if gradeLabel(p.id)}
-								<span class="badge" style="background: {gt.soft}; color: {gt.text}">
-									{gradeLabel(p.id)}
-								</span>
-							{/if}
-						</p>
-					{/if}
-					<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-snug">{p.title}</h2>
-					<p class="mt-0.5 text-[11px] font-semibold text-[#5f6b62]">
-						{p.jenjang} • {p.mapel} • {p.pages} hlm
-					</p>
-					<div class="mt-2 flex items-end justify-between gap-1">
-						<div>
-							{#if p.strikethrough_price}
-								<p class="text-[11px] font-semibold text-[#6e675c] line-through">
-									{formatRupiah(p.strikethrough_price)}
-								</p>
-							{/if}
-							<p class="text-sm font-semibold tabular-nums text-[#177245]">{formatRupiah(p.price)}</p>
-						</div>
-						<button
-							type="button"
-							class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#177245] text-white"
-							aria-label="Tambah {p.title} ke keranjang"
-							onclick={(e) => tambah(p.id, e)}
+					<div class="h-1.5 shrink-0" style="background: {gt.accent}" aria-hidden="true"></div>
+					{#if SAS_COVER[p.id]}
+						<img
+							src={SAS_COVER[p.id]}
+							alt="Sampul {p.title}"
+							width="1080"
+							height="1080"
+							loading="lazy"
+							class="h-24 w-full object-cover object-top lg:h-36"
+						/>
+					{:else}
+						<div
+							class="flex h-24 items-center justify-center px-3 text-center text-sm font-semibold text-white shadow-[inset_0_-12px_20px_-12px_rgb(0_0_0/0.35)] lg:h-36 lg:text-base"
+							style="background: {p.cover_color}"
 						>
-							<Icon name="plus" size={18} />
-						</button>
+							<span class="leading-tight">{p.cover_label}</span>
+						</div>
+					{/if}
+					<div class="p-3">
+						{#if p.badge || gradeLabel(p.id)}
+							<p class="flex flex-wrap items-center gap-1.5">
+								{#if p.badge}
+									<span class="badge badge-sun">{p.badge}</span>
+								{/if}
+								{#if gradeLabel(p.id)}
+									<span class="badge" style="background: {gt.soft}; color: {gt.text}">
+										{gradeLabel(p.id)}
+									</span>
+								{/if}
+							</p>
+						{/if}
+						<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-snug">{p.title}</h2>
+						<p class="mt-0.5 text-[11px] font-semibold text-[#5f6b62]">
+							{p.jenjang} • {p.mapel} • {p.pages} hlm
+						</p>
+						<div class="mt-2 flex items-end justify-between gap-1">
+							<div>
+								{#if p.strikethrough_price}
+									<p class="text-[11px] font-semibold text-[#6e675c] line-through">
+										{formatRupiah(p.strikethrough_price)}
+									</p>
+								{/if}
+								<p class="text-sm font-semibold tabular-nums text-[#177245]">{formatRupiah(p.price)}</p>
+							</div>
+							<button
+								type="button"
+								class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#177245] text-white"
+								aria-label="Tambah {p.title} ke keranjang"
+								onclick={(e) => tambah(p.id, e)}
+							>
+								<Icon name="plus" size={18} />
+							</button>
+						</div>
 					</div>
 				</div>
+			{/each}
+		</div>
+	{/if}
+</section>
+
+<!-- FAQ -->
+<section class="mt-12 lg:mt-14" aria-label="Pertanyaan umum">
+	<p class="home-kicker">Pertanyaan umum</p>
+	<h2 class="home-h2 mt-1">Yang sering ditanyakan</h2>
+	<div class="mt-4 space-y-3">
+		{#each FAQ as item, i (item.q)}
+			<div class="card p-4">
+				<button
+					type="button"
+					class="flex w-full items-center justify-between gap-3 text-left font-semibold"
+					aria-expanded={faqOpen === i}
+					onclick={() => (faqOpen = faqOpen === i ? null : i)}
+				>
+					<span>{item.q}</span>
+					<Icon
+						name="chevron-down"
+						size={18}
+						class="shrink-0 text-[#177245] transition-transform duration-300 ease-signature {faqOpen === i
+							? 'rotate-180'
+							: ''}"
+					/>
+				</button>
+				{#if faqOpen === i}
+					<p class="mt-1 text-sm text-[#3f4a42]">{item.a}</p>
+				{/if}
 			</div>
 		{/each}
 	</div>
-{/if}
+</section>
