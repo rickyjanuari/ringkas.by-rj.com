@@ -54,7 +54,7 @@
 		try {
 			bank = await api<HardBankData>("/api/hard-bank");
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Gagal memuat Soal Sulitku.";
+			error = e instanceof Error ? e.message : "Gagal memuat Soal sulitku.";
 		} finally {
 			loading = false;
 		}
@@ -114,7 +114,7 @@
 			await muatBank();
 			notice =
 				result.mastered.length > 0
-					? `${result.mastered.length} soal sudah dikuasai dan keluar dari bank. Hebat!`
+					? `${result.mastered.length} soal sudah dikuasai dan keluar dari bank. Hebat`
 					: "Belum ada yang dikuasai — soalnya tetap di bank, coba lagi ya.";
 		} catch (e) {
 			submitError = e instanceof Error ? e.message : "Gagal mengirim jawaban.";
@@ -133,11 +133,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Akun
+	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="target" size={22} class="shrink-0" /> Soal Sulitku
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="target" size={18} class="shrink-0" /> Soal sulitku
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Soal yang pernah kamu jawab salah — di kuis bab dan simulasi — terkumpul di sini. Jawab benar,
@@ -145,7 +145,7 @@
 </p>
 
 {#if notice}
-	<p class="ok-msg mt-3">{notice}</p>
+	<p class="tabular-nums ok-msg mt-3">{notice}</p>
 {/if}
 
 {#if loading}
@@ -156,32 +156,32 @@
 	{#if !bank || bank.total === 0}
 		<div class="card mt-4 p-5 text-center">
 			<p class="flex justify-center"><Mascot expression="senang" /></p>
-			<p class="text-2xl font-extrabold">Belum ada soal sulit!</p>
+			<p class="text-2xl font-semibold">Belum ada soal sulit</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Soal yang kamu jawab salah akan muncul di sini. Terus kerjakan kuis dan simulasi, ya!
 			</p>
-			<a href="/katalog" class="btn btn-primary mt-4">Cari Materi Belajar</a>
+			<a href="/katalog" class="btn btn-primary mt-4">Cari materi belajar</a>
 		</div>
 	{:else}
 		<div class="card mt-4 flex items-center gap-3 p-4">
-			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={24} /></span>
+			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={18} /></span>
 			<div class="min-w-0 flex-1">
-				<p class="font-extrabold">{bank.total} soal sulit menunggu</p>
+				<p class="font-semibold">{bank.total} soal sulit menunggu</p>
 				<p class="text-xs text-[#5f6b62]">Latihan 20 soal per sesi — yang paling baru salah dulu.</p>
 			</div>
 			<button type="button" class="btn btn-leaf shrink-0" onclick={mulaiLatihan}>
-				<Icon name="refresh" size={16} /> Latihan Sekarang
+				<Icon name="refresh" size={16} /> Latihan sekarang
 			</button>
 		</div>
 
 		{#each bySubject as [subject, list] (subject)}
-			<h2 class="mt-5 text-sm font-extrabold text-[#177245]">{subject} ({list.length})</h2>
+			<h2 class="mt-5 text-sm font-semibold text-[#177245]">{subject} ({list.length})</h2>
 			<div class="mt-2 space-y-2">
 				{#each list as it (it.question_id)}
 					<div class="card p-3">
-						<p class="text-sm font-bold leading-snug">{it.question}</p>
+						<p class="text-sm font-medium leading-snug">{it.question}</p>
 						<p class="mt-1 text-xs text-[#5f6b62]">
-							Dari: {it.origin_kind === "quiz" ? "Kuis Bab" : "Simulasi"} • {it.origin_title}
+							Dari: {it.origin_kind === "quiz" ? "Kuis bab" : "Simulasi"} • {it.origin_title}
 						</p>
 					</div>
 				{/each}
@@ -192,34 +192,33 @@
 	<div class="card mt-4 border-[#177245] p-4">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<p class="text-sm font-extrabold leading-snug">Latihan Soal Sulitku</p>
-				<p class="mt-0.5 text-xs font-bold text-[#177245]">
+				<p class="text-sm font-semibold leading-snug">Latihan soal sulitku</p>
+				<p class="mt-0.5 text-xs font-medium text-[#177245]">
 					{total} soal di sesi ini • Jawab benar supaya keluar dari bank
 				</p>
 			</div>
 			<button type="button" class="btn btn-ghost shrink-0 !px-2 !py-1 text-xs" onclick={tutupLatihan}>
-				<Icon name="x" size={14} /> Tutup
+				<Icon name="x" size={16} /> Tutup
 			</button>
 		</div>
 
 		{#if !result && current}
-			<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
+			<p class="tabular-nums mt-3 text-xs font-medium text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
 			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#177245] transition-all"
-					style="width: {((qIdx + 1) / Math.max(total, 1)) * 100}%"
+					class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((qIdx + 1) / Math.max(total, 1))})"
 				></div>
 			</div>
-			<p class="mt-3 text-base font-bold leading-snug">{current.question}</p>
+			<p class="mt-3 text-base font-semibold leading-snug">{current.question}</p>
 			<p class="mt-1 text-xs text-[#5f6b62]">
-				Dari: {current.origin_kind === "quiz" ? "Kuis Bab" : "Simulasi"} • {current.origin_title}
+				Dari: {current.origin_kind === "quiz" ? "Kuis bab" : "Simulasi"} • {current.origin_title}
 			</p>
 
 			{#if current.type === "pg" && Array.isArray(current.options)}
 				<div class="mt-3 space-y-2">
 					{#each current.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 								String(current.question_id)
 							] === opt
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -237,14 +236,14 @@
 					{/each}
 				</div>
 			{:else if current.type === "pg_kompleks" && Array.isArray(current.options)}
-				<p class="mt-2 text-xs font-bold text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
+				<p class="mt-2 text-xs font-medium text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
 				<div class="mt-2 space-y-2">
 					{#each current.options as opt (opt)}
 						{@const picked = Array.isArray(answers[String(current.question_id)])
 							? (answers[String(current.question_id)] as string[])
 							: []}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {picked.includes(
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {picked.includes(
 								opt
 							)
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -284,7 +283,7 @@
 							? (answers[String(current.question_id)] as Record<string, string>)[String(li)] ?? ""
 							: ""}
 						<div class="flex items-center gap-2 text-sm">
-							<span class="flex-1 font-bold">{li + 1}. {item}</span>
+							<span class="flex-1 font-medium">{li + 1}. {item}</span>
 							<select
 								class="input !w-40 !py-1.5 text-xs"
 								value={picked}
@@ -336,7 +335,7 @@
 						disabled={submitting}
 						onclick={kirimLatihan}
 					>
-						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -344,14 +343,14 @@
 				<p class="err mt-3">{submitError}</p>
 			{/if}
 		{:else if result}
-			<p class="mt-3 text-center text-xl font-extrabold">
+			<p class="mt-3 text-center text-xl font-semibold">
 				Skor: {result.score} / {result.max_score}
 				{#if result.score === result.max_score}
-					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Semua benar!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Semua benar</span>
 				{:else if result.score >= result.max_score * 0.7}
-					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 				{/if}
 			</p>
 			<p class="mt-1 text-center text-sm text-[#5f6b62]">
@@ -359,9 +358,9 @@
 			</p>
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
-					<div class="card !rounded-lg p-3 text-sm">
-						<p class="font-bold">
-							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar — soal ini keluar dari bank{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat — soal ini tetap di bank{/if} — {qText(r.questionId)}
+					<div class="card p-3 text-sm">
+						<p class="font-medium">
+							{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar — soal ini keluar dari bank{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat — soal ini tetap di bank{/if} — {qText(r.questionId)}
 						</p>
 						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>
@@ -369,11 +368,11 @@
 			</div>
 			<div class="mt-3 flex gap-2">
 				<button type="button" class="btn btn-outline flex-1" onclick={tutupLatihan}>
-					<Icon name="chevron-left" size={16} /> Kembali ke Daftar
+					<Icon name="chevron-left" size={16} /> Kembali ke daftar
 				</button>
 				{#if result.remaining > 0}
 					<button type="button" class="btn btn-primary flex-1" onclick={mulaiLatihan}>
-						<Icon name="refresh" size={16} /> Latihan Lagi
+						<Icon name="refresh" size={16} /> Latihan lagi
 					</button>
 				{/if}
 			</div>

@@ -79,11 +79,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Beranda
+	<Icon name="chevron-left" size={18} /> Kembali ke beranda
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="message" size={22} class="shrink-0" /> Soal Cerita Sehari-hari
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="message" size={18} class="shrink-0" /> Soal cerita sehari-hari
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Soal Matematika dan Bahasa Indonesia dari situasi nyata: belanja di warung, berbagi kue, antrean,
@@ -93,7 +93,7 @@
 {#if !pack}
 	<div class="card mt-4 space-y-4 p-4">
 		<div>
-			<p class="text-sm font-extrabold">Pilih kelas</p>
+			<p class="text-sm font-semibold">Pilih kelas</p>
 			<div class="mt-2 flex flex-wrap gap-2">
 				{#each [1, 2, 3, 4, 5, 6] as g (g)}
 					<button
@@ -108,7 +108,7 @@
 			</div>
 		</div>
 		<div>
-			<p class="text-sm font-extrabold">Pilih mapel</p>
+			<p class="text-sm font-semibold">Pilih mapel</p>
 			<div class="mt-2 flex flex-wrap gap-2">
 				{#each ["Matematika", "B. Indonesia"] as s (s)}
 					<button
@@ -123,7 +123,7 @@
 			</div>
 		</div>
 		<button type="button" class="btn btn-primary btn-block" disabled={loading} onclick={mulaiLatihan}>
-			{#if loading}Memuat soal...{:else}<Icon name="rocket" size={16} /> Mulai Latihan (10 soal){/if}
+			{#if loading}Memuat soal...{:else}<Icon name="rocket" size={16} /> Mulai latihan (10 soal){/if}
 		</button>
 		{#if error}
 			<p class="err">{error}</p>
@@ -136,31 +136,30 @@
 	<div class="card mt-4 border-[#177245] p-4">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<p class="text-sm font-extrabold leading-snug">
+				<p class="text-sm font-semibold leading-snug">
 					Soal Cerita {pack.subject} • Kelas {pack.grade}
 				</p>
-				<p class="mt-0.5 text-xs font-bold text-[#177245]">{total} soal • 1 poin per soal</p>
+				<p class="mt-0.5 text-xs font-medium text-[#177245]">{total} soal • 1 poin per soal</p>
 			</div>
 			<button type="button" class="btn btn-ghost shrink-0 !px-2 !py-1 text-xs" onclick={latihanBaru}>
-				<Icon name="x" size={14} /> Tutup
+				<Icon name="x" size={16} /> Tutup
 			</button>
 		</div>
 
 		{#if !result && current}
-			<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
+			<p class="tabular-nums mt-3 text-xs font-medium text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
 			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#177245] transition-all"
-					style="width: {((qIdx + 1) / Math.max(total, 1)) * 100}%"
+					class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((qIdx + 1) / Math.max(total, 1))})"
 				></div>
 			</div>
-			<p class="mt-3 text-base font-bold leading-snug">{current.question}</p>
+			<p class="mt-3 text-base font-semibold leading-snug">{current.question}</p>
 
 			{#if current.type === "pg" && Array.isArray(current.options)}
 				<div class="mt-3 space-y-2">
 					{#each current.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 								String(current.id)
 							] === opt
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -219,7 +218,7 @@
 						disabled={submitting}
 						onclick={kirimLatihan}
 					>
-						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -227,21 +226,21 @@
 				<p class="err mt-3">{submitError}</p>
 			{/if}
 		{:else if result}
-			<p class="mt-3 text-center text-xl font-extrabold">
+			<p class="mt-3 text-center text-xl font-semibold">
 				Skor: {result.score} / {result.max_score}
 				{#if result.score === result.max_score}
-					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 				{:else if result.score >= result.max_score * 0.7}
-					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 				{/if}
 			</p>
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
-					<div class="card !rounded-lg p-3 text-sm">
-						<p class="font-bold">
-							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
+					<div class="card p-3 text-sm">
+						<p class="font-medium">
+							{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
 						</p>
 						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>
@@ -249,10 +248,10 @@
 			</div>
 			<div class="mt-3 flex gap-2">
 				<button type="button" class="btn btn-outline flex-1" onclick={latihanBaru}>
-					<Icon name="refresh" size={16} /> Pilih Kelas/Mapel Lain
+					<Icon name="refresh" size={16} /> Pilih kelas/mapel lain
 				</button>
 				<button type="button" class="btn btn-primary flex-1" onclick={mulaiLatihan}>
-					<Icon name="refresh" size={16} /> Ulangi Latihan Ini
+					<Icon name="refresh" size={16} /> Ulangi latihan ini
 				</button>
 			</div>
 		{/if}

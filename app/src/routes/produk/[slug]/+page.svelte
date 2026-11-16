@@ -83,10 +83,10 @@
 		aria-label="Kembali"
 		onclick={() => history.back()}
 	>
-		<Icon name="chevron-left" size={24} />
+		<Icon name="chevron-left" size={18} />
 	</button>
-	<h1 class="min-w-0 flex-1 truncate text-center text-base font-bold">
-		{loading ? "Detail Produk" : (product?.title ?? "Detail Produk")}
+	<h1 class="min-w-0 flex-1 truncate text-center text-base font-semibold">
+		{#if loading}Detail produk{:else}<span class="u-pencil">{(product?.title ?? "Detail produk").split(" ")[0]}</span> {(product?.title ?? "Detail produk").split(" ").slice(1).join(" ")}{/if}
 	</h1>
 	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
 </div>
@@ -95,7 +95,7 @@
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error || !product}
 	<p class="err mt-6">{error || "Produk tidak ditemukan."}</p>
-	<a href="/katalog" class="btn btn-primary mt-4">Lihat Katalog</a>
+	<a href="/katalog" class="btn btn-primary mt-4">Lihat katalog</a>
 {:else}
 	<!-- Desktop: dua kolom — galeri/info kiri, panel beli sticky kanan -->
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
@@ -106,7 +106,7 @@
 			<img src={featureImage} alt={product.title} class="datasaver-hide h-44 w-full object-cover lg:h-80" />
 		{:else}
 			<div
-				class="flex h-44 items-center justify-center px-6 text-center text-lg font-extrabold text-white lg:h-80"
+				class="flex h-44 items-center justify-center px-6 text-center text-lg font-semibold text-white lg:h-80"
 				style="background: {product.cover_color}"
 			>
 				{product.cover_label}
@@ -125,9 +125,9 @@
 				<p class="mt-2 text-sm leading-relaxed">{product.description}</p>
 			{/if}
 			<div class="mt-3 flex items-baseline gap-2">
-				<p class="text-2xl font-extrabold text-[#177245]">{formatRupiah(product.price)}</p>
+				<p class="text-2xl font-semibold tabular-nums text-[#177245]">{formatRupiah(product.price)}</p>
 				{#if product.strikethrough_price}
-					<p class="text-sm font-semibold text-[#9aa096] line-through">
+					<p class="text-sm font-semibold text-[#6e675c] line-through">
 						{formatRupiah(product.strikethrough_price)}
 					</p>
 				{/if}
@@ -156,57 +156,57 @@
 	<!-- Kartu Ruang Belajar bila sudah LUNAS -->
 	{#if owned}
 		<div class="card mt-4 border-2 !border-[#177245] p-4">
-			<p class="flex items-center gap-1.5 text-sm font-extrabold text-[#065f46]">
-				<Icon name="party-popper" size={16} /> Produk ini sudah milikmu!
+			<p class="flex items-center gap-1.5 text-sm font-semibold text-[#065f46]">
+				<Icon name="party-popper" size={16} /> Produk ini sudah milikmu.
 			</p>
 			<p class="mt-0.5 text-sm text-[#3f4a42]">
 				Lanjutkan belajar, kerjakan kuis, dan coba simulasi SAS-nya.
 			</p>
 			<a href={`/belajar/${product.id}`} class="btn btn-leaf mt-3 w-full">
-				<Icon name="book-open" size={16} /> Buka Ruang Belajar
+				<Icon name="book-open" size={16} /> Buka ruang belajar
 			</a>
 		</div>
 	{/if}
 
-	<!-- Isi Bundel -->
+	<!-- Isi bundel -->
 	{#if bundleItems.length > 0}
-		<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold">
-			<Icon name="package" size={18} /> Isi Bundel
+		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
+			<Icon name="package" size={18} /> Isi bundel
 		</h2>
 		<p class="text-xs text-[#5f6b62]">Bundel ini berisi {bundleItems.length} produk:</p>
 		<div class="mt-2 space-y-2">
 			{#each bundleItems as item (item.product_id)}
 				<div class="card flex items-center justify-between gap-2 p-3">
-					<span class="min-w-0 flex-1 text-sm font-bold leading-snug">{item.title}</span>
-					<span class="shrink-0 text-sm font-extrabold text-[#177245]">{formatRupiah(item.price)}</span>
+					<span class="min-w-0 flex-1 text-sm font-semibold leading-snug">{item.title}</span>
+					<span class="shrink-0 text-sm font-semibold text-[#177245]">{formatRupiah(item.price)}</span>
 				</div>
 			{/each}
 		</div>
 	{/if}
 
-	<!-- Isi Materi -->
-	<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold">
-		<Icon name="book-open" size={18} /> Isi Materi
+	<!-- Isi materi -->
+	<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
+		<Icon name="book-open" size={18} /> Isi materi
 	</h2>
 	{#if chapters.length === 0}
 		<p class="mt-2 text-sm text-[#5f6b62]">Daftar bab akan segera hadir.</p>
 	{:else}
 		{#each bySubject as [subject, list] (subject)}
-			<h3 class="mt-4 text-sm font-extrabold text-[#177245]">{subject}</h3>
+			<h3 class="mt-4 text-sm font-semibold text-[#177245]">{subject}</h3>
 			<div class="mt-2 space-y-2">
 				{#each list as c (c.id)}
 					<div class="card flex items-center gap-3 p-3">
 						<span
-							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"
+							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#3f4a42]"
 						>
-							<Icon name="file-text" size={17} />
+							<Icon name="file-text" size={16} />
 						</span>
 						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm font-bold">{c.title}</p>
+							<p class="truncate text-sm font-semibold">{c.title}</p>
 							<p class="text-xs text-[#5f6b62]">
 								Kelas {c.grade} • Semester {c.semester}
 								{#if c.video_url}
-									• <Icon name="video" size={13} class="inline-block align-[-2px]" /> Ada video
+									• <Icon name="video" size={16} class="inline-block align-[-2px]" /> Ada video
 								{/if}
 							</p>
 						</div>
@@ -220,22 +220,22 @@
 		<!-- Panel beli: bar bawah di mobile, panel sticky kanan di desktop -->
 		<div class="lg:sticky lg:top-[72px] lg:self-start">
 	<div
-		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)] lg:static lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:flex-col lg:rounded-2xl lg:border lg:p-4 lg:shadow-[0_2px_12px_rgb(23_114_69/0.06)]"
+		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)] lg:static lg:z-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:flex-col lg:rounded-2xl lg:border lg:p-4 lg:shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
 	>
 		<div class="hidden lg:block">
-			<p class="text-2xl font-extrabold text-[#177245]">{formatRupiah(product.price)}</p>
+			<p class="text-2xl font-semibold tabular-nums text-[#177245]">{formatRupiah(product.price)}</p>
 			{#if product.strikethrough_price}
-				<p class="text-sm font-semibold text-[#9aa096] line-through">
+				<p class="text-sm font-semibold text-[#6e675c] line-through">
 					{formatRupiah(product.strikethrough_price)}
 				</p>
 			{/if}
 			<p class="mt-1 text-xs text-[#5f6b62]">{product.pages} halaman • {product.category}</p>
 		</div>
 		<button type="button" class="btn btn-outline flex-1 lg:w-full" onclick={tambahKeranjang}>
-			<Icon name="shopping-cart" size={16} /> Tambah ke Keranjang
+			<Icon name="shopping-cart" size={16} /> Tambah ke keranjang
 		</button>
 		<button type="button" class="btn btn-primary flex-1 lg:w-full" onclick={beliSekarang}>
-			<Icon name="zap" size={16} /> Beli Sekarang
+			<Icon name="zap" size={16} /> Beli sekarang
 		</button>
 	</div>
 	<div class="h-16 lg:hidden"></div>

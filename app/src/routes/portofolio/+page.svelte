@@ -373,8 +373,8 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-extrabold">
-	<Icon name="pen" size={22} /> {viewTitle}
+<h1 class="flex items-center gap-2 text-xl font-semibold">
+	<Icon name="pen" size={18} /> {viewTitle}
 </h1>
 <p class="mt-1 text-sm text-[#5f6b62]">
 	{viewDesc}
@@ -384,16 +384,16 @@
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat karya...</p>
 {:else if error}
 	<p class="err mt-6">{error}</p>
-	<button type="button" class="btn btn-primary mt-3" onclick={muatKarya}>Coba Lagi</button>
+	<button type="button" class="btn btn-primary mt-3" onclick={muatKarya}>Coba lagi</button>
 {:else}
 	{#if notice}
-		<p class="ok-msg mt-4">{notice}</p>
+		<p class="tabular-nums ok-msg mt-4">{notice}</p>
 	{/if}
 
 	<!-- Form unggah karya (hanya untuk karyaku sendiri) -->
 	{#if viewMode === "milikku"}
 	<div class="card mt-4 p-4">
-		<p class="flex items-center gap-2 text-sm font-extrabold">
+		<p class="flex items-center gap-2 text-sm font-semibold">
 			<Icon name="upload" size={17} /> Unggah Karya Baru
 		</p>
 		<p class="mt-0.5 text-xs text-[#5f6b62]">
@@ -475,7 +475,7 @@
 	{#if items.length === 0}
 		<div class="card mt-4 p-6 text-center">
 			<p class="flex justify-center"><Icon name="pen" size={40} class="text-[#177245]" /></p>
-			<p class="mt-2 font-bold">Belum ada karya</p>
+			<p class="mt-2 font-medium">Belum ada karya</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				{#if viewMode === "milikku"}
 					Unggah karya pertamamu lewat form di atas ya.
@@ -489,7 +489,7 @@
 			{#each items as item (item.id)}
 				<button
 					type="button"
-					class="card overflow-hidden p-0 text-left transition hover:shadow-md"
+					class="card overflow-hidden p-0 text-left transition-shadow hover:shadow-[0_8px_24px_rgb(0_0_0/0.06)]"
 					onclick={() => bukaDetail(item.id)}
 				>
 					<img
@@ -499,18 +499,18 @@
 						loading="lazy"
 					/>
 					<span class="block p-3">
-						<span class="block truncate text-sm font-extrabold">{item.title}</span>
+						<span class="block truncate text-sm font-semibold">{item.title}</span>
 						{#if item.owner_name}
-							<span class="block truncate text-xs font-bold text-[#177245]">{item.owner_name}</span>
+							<span class="block truncate text-xs font-medium text-[#177245]">{item.owner_name}</span>
 						{/if}
 						<span class="mt-0.5 block text-xs text-[#5f6b62]">{formatTanggal(item.created_at)}</span>
-						<span class="mt-1.5 flex items-center gap-3 text-xs font-bold text-[#3f4a42]">
+						<span class="mt-1.5 flex items-center gap-3 text-xs font-medium text-[#3f4a42]">
 							<span class="flex items-center gap-1">
-								<Icon name="star" size={14} class="text-[#f2b33d]" />
+								<Icon name="star" size={16} class="text-[#f2b33d]" />
 								{labelBintang(item.stars_avg, item.stars_count)}
 							</span>
 							<span class="flex items-center gap-1">
-								<Icon name="message" size={14} />
+								<Icon name="message" size={16} />
 								{item.comments_count} komentar
 							</span>
 						</span>
@@ -536,22 +536,22 @@
 		{#if detailItem.caption}
 			<p class="mt-3 text-sm text-[#3f4a42]">{detailItem.caption}</p>
 		{/if}
-		<p class="mt-2 flex items-center gap-1.5 text-sm font-bold">
+		<p class="mt-2 flex items-center gap-1.5 text-sm font-medium">
 			<Icon name="star" size={16} class="text-[#f2b33d]" />
 			{labelBintang(detailItem.stars_avg, detailItem.stars_count)}
 			<span class="font-normal text-[#5f6b62]">• {formatTanggal(detailItem.created_at)}</span>
 		</p>
 
-		<h3 class="mt-4 text-sm font-extrabold">Komentar ({detailComments.length})</h3>
+		<h3 class="mt-4 text-sm font-semibold">Komentar ({detailComments.length})</h3>
 		{#if detailComments.length === 0}
 			<p class="mt-1 text-sm text-[#5f6b62]">Belum ada komentar.</p>
 		{:else}
 			<div class="mt-2 space-y-2">
 				{#each detailComments as c (c.created_at + c.text)}
 					<div class="rounded-xl bg-[#f7f5ef] px-3 py-2">
-						<p class="text-xs font-extrabold">{c.by_name ?? "Orang tua / guru"}</p>
+						<p class="text-xs font-semibold">{c.by_name ?? "Orang tua / guru"}</p>
 						<p class="mt-0.5 text-sm">{c.text}</p>
-						<p class="mt-0.5 text-[11px] text-[#5f6b62]">{formatTanggal(c.created_at)}</p>
+						<p class="mt-0.5 text-xs text-[#5f6b62]">{formatTanggal(c.created_at)}</p>
 					</div>
 				{/each}
 			</div>
@@ -564,7 +564,7 @@
 		{:else}
 			<!-- Beri bintang (orang tua / guru) -->
 			<div class="mt-4">
-				<p class="text-sm font-extrabold">Beri bintang</p>
+				<p class="text-sm font-semibold">Beri bintang</p>
 				<div class="mt-1.5 flex items-center gap-1">
 					{#each [1, 2, 3, 4, 5] as n (n)}
 						<button
@@ -589,7 +589,7 @@
 					</button>
 				</div>
 				{#if bintangTerkirim}
-					<p class="ok-msg mt-2">Terima kasih! Bintangmu sudah tersimpan.</p>
+					<p class="ok-msg mt-2">Terima kasih. Bintangmu sudah tersimpan.</p>
 				{/if}
 				{#if bintangError}
 					<p class="err mt-2">{bintangError}</p>

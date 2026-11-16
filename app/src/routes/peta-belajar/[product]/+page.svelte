@@ -124,7 +124,7 @@
 		}
 		try {
 			pack = await api<StudyPack>(`/api/study/${productId}`);
-			// Bab yang sudah selesai (dari tracker) — sama seperti Ruang Belajar.
+			// Bab yang sudah selesai (dari tracker) — sama seperti Ruang belajar.
 			try {
 				const t = await api<{ doneChapters: { chapter_id: string }[] }>("/api/tracker");
 				doneSet = new Set((t.doneChapters ?? []).map((d) => d.chapter_id));
@@ -132,7 +132,7 @@
 				/* tracker opsional */
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Gagal memuat Peta Belajar.";
+			error = e instanceof Error ? e.message : "Gagal memuat Peta belajar.";
 		} finally {
 			loading = false;
 		}
@@ -147,31 +147,8 @@
 	}
 </script>
 
-<style>
-	/* Denyut halus di node "saat ini" (marigold). */
-	@keyframes map-ping {
-		0% {
-			transform: scale(1);
-			opacity: 0.7;
-		}
-		80%,
-		100% {
-			transform: scale(1.9);
-			opacity: 0;
-		}
-	}
-	.map-ping {
-		animation: map-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.map-ping {
-			animation: none;
-		}
-	}
-</style>
-
 <button type="button" class="btn btn-ghost" onclick={() => goto(`/belajar/${productId}`)}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Ruang Belajar
+	<Icon name="chevron-left" size={18} /> Kembali ke ruang belajar
 </button>
 
 {#if loading}
@@ -179,8 +156,8 @@
 {:else if error || !pack}
 	<p class="err mt-6">{error || "Peta belajar tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-		<Icon name="map" size={22} class="shrink-0" /> Peta Belajar
+	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+		<Icon name="map" size={18} class="shrink-0" /> Peta <span class="u-pencil">belajar</span>
 	</h1>
 	<p class="text-sm text-[#5f6b62]">
 		{pack.product.title} • {pack.chapters.length} bab
@@ -189,19 +166,19 @@
 	<!-- Ringkasan progres -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center justify-between gap-2">
-			<p class="text-sm font-extrabold">Progresmu</p>
-			<p class="text-sm font-extrabold text-[#177245]">{doneCount} dari {totalCount} bab selesai</p>
+			<p class="text-sm font-semibold">Progresmu</p>
+			<p class="tabular-nums text-sm font-semibold text-[#177245]">{doneCount} dari {totalCount} bab selesai</p>
 		</div>
 		<div class="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e7e2d2]">
-			<div class="h-full bg-[#177245] transition-all" style="width: {pct}%"></div>
+			<div class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({pct / 100})"></div>
 		</div>
 		{#if totalCount > 0 && doneCount === totalCount}
-			<p class="mt-2 flex items-center gap-1.5 text-sm font-bold text-[#065f46]">
-				<Icon name="trophy" size={16} /> Semua bab selesai! Hebat!
+			<p class="mt-2 flex items-center gap-1.5 text-sm font-medium text-[#065f46]">
+				<Icon name="trophy" size={16} /> Semua bab selesai, hebat
 			</p>
 		{:else if currentNode}
 			<p class="mt-2 text-sm text-[#5f6b62]">
-				Lanjut ke <b>{currentNode.ch.title}</b> yuk!
+				Lanjut ke <b>{currentNode.ch.title}</b>, yuk
 			</p>
 			<a href="/belajar/{productId}/{currentNode.ch.id}" class="btn btn-sun btn-block mt-3">
 				<Icon name="play" size={16} /> Lanjut: Bab {currentNode.i + 1}
@@ -216,12 +193,12 @@
 		{/if}
 	</div>
 
-	<!-- Pemberitahuan node terkunci (perilaku sama seperti di Ruang Belajar) -->
+	<!-- Pemberitahuan node terkunci (perilaku sama seperti di Ruang belajar) -->
 	{#if lockedChapter}
 		<div class="err mt-3">
 			<div class="flex items-start justify-between gap-2">
-				<p class="flex items-center gap-1.5 font-extrabold">
-					<Icon name="lock" size={15} /> Bab ini terkunci
+				<p class="flex items-center gap-1.5 font-semibold">
+					<Icon name="lock" size={16} /> Bab ini terkunci
 				</p>
 				<button
 					type="button"
@@ -229,7 +206,7 @@
 					aria-label="Tutup pemberitahuan"
 					onclick={() => (lockedChapter = null)}
 				>
-					<Icon name="x" size={15} />
+					<Icon name="x" size={16} />
 				</button>
 			</div>
 			<p class="mt-1 text-sm">
@@ -237,7 +214,7 @@
 				membuka semua bab.
 			</p>
 			<a href="/produk/{productId}" class="btn btn-sun mt-2 w-full text-xs">
-				<Icon name="lock" size={14} /> Beli untuk membuka
+				<Icon name="lock" size={16} /> Beli untuk membuka
 			</a>
 		</div>
 	{/if}
@@ -289,10 +266,10 @@
 						<button
 							type="button"
 							aria-label="Bab {n.i + 1} terkunci: {n.ch.title}"
-							class="relative flex h-full w-full items-center justify-center rounded-full border-2 border-[#d8d2bd] bg-[#efead9] text-[#9aa096] shadow-sm"
+							class="relative flex h-full w-full items-center justify-center rounded-full border-2 border-[#d8d2bd] bg-[#efead9] text-[#6e675c] shadow-[0_1px_2px_rgb(0_0_0/0.05)]"
 							onclick={() => bukaNode(n)}
 						>
-							<Icon name="lock" size={nodeR >= 30 ? 22 : 18} />
+							<Icon name="lock" size={18} />
 						</button>
 					{:else}
 						<a
@@ -301,20 +278,17 @@
 							style={n.state === "current"
 								? `border-color: ${gtPeta.accent}; background: ${gtPeta.soft}; color: ${gtPeta.text}`
 								: undefined}
-							class="relative flex h-full w-full items-center justify-center rounded-full border-2 shadow-sm {n.state ===
+							class="relative flex h-full w-full items-center justify-center rounded-full border-2 shadow-[0_1px_2px_rgb(0_0_0/0.05)] {n.state ===
 							'done'
 								? 'border-[#115c39] bg-[#177245] text-white'
 								: n.state === 'current'
-									? ''
+									? 'ring-2 ring-[#f2b33d]'
 									: 'border-[#e7e2d2] bg-[#fffdf7] text-[#5f6b62]'}"
 						>
-							{#if n.state === "current"}
-								<span class="map-ping absolute inset-0 rounded-full" style="background: {gtPeta.accent}" aria-hidden="true"></span>
-							{/if}
 							{#if n.state === "done"}
-								<Icon name="check" size={nodeR >= 30 ? 24 : 20} class="relative" />
+								<Icon name="check" size={18} class="relative" />
 							{:else}
-								<span class="relative text-base font-extrabold lg:text-lg">{n.i + 1}</span>
+								<span class="tabular-nums relative text-base font-semibold lg:text-lg">{n.i + 1}</span>
 							{/if}
 						</a>
 					{/if}
@@ -326,19 +300,19 @@
 						? ''
 						: 'transform: translateY(-50%);'}"
 				>
-					<p class="text-[11px] font-bold text-[#5f6b62]">Bab {n.i + 1} • {n.ch.subject}</p>
-					<p class="text-sm font-bold leading-snug {lp.below ? 'line-clamp-1' : 'line-clamp-2'}">
+					<p class="text-xs font-medium text-[#5f6b62]">Bab {n.i + 1} • {n.ch.subject}</p>
+					<p class="text-sm font-medium leading-snug {lp.below ? 'line-clamp-1' : 'line-clamp-2'}">
 						{n.ch.title}
 					</p>
 					{#if !lp.below}
-						<p class="text-[11px] font-bold">
+						<p class="text-xs font-medium">
 							{#if n.state === "done"}
 								<span class="inline-flex items-center gap-1 text-[#065f46]">
-									<Icon name="check" size={12} /> Selesai
+									<Icon name="check" size={16} /> Selesai
 								</span>
 							{:else if n.state === "locked"}
 								<span class="inline-flex items-center gap-1 text-[#5f6b62]">
-									<Icon name="lock" size={12} /> Terkunci
+									<Icon name="lock" size={16} /> Terkunci
 								</span>
 							{:else if n.state === "current"}
 								<span style="color: {gtPeta.text}">Lanjutkan di sini</span>
@@ -350,9 +324,9 @@
 		</div>
 
 		<!-- Keterangan -->
-		<div class="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-bold text-[#5f6b62]">
+		<div class="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-[#5f6b62]">
 			<span class="inline-flex items-center gap-1.5">
-				<span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#177245] text-white"><Icon name="check" size={12} /></span>
+				<span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#177245] text-white"><Icon name="check" size={16} /></span>
 				Selesai
 			</span>
 			<span class="inline-flex items-center gap-1.5">
@@ -369,13 +343,13 @@
 				Belum dikerjakan
 			</span>
 			<span class="inline-flex items-center gap-1.5">
-				<span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#efead9] text-[#9aa096]"><Icon name="lock" size={12} /></span>
+				<span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#efead9] text-[#6e675c]"><Icon name="lock" size={16} /></span>
 				Terkunci
 			</span>
 		</div>
 
 		<a href="/belajar/{productId}" class="btn btn-outline btn-block mt-6">
-			<Icon name="trophy" size={16} /> Lihat Simulasi SAS di Ruang Belajar
+			<Icon name="trophy" size={16} /> Lihat simulasi SAS di ruang belajar
 		</a>
 	{/if}
 {/if}

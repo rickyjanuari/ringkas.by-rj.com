@@ -264,11 +264,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Akun
+	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="alarm-clock" size={22} class="shrink-0" /> Jadwal Belajar & Pengingat
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="alarm-clock" size={18} class="shrink-0" /> Jadwal belajar & pengingat
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Atur jam belajar tiap anak, lalu Ringkas mengingatkan lewat notifikasi saat waktunya tiba.
@@ -276,7 +276,7 @@
 
 <!-- Kartu langganan push -->
 <div class="card mt-4 p-4">
-	<p class="flex items-center gap-2 text-sm font-bold">
+	<p class="flex items-center gap-2 text-sm font-medium">
 		<Icon name="alarm-clock" size={18} /> Pengingat di perangkat ini
 	</p>
 	{#if !pushSupported}
@@ -286,13 +286,13 @@
 	{:else}
 		<p class="mt-2 text-sm text-[#5f6b62]">
 			{#if subscribed}
-				Pengingat <span class="font-bold text-[#177245]">aktif</span> di perangkat ini. Notifikasi
+				Pengingat <span class="font-medium text-[#177245]">aktif</span> di perangkat ini. Notifikasi
 				akan muncul saat jadwal belajar tiba, walau Ringkas sedang tidak dibuka.
 			{:else if permission === "denied"}
-				Notifikasi <span class="font-bold text-[#b91c1c]">diblokir</span> di browser ini. Ketuk ikon
+				Notifikasi <span class="font-medium text-[#b91c1c]">diblokir</span> di browser ini. Ketuk ikon
 				gembok di bilah alamat, izinkan notifikasi, lalu muat ulang halaman.
 			{:else}
-				Pengingat <span class="font-bold">belum aktif</span> di perangkat ini. Aktifkan supaya
+				Pengingat <span class="font-medium">belum aktif</span> di perangkat ini. Aktifkan supaya
 				jadwal belajar mengingatkanmu tepat waktu.
 			{/if}
 		</p>
@@ -317,7 +317,7 @@
 
 <!-- Editor jadwal -->
 <div class="card mt-4 p-4">
-	<p class="flex items-center gap-2 text-sm font-bold">
+	<p class="flex items-center gap-2 text-sm font-medium">
 		<Icon name="calendar" size={18} /> Buat jadwal belajar
 	</p>
 	{#if childrenLoading}
@@ -325,8 +325,8 @@
 	{:else if children.length === 0}
 		<p class="mt-2 text-sm text-[#5f6b62]">
 			Belum ada anak terhubung. Hubungkan dulu lewat <a
-				class="font-bold text-[#177245] underline"
-				href="/akun">Mode Orang Tua di halaman Akun</a
+				class="font-medium text-[#177245] underline"
+				href="/akun">Mode orang tua di halaman Akun</a
 			>, lalu kembali ke sini.
 		</p>
 	{:else}
@@ -367,7 +367,7 @@
 
 <!-- Daftar jadwal -->
 <div class="card mt-4 p-4">
-	<p class="flex items-center gap-2 text-sm font-bold">
+	<p class="flex items-center gap-2 text-sm font-medium">
 		<Icon name="clock" size={18} /> Jadwal yang sudah ada
 	</p>
 	{#if schedulesLoading}
@@ -386,10 +386,10 @@
 					<span
 						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"
 					>
-						<Icon name="calendar" size={20} />
+						<Icon name="calendar" size={18} />
 					</span>
 					<span class="min-w-0 flex-1">
-						<span class="block font-bold">{s.child_name ?? "Anak"}</span>
+						<span class="block font-medium">{s.child_name ?? "Anak"}</span>
 						<span class="block text-sm text-[#5f6b62]">
 							Setiap {namaHari(s.weekday)} pukul {s.time} WIB
 						</span>

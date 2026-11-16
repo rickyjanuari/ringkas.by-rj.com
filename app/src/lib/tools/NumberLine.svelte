@@ -31,7 +31,7 @@
 		if (bergerak) return;
 		const target = awal + arah * langkah;
 		if (target < 0 || target > MAKS) {
-			pesan = "Coba langkah yang lebih kecil, yuk!";
+			pesan = "Coba langkah yang lebih kecil, yuk";
 			kalimat = "";
 			return;
 		}
@@ -83,8 +83,8 @@
 </script>
 
 <div class="card p-4">
-	<h3 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-		<Icon name="target" size={18} /> Garis Bilangan
+	<h3 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+		<Icon name="target" size={18} /> Garis bilangan
 	</h3>
 	<p class="mt-1 text-sm text-[#5f6b62]">
 		Pilih bilangan awal dan langkah, lalu tekan Lompat dan lihat penandanya bergerak.
@@ -95,7 +95,7 @@
 			<label class="lbl" for="gl-awal">Bilangan awal (0–20)</label>
 			<input
 				id="gl-awal"
-				class="input !w-24 text-center text-lg font-extrabold"
+				class="tabular-nums input !w-24 text-center text-lg font-semibold"
 				type="number"
 				min="0"
 				max="20"
@@ -108,7 +108,7 @@
 			<label class="lbl" for="gl-langkah">Langkah</label>
 			<select
 				id="gl-langkah"
-				class="input !w-24 text-center text-lg font-extrabold"
+				class="tabular-nums input !w-24 text-center text-lg font-semibold"
 				bind:value={langkah}
 				disabled={bergerak}
 				onchange={ulangi}
@@ -156,7 +156,7 @@
 			<div class="absolute right-1 left-1 top-[52px] h-1 rounded-full bg-[#177245]"></div>
 			<!-- Penanda -->
 			<div
-				class="absolute top-[34px] z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-[#f2b33d] text-base font-extrabold text-[#22302a] shadow transition-all duration-300"
+				class="absolute top-8 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-[#f2b33d] text-base font-semibold text-[#22302a] shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-[left] duration-300 ease-signature"
 				style="left: calc({(posisi / MAKS) * 100}% )"
 				aria-label="Posisi {posisi}"
 			>
@@ -167,7 +167,7 @@
 				{#each Array.from({ length: MAKS + 1 }, (_, i) => i) as n (n)}
 					<button
 						type="button"
-						class="flex w-5 flex-col items-center gap-1 text-xs font-bold {n === posisi
+						class="flex w-5 flex-col items-center gap-1 text-xs font-medium {n === posisi
 							? 'text-[#177245]'
 							: 'text-[#5f6b62]'}"
 						disabled={bergerak}
@@ -186,9 +186,9 @@
 		<p class="err mt-3">{pesan}</p>
 	{/if}
 	{#if kalimat}
-		<p class="ok-msg mt-3 text-center text-xl font-extrabold">{kalimat}</p>
+		<p class="tabular-nums ok-msg mt-3 text-center text-xl font-semibold">{kalimat}</p>
 	{:else if !pesan}
-		<p class="mt-3 text-center text-sm font-bold text-[#5f6b62]">
+		<p class="mt-3 text-center text-sm font-medium text-[#5f6b62]">
 			Sekarang di {posisi}. Tekan Lompat untuk bergerak {langkah} langkah {arah > 0 ? "maju" : "mundur"}.
 		</p>
 	{/if}

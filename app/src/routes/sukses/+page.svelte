@@ -123,13 +123,13 @@
 	<button
 		type="button"
 		class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#177245]"
-		aria-label="Kembali ke Pesanan Saya"
+		aria-label="Kembali ke Pesanan saya"
 		onclick={() => goto("/pesanan")}
 	>
-		<Icon name="chevron-left" size={24} />
+		<Icon name="chevron-left" size={18} />
 	</button>
-	<h1 class="min-w-0 flex-1 truncate text-center text-base font-bold">
-		Status Pembayaran
+	<h1 class="min-w-0 flex-1 truncate text-center text-base font-semibold">
+		Status pembayaran
 	</h1>
 	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
 </div>
@@ -141,13 +141,13 @@
 		<p class="flex justify-center">
 			<Icon name="help-circle" size={40} class="text-[#177245]" />
 		</p>
-		<p class="mt-2 text-lg font-extrabold">Tidak Ada Nomor Order</p>
+		<p class="mt-2 text-lg font-semibold">Tidak ada nomor order</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">
-			Halaman ini membutuhkan nomor order. Buka Pesanan Saya untuk melihat pesananmu.
+			Halaman ini membutuhkan nomor order. Buka Pesanan saya untuk melihat pesananmu.
 		</p>
 		<div class="mt-4 flex flex-col gap-2">
-			<a href="/pesanan" class="btn btn-primary btn-block">Lihat Pesanan Saya</a>
-			<a href="/katalog" class="btn btn-outline btn-block">Lihat Katalog</a>
+			<a href="/pesanan" class="btn btn-primary btn-block">Lihat Pesanan saya</a>
+			<a href="/katalog" class="btn btn-outline btn-block">Lihat katalog</a>
 		</div>
 	</div>
 {:else if error || !order}
@@ -155,13 +155,13 @@
 		<p class="flex justify-center">
 			<Icon name="x-circle" size={40} class="text-[#b91c1c]" />
 		</p>
-		<p class="mt-2 text-lg font-extrabold">Order Tidak Ditemukan</p>
+		<p class="mt-2 text-lg font-semibold">Order tidak ditemukan</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">
 			{error || "Order tidak ditemukan atau bukan milik akun ini."}
 		</p>
 		<div class="mt-4 flex flex-col gap-2">
-			<a href="/pesanan" class="btn btn-primary btn-block">Lihat Pesanan Saya</a>
-			<a href="/katalog" class="btn btn-outline btn-block">Lihat Katalog</a>
+			<a href="/pesanan" class="btn btn-primary btn-block">Lihat Pesanan saya</a>
+			<a href="/katalog" class="btn btn-outline btn-block">Lihat katalog</a>
 		</div>
 	</div>
 {:else if order.status === "PAID"}
@@ -170,32 +170,32 @@
 		<p class="flex justify-center">
 			<Icon name="check-circle" size={56} class="text-[#177245]" />
 		</p>
-		<h2 class="mt-2 text-xl font-extrabold text-[#065f46]">Pembayaran Berhasil!</h2>
+		<h2 class="mt-2 text-xl font-semibold text-[#065f46]">Pembayaran berhasil</h2>
 		<p class="mt-1 text-sm text-[#5f6b62]">
-			Terima kasih! Produkmu sudah bisa dibuka di Ruang Belajar.
+			Terima kasih, produkmu sudah bisa dibuka di Ruang Belajar.
 		</p>
 
 		<div class="mt-4 space-y-2 rounded-2xl bg-[#f7f5ef] p-4 text-left text-sm">
 			<div class="flex justify-between gap-2">
 				<span class="text-[#5f6b62]">Nomor order</span>
-				<b class="break-all text-right">{order.id}</b>
+				<b class="break-all font-semibold text-right">{order.id}</b>
 			</div>
 			{#each order.items as it (it.product_id)}
 				<div class="flex justify-between gap-2">
 					<span class="text-[#5f6b62]">{it.title}</span>
-					<b class="shrink-0">{formatRupiah(it.price)}</b>
+					<b class="shrink-0 font-semibold tabular-nums">{formatRupiah(it.price)}</b>
 				</div>
 			{/each}
 			<div
 				class="flex justify-between gap-2 border-t border-dashed border-[#e7e2d2] pt-2"
 			>
 				<span class="text-[#5f6b62]">Total dibayar</span>
-				<b class="text-[#177245]">{formatRupiah(order.total_amount ?? order.total)}</b>
+				<b class="font-semibold tabular-nums text-[#177245]">{formatRupiah(order.total_amount ?? order.total)}</b>
 			</div>
 			{#if order.paid_at}
 				<div class="flex justify-between gap-2">
 					<span class="text-[#5f6b62]">Tanggal bayar</span>
-					<b>{formatTanggal(order.paid_at)}</b>
+					<b class="font-semibold tabular-nums">{formatTanggal(order.paid_at)}</b>
 				</div>
 			{/if}
 		</div>
@@ -203,7 +203,7 @@
 		<div class="mt-4 flex flex-col gap-2">
 			{#each order.items as it (it.product_id)}
 				<a href={`/belajar/${it.product_id}`} class="btn btn-leaf btn-block">
-					<Icon name="book-open" size={16} /> Mulai Belajar — {it.title}
+					<Icon name="book-open" size={16} /> Mulai belajar — {it.title}
 				</a>
 				{#if it.externalUrl}
 					<a
@@ -212,7 +212,7 @@
 						rel="noopener noreferrer"
 						class="btn btn-outline btn-block"
 					>
-						<Icon name="link" size={16} /> Buka Produk — {it.title}
+						<Icon name="link" size={16} /> Buka produk — {it.title}
 					</a>
 				{/if}
 			{/each}
@@ -225,11 +225,11 @@
 				{#if downloadingStruk}
 					Mengunduh...
 				{:else}
-					<Icon name="receipt" size={16} /> Unduh Struk
+					<Icon name="receipt" size={16} /> Unduh struk
 				{/if}
 			</button>
-			<a href="/pesanan" class="btn btn-outline btn-block">Lihat Pesanan Saya</a>
-			<a href="/" class="btn btn-ghost btn-block">Kembali ke Beranda</a>
+			<a href="/pesanan" class="btn btn-outline btn-block">Lihat Pesanan saya</a>
+			<a href="/" class="btn btn-ghost btn-block">Kembali ke beranda</a>
 		</div>
 	</div>
 {:else if order.status === "EXPIRED"}
@@ -237,14 +237,14 @@
 		<p class="flex justify-center">
 			<Icon name="alarm-clock" size={40} class="text-[#b91c1c]" />
 		</p>
-		<p class="mt-2 text-lg font-extrabold">Pembayaran Kedaluwarsa</p>
+		<p class="mt-2 text-lg font-semibold">Pembayaran kedaluwarsa</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">
-			Nomor order: <b>{order.id}</b>. Kode QRIS ini sudah tidak berlaku. Silakan buat
+			Nomor order: <b class="font-semibold">{order.id}</b>. Kode QRIS ini sudah tidak berlaku. Silakan buat
 			pembayaran baru dari keranjang.
 		</p>
 		<div class="mt-4 flex flex-col gap-2">
-			<a href="/keranjang" class="btn btn-primary btn-block">Checkout Lagi</a>
-			<a href="/pesanan" class="btn btn-outline btn-block">Lihat Pesanan Saya</a>
+			<a href="/keranjang" class="btn btn-primary btn-block">Checkout lagi</a>
+			<a href="/pesanan" class="btn btn-outline btn-block">Lihat Pesanan saya</a>
 		</div>
 	</div>
 {:else}
@@ -252,11 +252,11 @@
 		<p class="flex justify-center">
 			<Icon name="clock" size={40} class="text-[#177245]" />
 		</p>
-		<p class="mt-2 text-lg font-extrabold">Menunggu Pembayaran</p>
+		<p class="mt-2 text-lg font-semibold">Menunggu pembayaran</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">
-			Nomor order: <b>{order.id}</b>
+			Nomor order: <b class="font-semibold">{order.id}</b>
 		</p>
-		<p class="mt-3 text-2xl font-extrabold text-[#177245]">
+		<p class="mt-3 text-2xl font-semibold tabular-nums text-[#177245]">
 			{formatRupiah(order.total_amount ?? order.total)}
 		</p>
 		{#if order.expired_at}
@@ -266,11 +266,11 @@
 		{/if}
 		<p class="mt-3 text-sm text-[#5f6b62]">
 			Kami mengecek status pembayaranmu otomatis setiap 10 detik. Halaman ini akan berubah
-			sendiri menjadi "Pembayaran Berhasil" begitu pembayaran masuk.
+			sendiri menjadi "Pembayaran berhasil" begitu pembayaran masuk.
 		</p>
 		<div class="mt-4 flex flex-col gap-2">
 			<button type="button" class="btn btn-primary btn-block" onclick={lanjutkanBayar}>
-				<Icon name="link" size={16} /> Lanjutkan Bayar
+				<Icon name="link" size={16} /> Lanjutkan bayar
 			</button>
 			<button
 				type="button"
@@ -281,10 +281,10 @@
 				{#if checkingNow}
 					Memeriksa...
 				{:else}
-					<Icon name="refresh" size={16} /> Cek Status Sekarang
+					<Icon name="refresh" size={16} /> Cek status sekarang
 				{/if}
 			</button>
-			<a href="/pesanan" class="btn btn-ghost btn-block">Lihat Pesanan Saya</a>
+			<a href="/pesanan" class="btn btn-ghost btn-block">Lihat Pesanan saya</a>
 		</div>
 	</div>
 {/if}

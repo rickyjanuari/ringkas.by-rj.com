@@ -30,7 +30,7 @@
 	});
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="shopping-cart" size={22} /> Keranjang</h1>
+<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="shopping-cart" size={18} /> Keranjang</h1>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
@@ -40,9 +40,9 @@
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Mascot expression="berpikir" /></p>
 		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
-		<p class="mt-2 font-bold">Keranjangmu masih kosong</p>
+		<p class="mt-2 font-semibold">Keranjangmu masih kosong</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Yuk, cari rangkuman favoritmu di katalog.</p>
-		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
+		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat katalog</a>
 	</div>
 {:else}
 	{#if missing > 0}
@@ -56,15 +56,15 @@
 		{#each items as p (p.id)}
 			<article class="card flex gap-3 p-3">
 				<div
-					class="flex w-16 shrink-0 items-center justify-center rounded-xl px-1 text-center text-[11px] font-extrabold leading-tight text-white"
+					class="flex w-16 shrink-0 items-center justify-center rounded-xl px-1 text-center text-[11px] font-semibold leading-tight text-white"
 					style="background: {p.cover_color}"
 				>
 					{p.cover_label}
 				</div>
 				<div class="min-w-0 flex-1">
-					<p class="line-clamp-2 text-sm font-bold leading-snug">{p.title}</p>
+					<p class="line-clamp-2 text-sm font-semibold leading-snug">{p.title}</p>
 					<p class="text-xs text-[#5f6b62]">{p.jenjang} • {p.mapel}</p>
-					<p class="mt-1 text-sm font-extrabold text-[#177245]">{formatRupiah(p.price)}</p>
+					<p class="mt-1 text-sm font-semibold tabular-nums text-[#177245]">{formatRupiah(p.price)}</p>
 				</div>
 				<button
 					type="button"
@@ -81,11 +81,11 @@
 	<div class="card mt-4 p-4 lg:sticky lg:top-[72px] lg:self-start">
 		<div class="flex justify-between text-sm">
 			<span class="text-[#5f6b62]">{items.length} produk</span>
-			<span class="font-bold">{formatRupiah(total)}</span>
+			<span class="font-semibold tabular-nums">{formatRupiah(total)}</span>
 		</div>
 		<div class="mt-2 flex justify-between border-t border-dashed border-[#e7e2d2] pt-2">
-			<span class="font-extrabold">Total Bayar</span>
-			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(total)}</span>
+			<span class="font-semibold">Total bayar</span>
+			<span class="text-lg font-semibold tabular-nums text-[#177245]">{formatRupiah(total)}</span>
 		</div>
 		<button
 			type="button"
@@ -96,7 +96,7 @@
 			<Icon name="credit-card" size={16} /> Checkout
 		</button>
 		<button type="button" class="btn btn-ghost btn-block mt-2" onclick={() => cart.clear()}>
-			Kosongkan Keranjang
+			Kosongkan keranjang
 		</button>
 	</div>
 	</div>

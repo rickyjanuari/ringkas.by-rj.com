@@ -93,7 +93,7 @@
 			await deferredPrompt.prompt();
 			const choice = await deferredPrompt.userChoice;
 			if (choice.outcome === "accepted") {
-				installNotice = "Terima kasih! Aplikasi Ringkas sedang dipasang ke layar utama.";
+				installNotice = "Terima kasih. Aplikasi Ringkas sedang dipasang ke layar utama.";
 				installState = "installed";
 			} else {
 				installNotice =
@@ -110,11 +110,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Akun
+	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="graduation-cap" size={22} class="shrink-0" /> Rapor Semester
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="graduation-cap" size={18} class="shrink-0" /> Rapor semester
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Ringkasan belajarmu satu semester dalam satu berkas PDF — siap diunduh dan dibagikan ke orang tua.
@@ -122,8 +122,8 @@
 
 <!-- Rapor saya -->
 <div class="card mt-4 p-4">
-	<p class="flex items-center gap-1.5 text-sm font-extrabold">
-		<Icon name="file-text" size={15} /> Rapor Saya
+	<p class="flex items-center gap-1.5 text-sm font-semibold">
+		<Icon name="file-text" size={16} /> Rapor Saya
 	</p>
 	<p class="mt-1 text-sm text-[#5f6b62]">Isi rapor:</p>
 	<ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-[#3f4a42]">
@@ -141,7 +141,7 @@
 		disabled={downloading !== null}
 		onclick={() => unduhRapor(null)}
 	>
-		{#if downloading === "me"}Mengunduh...{:else}<Icon name="download" size={16} /> Unduh Rapor Semester (PDF){/if}
+		{#if downloading === "me"}Mengunduh...{:else}<Icon name="download" size={16} /> Unduh rapor semester (PDF){/if}
 	</button>
 </div>
 
@@ -153,8 +153,8 @@
 {#if childrenLoading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat daftar anak...</p>
 {:else if children.length > 0}
-	<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold">
-		<Icon name="users" size={18} /> Rapor Anak
+	<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
+		<Icon name="users" size={18} /> Rapor anak
 	</h2>
 	<p class="text-xs text-[#5f6b62]">
 		Anak-anak yang sudah menebus kode Mode Orang Tua darimu.
@@ -164,7 +164,7 @@
 			<div class="card p-4">
 				<div class="flex items-start justify-between gap-2">
 					<div>
-						<p class="text-sm font-extrabold leading-snug">{child.name}</p>
+						<p class="text-sm font-semibold leading-snug">{child.name}</p>
 						<p class="mt-0.5 text-xs text-[#5f6b62]">Rapor semester anakmu dalam berkas PDF.</p>
 					</div>
 				</div>
@@ -174,7 +174,7 @@
 					disabled={downloading !== null}
 					onclick={() => unduhRapor(child.id)}
 				>
-					{#if downloading === child.id}Mengunduh...{:else}<Icon name="download" size={16} /> Unduh Rapor {child.name}{/if}
+					{#if downloading === child.id}Mengunduh...{:else}<Icon name="download" size={16} /> Unduh rapor {child.name}{/if}
 				</button>
 			</div>
 		{/each}
@@ -183,8 +183,8 @@
 
 <!-- Instal aplikasi (PWA) -->
 <div class="card mt-6 p-4">
-	<p class="flex items-center gap-1.5 text-sm font-extrabold">
-		<Icon name="smartphone" size={15} /> Instal Aplikasi Ringkas
+	<p class="flex items-center gap-1.5 text-sm font-semibold">
+		<Icon name="smartphone" size={16} /> Instal aplikasi Ringkas
 	</p>
 	<p class="mt-1 text-sm text-[#5f6b62]">
 		Pasang Ringkas di layar utama HP supaya bisa dibuka seperti aplikasi.
@@ -192,15 +192,15 @@
 
 	{#if installState === "available"}
 		<button type="button" class="btn btn-sun btn-block mt-3" onclick={instalAplikasi}>
-			<Icon name="download" size={16} /> Instal Aplikasi
+			<Icon name="download" size={16} /> Instal aplikasi
 		</button>
 	{:else if installState === "installed"}
-		<p class="ok-msg mt-3">
-			<Icon name="check" size={15} class="inline-block align-[-2px]" /> Aplikasi Ringkas sudah terinstal di perangkat ini.
+		<p class="tabular-nums ok-msg mt-3">
+			<Icon name="check" size={16} class="inline-block align-[-2px]" /> Aplikasi Ringkas sudah terinstal di perangkat ini.
 		</p>
 	{:else}
 		<div class="mt-3 rounded-xl border border-[#e7e2d2] bg-[#f7f5ef] p-3 text-sm">
-			<p class="font-bold">Cara manual memasang aplikasi:</p>
+			<p class="font-medium">Cara manual memasang aplikasi:</p>
 			<ul class="mt-1 list-disc space-y-1 pl-5 text-[#3f4a42]">
 				<li>
 					<strong>Android (Chrome):</strong> ketuk menu titik tiga (⋮) di kanan atas, lalu pilih
@@ -215,11 +215,11 @@
 	{/if}
 
 	{#if installNotice}
-		<p class="ok-msg mt-3">{installNotice}</p>
+		<p class="tabular-nums ok-msg mt-3">{installNotice}</p>
 	{/if}
 
 	<p class="mt-3 flex items-start gap-1.5 text-xs text-[#5f6b62]">
-		<Icon name="info" size={14} class="mt-0.5 shrink-0" />
+		<Icon name="info" size={16} class="mt-0.5 shrink-0" />
 		<span>
 			Catatan offline: materi yang sudah pernah dibuka tetap bisa dibaca tanpa internet. Materi
 			yang belum pernah dibuka belum tersedia offline.
@@ -227,6 +227,6 @@
 	</p>
 </div>
 
-<p class="mt-6 text-center text-xs text-[#9aa096]">
-	Rapor dibuat dari data belajarmu di Ringkas • Semangat belajarnya!
+<p class="mt-6 text-center text-xs text-[#6e675c]">
+	Rapor dibuat dari data belajarmu di Ringkas • Semangat belajarnya
 </p>

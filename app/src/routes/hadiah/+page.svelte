@@ -79,55 +79,55 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="package" size={22} /> Hadiah untukmu</h1>
+<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="package" size={18} /> Hadiah untukmu</h1>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat hadiahmu...</p>
 {:else if error}
 	<div class="card mx-auto mt-4 max-w-xl p-6 text-center">
 		<p class="flex justify-center"><Icon name="x-circle" size={40} class="text-[#b91c1c]" /></p>
-		<p class="mt-2 font-bold">Hadiah tidak ditemukan</p>
+		<p class="mt-2 font-semibold">Hadiah tidak ditemukan</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">{error}</p>
-		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
+		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat katalog</a>
 	</div>
 {:else if claimed}
 	<div class="card mx-auto mt-4 max-w-xl p-6 text-center">
 		<p class="flex justify-center"><Icon name="check-circle" size={40} class="text-[#177245]" /></p>
-		<p class="mt-2 text-lg font-extrabold">
-			{claimed.already ? "Hadiah ini sudah ada di akunmu!" : "Hadiah berhasil diklaim!"}
+		<p class="mt-2 text-lg font-semibold">
+			{claimed.already ? "Hadiah ini sudah ada di akunmu." : "Hadiah berhasil diklaim."}
 		</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">
 			{claimed.already
 				? "Aksesnya sudah masuk ke akunmu sebelumnya — langsung belajar saja ya."
-				: "Produk di bawah ini sekarang milikmu. Selamat belajar!"}
+				: "Produk di bawah ini sekarang milikmu. Selamat belajar."}
 		</p>
 		<div class="mt-3 space-y-1 text-left">
 			{#each claimed.products as p (p.product_id)}
 				<p class="flex items-center gap-1.5 text-sm">
-					<Icon name="book-open" size={15} class="shrink-0" /> {p.title}
+					<Icon name="book-open" size={16} class="shrink-0" /> {p.title}
 				</p>
 			{/each}
 		</div>
 		{#if claimed.products[0]}
 			<a href={`/belajar/${claimed.products[0].product_id}`} class="btn btn-primary btn-block mt-4">
-				<Icon name="book-open" size={16} /> Buka Ruang Belajar
+				<Icon name="book-open" size={16} /> Buka ruang belajar
 			</a>
 		{/if}
 		<a href="/pesanan" class="btn btn-outline btn-block mt-2">
-			<Icon name="receipt" size={16} /> Lihat Pesanan Saya
+			<Icon name="receipt" size={16} /> Lihat Pesanan saya
 		</a>
 	</div>
 {:else if info}
 	<div class="card mx-auto mt-4 max-w-xl p-6">
 		<p class="flex justify-center"><Icon name="package" size={40} class="text-[#177245]" /></p>
-		<p class="mt-2 text-center text-lg font-extrabold">Kamu mendapat hadiah!</p>
+		<p class="mt-2 text-center text-lg font-semibold">Kamu mendapat hadiah.</p>
 		<p class="mt-1 text-center text-sm text-[#5f6b62]">
 			{info.giver_name} membelikanmu materi belajar dari Ringkas.
 		</p>
 		<div class="mt-4 space-y-1">
 			{#each info.products as p (p.product_id)}
 				<p class="flex items-center gap-1.5 text-sm">
-					<Icon name="book-open" size={15} class="shrink-0" /> <span class="font-bold">{p.title}</span>
+					<Icon name="book-open" size={16} class="shrink-0" /> <span class="font-semibold">{p.title}</span>
 				</p>
 			{/each}
 		</div>
@@ -154,16 +154,16 @@
 			<p class="ok-msg mt-4">Hadiah ini sudah diklaim. Bila ini hadiahmu, cek status klaim di bawah.</p>
 			{#if loggedIn}
 				<button type="button" class="btn btn-primary btn-block mt-3" disabled={claiming} onclick={klaim}>
-					{#if claiming}Memeriksa...{:else}<Icon name="check" size={16} /> Cek Status Klaim{/if}
+					{#if claiming}Memeriksa...{:else}<Icon name="check" size={16} /> Cek status klaim{/if}
 				</button>
 			{:else}
 				<button type="button" class="btn btn-primary btn-block mt-3" onclick={() => goto("/akun")}>
-					<Icon name="user" size={16} /> Masuk untuk Mengecek
+					<Icon name="user" size={16} /> Masuk untuk mengecek
 				</button>
 			{/if}
 		{:else if loggedIn}
 			<button type="button" class="btn btn-primary btn-block mt-4" disabled={claiming} onclick={klaim}>
-				{#if claiming}Mengklaim...{:else}<Icon name="package" size={16} /> Klaim Hadiah Ini{/if}
+				{#if claiming}Mengklaim...{:else}<Icon name="package" size={16} /> Klaim hadiah ini{/if}
 			</button>
 			<p class="mt-2 text-center text-xs text-[#5f6b62]">
 				Hadiah masuk ke akun yang sedang masuk ({info.recipient_name ?? "penerima"}) — pastikan
@@ -171,7 +171,7 @@
 			</p>
 		{:else}
 			<button type="button" class="btn btn-primary btn-block mt-4" onclick={() => goto("/akun")}>
-				<Icon name="user" size={16} /> Masuk / Daftar untuk Klaim
+				<Icon name="user" size={16} /> Masuk / daftar untuk klaim
 			</button>
 			<p class="mt-2 text-center text-xs text-[#5f6b62]">
 				Belum punya akun? Daftar dulu dengan email penerima hadiah — setelah masuk, kamu kembali

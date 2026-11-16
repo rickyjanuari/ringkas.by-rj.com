@@ -39,7 +39,7 @@
 		s === "PAID" ? "badge-leaf" : s === "EXPIRED" ? "badge-red" : "badge-sun"
 	);
 	let statusLabel = $derived((s: string) =>
-		s === "PAID" ? "LUNAS" : s === "EXPIRED" ? "KEDALUWARSA" : "MENUNGGU BAYAR"
+		s === "PAID" ? "Lunas" : s === "EXPIRED" ? "Kedaluwarsa" : "Menunggu bayar"
 	);
 
 	onMount(async () => {
@@ -71,7 +71,7 @@
 			orders = orders.map((o) => (o.id === orderId ? data.order : o));
 			notice =
 				data.order.status === "PAID"
-					? `Order ${orderId} sudah LUNAS. Selamat belajar!`
+					? `Order ${orderId} sudah LUNAS. Selamat belajar.`
 					: data.order.status === "EXPIRED"
 						? `Order ${orderId} sudah kedaluwarsa.`
 						: `Order ${orderId} masih menunggu pembayaran.`;
@@ -111,10 +111,10 @@
 	function pesanWa(o: Order, productTitle: string, link: string): string {
 		const nama = $auth.user?.name ?? "Saya";
 		return (
-			`Halo! ${nama} sudah membeli "${productTitle}" di Ringkas.\n` +
+			`Halo, ${nama} sudah membeli "${productTitle}" di Ringkas.\n` +
 			`Nomor order: ${o.id}\n` +
 			`Link produk: ${link}\n` +
-			`Terima kasih!`
+			`Terima kasih.`
 		);
 	}
 
@@ -124,20 +124,20 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-extrabold"><Icon name="receipt" size={22} /> Pesanan Saya</h1>
+<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="receipt" size={18} /> Pesanan saya</h1>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error}
 	<p class="err mt-6">{error}</p>
-	<button type="button" class="btn btn-primary mt-3" onclick={loadOrders}>Coba Lagi</button>
+	<button type="button" class="btn btn-primary mt-3" onclick={loadOrders}>Coba lagi</button>
 {:else if orders.length === 0}
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Mascot expression="semangat" /></p>
 		<p class="flex justify-center"><Icon name="receipt" size={40} class="text-[#177245]" /></p>
-		<p class="mt-2 font-bold">Belum ada pesanan</p>
+		<p class="mt-2 font-semibold">Belum ada pesanan</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Pesananmu setelah checkout akan muncul di sini.</p>
-		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
+		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat katalog</a>
 	</div>
 {:else}
 	{#if notice}
@@ -148,21 +148,21 @@
 			<article class="card p-4">
 				<div class="flex items-start justify-between gap-2">
 					<div class="min-w-0">
-						<p class="truncate text-sm font-extrabold">{o.id}</p>
+						<p class="truncate text-sm font-semibold">{o.id}</p>
 						<p class="text-xs text-[#5f6b62]">{formatTanggal(o.created_at)}</p>
 					</div>
 					<span class="badge {statusBadge(o.status)}">{statusLabel(o.status)}</span>
 				</div>
 				<div class="mt-2 space-y-1">
 					{#each o.items as it (it.product_id)}
-						<p class="flex items-center gap-1.5 text-sm"><Icon name="book-open" size={15} class="shrink-0" /> <span class="min-w-0">{it.title} — <b>{formatRupiah(it.price)}</b></span></p>
+						<p class="flex items-center gap-1.5 text-sm"><Icon name="book-open" size={16} class="shrink-0" /> <span class="min-w-0">{it.title} — <b class="font-semibold tabular-nums">{formatRupiah(it.price)}</b></span></p>
 					{/each}
 				</div>
 				<p class="mt-2 text-sm">
-					Total: <b class="text-[#177245]">{formatRupiah(o.total_amount ?? o.total)}</b>
+					Total: <b class="font-semibold tabular-nums text-[#177245]">{formatRupiah(o.total_amount ?? o.total)}</b>
 				</p>
 				{#if o.is_gift}
-					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-bold text-[#22302a]">
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-semibold text-[#22302a]">
 						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
 						<span>
 							Hadiah untuk {o.gift_recipient_name ?? o.gift_recipient_email}
@@ -170,13 +170,13 @@
 						</span>
 					</p>
 				{:else if o.is_gift_received}
-					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-semibold text-[#065f46]">
 						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
-						<span>Hadiah dari {o.gift_from_name ?? "seseorang"} — selamat belajar!</span>
+						<span>Hadiah dari {o.gift_from_name ?? "seseorang"} — selamat belajar.</span>
 					</p>
 				{/if}
 				{#if o.donated}
-					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-semibold text-[#065f46]">
 						<Icon name="thumbs-up" size={16} class="mt-0.5 shrink-0" />
 						<span>Kamu mendonasikan 1 akses</span>
 					</p>
@@ -189,7 +189,7 @@
 						disabled={checkingId === o.id}
 						onclick={() => cekStatus(o.id)}
 					>
-						{#if checkingId === o.id}Memeriksa...{:else}<Icon name="refresh" size={16} /> Cek Status Pembayaran{/if}
+						{#if checkingId === o.id}Memeriksa...{:else}<Icon name="refresh" size={16} /> Cek status pembayaran{/if}
 					</button>
 				{/if}
 
@@ -203,7 +203,7 @@
 								disabled={downloadingId === `struk-${o.id}`}
 								onclick={() => unduhStruk(o.id)}
 							>
-								<Icon name="receipt" size={15} /> Unduh Struk
+								<Icon name="receipt" size={16} /> Unduh struk
 							</button>
 						</div>
 						<p class="mt-2 text-xs text-[#5f6b62]">
@@ -218,7 +218,7 @@
 							disabled={downloadingId === `struk-${o.id}`}
 							onclick={() => unduhStruk(o.id)}
 						>
-							<Icon name="receipt" size={15} /> Unduh Struk
+							<Icon name="receipt" size={16} /> Unduh struk
 						</button>
 						{/if}
 						{#each o.items as it (it.product_id)}
@@ -228,7 +228,7 @@
 								disabled={downloadingId === `pdf-${o.id}-${it.product_id}`}
 								onclick={() => unduhPdf(o.id, it.product_id, it.title)}
 							>
-								<Icon name="file-text" size={15} /> Unduh PDF
+								<Icon name="file-text" size={16} /> Unduh PDF
 							</button>
 							{#if it.externalUrl}
 								<a
@@ -237,7 +237,7 @@
 									rel="noopener noreferrer"
 									class="btn btn-sun text-xs"
 								>
-									<Icon name="link" size={15} /> Buka Produk
+									<Icon name="link" size={16} /> Buka produk
 								</a>
 							{/if}
 							<a
@@ -249,7 +249,7 @@
 								rel="noopener noreferrer"
 								class="btn btn-leaf text-xs"
 							>
-								<Icon name="message" size={15} /> Kirim ke WhatsApp
+								<Icon name="message" size={16} /> Kirim ke WhatsApp
 							</a>
 						{/each}
 					</div>
@@ -257,7 +257,7 @@
 						Membuka WhatsApp dengan pesan siap kirim — bukan pengiriman otomatis dari server.
 					</p>
 					<a href={`/belajar/${o.items[0]?.product_id}`} class="btn btn-primary btn-block mt-2">
-						<Icon name="book-open" size={15} /> Buka Ruang Belajar
+						<Icon name="book-open" size={16} /> Buka ruang belajar
 					</a>
 					{/if}
 				{/if}

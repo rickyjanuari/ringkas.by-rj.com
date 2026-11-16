@@ -162,7 +162,7 @@
 		}, 200);
 	}
 
-	// Aksi hafal TUNGGAL: dipakai tombol "Sudah Hafal" DAN geser kanan.
+	// Aksi hafal TUNGGAL: dipakai tombol "Sudah hafal" DAN geser kanan.
 	function tandaiHafal(): void {
 		if (!chapter || chapter.flashcards.length === 0 || fcKeluar) return;
 		hafalSet = new Set(hafalSet).add(fcIndex);
@@ -313,7 +313,7 @@
 		return "badge badge-gray";
 	}
 
-	// Glosarium: istilah di Teks Fokus bisa diketuk untuk melihat artinya.
+	// Glosarium: istilah di Teks fokus bisa diketuk untuk melihat artinya.
 	interface GlossaryTerm {
 		term: string;
 		meaning: string;
@@ -340,7 +340,7 @@
 		glossaryOpen = true;
 	}
 
-	// Bagi Teks Fokus menjadi potongan teks biasa + kemunculan pertama tiap
+	// Bagi Teks fokus menjadi potongan teks biasa + kemunculan pertama tiap
 	// istilah glosarium (cocok case-insensitive pada batas kata). Teks asli
 	// tidak diubah selain penanda ini.
 	type FocusSegment =
@@ -404,8 +404,8 @@
 				body: JSON.stringify({ product_id: productId, chapter_id: chapterId })
 			});
 			notice = data.sticker
-				? "Bab selesai — kamu dapat 1 stiker baru!"
-				: "Bab ditandai selesai. Hebat!";
+				? "Bab selesai — kamu dapat 1 stiker baru"
+				: "Bab ditandai selesai, hebat";
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal menandai bab selesai.";
 		} finally {
@@ -507,7 +507,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto(`/belajar/${productId}`)}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Ruang Belajar
+	<Icon name="chevron-left" size={18} /> Kembali ke ruang belajar
 </button>
 
 {#if loading}
@@ -516,18 +516,18 @@
 	<p class="err mt-6">{error || "Bab tidak ditemukan."}</p>
 {:else}
 	<Confetti fire={confettiFire} />
-	<h1 class="mt-3 text-xl font-extrabold leading-snug">{chapter.title}</h1>
+	<h1 class="mt-3 text-xl font-semibold leading-snug">{chapter.title}</h1>
 	<p class="text-sm text-[#5f6b62]">
 		{chapter.subject} • Kelas {chapter.grade} • Semester {chapter.semester}
 	</p>
 
 	{#if notice}
-		<p class="ok-msg mt-3">{notice}</p>
+		<p class="tabular-nums ok-msg mt-3">{notice}</p>
 	{/if}
 
 	<div class="mt-3 flex flex-wrap gap-2">
 		<button type="button" class="btn {bookmarked ? 'btn-sun' : 'btn-ghost'} text-xs" onclick={toggleBookmark}>
-			{#if bookmarked}<Icon name="bookmark" size={15} /> Dibookmark{:else}<Icon name="bookmark" size={15} /> Bookmark{/if}
+			{#if bookmarked}<Icon name="bookmark" size={16} /> Dibookmark{:else}<Icon name="bookmark" size={16} /> Bookmark{/if}
 		</button>
 		<button
 			type="button"
@@ -535,7 +535,7 @@
 			disabled={downloadingWs}
 			onclick={unduhWorksheet}
 		>
-			{#if downloadingWs}Mengunduh...{:else}<Icon name="printer" size={15} /> Worksheet Printable (PDF){/if}
+			{#if downloadingWs}Mengunduh...{:else}<Icon name="printer" size={16} /> Worksheet printable (PDF){/if}
 		</button>
 		<button
 			type="button"
@@ -543,13 +543,13 @@
 			disabled={downloadingFc}
 			onclick={unduhFlashcard}
 		>
-			{#if downloadingFc}Mengunduh...{:else}<Icon name="layers" size={15} /> Unduh Flashcard (PDF){/if}
+			{#if downloadingFc}Mengunduh...{:else}<Icon name="layers" size={16} /> Unduh flashcard (PDF){/if}
 		</button>
 		<a href="/rekam-suara?product={productId}&chapter={chapterId}" class="btn btn-ghost text-xs">
-			<Icon name="play" size={15} /> Rekam Suara Baca Nyaring
+			<Icon name="play" size={16} /> Rekam suara baca nyaring
 		</a>
 		<button type="button" class="btn btn-leaf text-xs" disabled={marking} onclick={tandaiSelesai}>
-			{#if marking}...{:else}<Icon name="check" size={15} /> Tandai Selesai{/if}
+			{#if marking}...{:else}<Icon name="check" size={16} /> Tandai selesai{/if}
 		</button>
 	</div>
 
@@ -558,11 +558,11 @@
 		<div class="min-w-0">
 	<!-- Poin inti -->
 	<div class="card mt-4 p-4">
-		<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="target" size={16} /> Poin Inti</h2>
+		<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="target" size={16} /> Poin inti</h2>
 		<ul class="mt-2 space-y-1.5">
 			{#each chapter.points as p, i (i)}
 				<li class="flex gap-2 text-sm leading-relaxed">
-					<Icon name="check" size={15} class="mt-0.5 shrink-0 text-[#177245]" /><span>{p}</span>
+					<Icon name="check" size={16} class="mt-0.5 shrink-0 text-[#177245]" /><span>{p}</span>
 				</li>
 			{/each}
 		</ul>
@@ -571,7 +571,7 @@
 	<!-- Rangkuman kilat -->
 	{#if chapter.summary}
 		<div class="card mt-3 border-2 !border-[#f2b33d] p-4">
-			<h2 class="flex items-center gap-1.5 text-sm font-extrabold"><Icon name="zap" size={16} /> Rangkuman Kilat</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-semibold"><Icon name="zap" size={16} /> Rangkuman kilat</h2>
 			<p class="mt-1 text-sm leading-relaxed">{chapter.summary}</p>
 		</div>
 	{/if}
@@ -579,7 +579,7 @@
 	<!-- Teks fokus -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center justify-between gap-2">
-			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="book-open" size={16} /> Teks Fokus</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="book-open" size={16} /> Teks fokus</h2>
 			<div class="flex items-center gap-1">
 				<button
 					type="button"
@@ -590,7 +590,7 @@
 				>
 					A−
 				</button>
-				<span class="px-1 text-xs font-bold">A</span>
+				<span class="px-1 text-xs font-medium">A</span>
 				<button
 					type="button"
 					class="btn btn-ghost !px-2.5 !py-1 text-xs"
@@ -607,7 +607,7 @@
 
 	<!-- Catatan pribadi -->
 	<div class="card mt-3 p-4">
-		<label class="lbl flex items-center gap-1.5" for="catatan"><Icon name="file-text" size={14} /> Catatan Pribadi</label>
+		<label class="lbl flex items-center gap-1.5" for="catatan"><Icon name="file-text" size={16} /> Catatan pribadi</label>
 		<textarea
 			id="catatan"
 			class="input"
@@ -628,11 +628,11 @@
 	<!-- Flashcard: ketuk untuk membalik, geser untuk menandai -->
 	{#if chapter.flashcards.length > 0}
 		<div class="card mt-3 p-4">
-			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="layers" size={16} /> Flashcard</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="layers" size={16} /> Flashcard</h2>
 			<p class="mt-1 text-xs text-[#5f6b62]">
 				Ketuk kartu untuk membalik. Geser ke kanan bila sudah hafal, geser ke kiri untuk lanjut tanpa menandai.
 			</p>
-			<p class="mt-2 text-xs font-bold text-[#5f6b62]">
+			<p class="mt-2 text-xs font-medium text-[#5f6b62]">
 				Kartu {fcIndex + 1} dari {chapter.flashcards.length} • {hafalSet.size} sudah hafal
 			</p>
 			<div class="fc-wrap">
@@ -678,22 +678,22 @@
 			</div>
 			<div class="mt-3 flex gap-2">
 				<button type="button" class="btn btn-leaf flex-1 text-xs" onclick={tandaiHafal}>
-					<Icon name="check" size={15} /> Sudah Hafal
+					<Icon name="check" size={16} /> Sudah hafal
 				</button>
 				<button
 					type="button"
 					class="btn btn-outline flex-1 text-xs"
 					onclick={() => lanjutKartu("kiri")}
 				>
-					Belum Hafal <Icon name="arrow-right" size={15} />
+					Belum hafal <Icon name="arrow-right" size={16} />
 				</button>
 			</div>
 			{#if hafalSet.size === chapter.flashcards.length}
-				<p class="mt-2 text-center text-xs font-extrabold text-[#065f46]">
-					Semua kartu sudah hafal — hebat!
+				<p class="mt-2 text-center text-xs font-semibold text-[#065f46]">
+					Semua kartu sudah hafal — hebat
 				</p>
 				<button type="button" class="btn btn-ghost btn-block mt-2 text-xs" onclick={resetHafal}>
-					<Icon name="refresh" size={15} /> Ulangi dari Awal
+					<Icon name="refresh" size={16} /> Ulangi dari awal
 				</button>
 			{/if}
 		</div>
@@ -703,7 +703,7 @@
 		<div class="min-w-0">
 	<!-- Kuis -->
 	<div class="card mt-4 p-4">
-		<h2 class="flex items-center gap-2 text-base font-extrabold"><Icon name="gamepad-2" size={18} /> Kuis Bab ({totalQ} soal)</h2>
+		<h2 class="flex items-center gap-2 text-base font-semibold"><Icon name="gamepad-2" size={18} /> Kuis bab ({totalQ} soal)</h2>
 		{#if !quizStarted}
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Jawab satu per satu. Nilai dan pembahasan muncul setelah kamu mengirim semua jawaban.
@@ -717,19 +717,18 @@
 				{#if totalQ === 0}Kuis belum tersedia{:else}<Icon name="rocket" size={16} /> Mulai Kuis{/if}
 			</button>
 		{:else if !result && currentQ}
-			<p class="mt-2 text-xs font-bold text-[#5f6b62]">Soal {qIndex + 1} dari {totalQ}</p>
+			<p class="tabular-nums mt-2 text-xs font-medium text-[#5f6b62]">Soal {qIndex + 1} dari {totalQ}</p>
 			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#177245] transition-all"
-					style="width: {((qIndex + 1) / Math.max(totalQ, 1)) * 100}%"
+					class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((qIndex + 1) / Math.max(totalQ, 1))})"
 				></div>
 			</div>
-			<p class="mt-3 text-base font-bold leading-snug">{currentQ.question}</p>
+			<p class="mt-3 text-base font-semibold leading-snug">{currentQ.question}</p>
 			{#if currentQ.type === "pg" && Array.isArray(currentQ.options)}
 				<div class="mt-3 space-y-2">
 					{#each currentQ.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 								String(currentQ.id)
 							] === opt
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -787,7 +786,7 @@
 						disabled={submitting}
 						onclick={kirimKuis}
 					>
-						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -795,21 +794,21 @@
 				<p class="err mt-3">{quizError}</p>
 			{/if}
 		{:else if result}
-			<p class="mt-3 text-center text-xl font-extrabold">
+			<p class="mt-3 text-center text-xl font-semibold">
 				Skor: {result.score} / {result.max_score}
 				{#if result.score === result.max_score}
-					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 				{:else if result.score >= result.max_score * 0.7}
-					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 				{/if}
 			</p>
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
-					<div class="card !rounded-lg p-3 text-sm">
-						<p class="font-bold">
-							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
+					<div class="card p-3 text-sm">
+						<p class="font-medium">
+							{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
 						</p>
 						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>
@@ -824,18 +823,18 @@
 					qIndex = 0;
 				}}
 			>
-				<Icon name="refresh" size={16} /> Ulangi Kuis
+				<Icon name="refresh" size={16} /> Ulangi kuis
 			</button>
 		{/if}
 	</div>
 		</div>
 	</div>
 
-	<!-- Alat Interaktif (hanya bab Matematika Kelas 1–6) -->
+	<!-- Alat interaktif (hanya bab Matematika Kelas 1–6) -->
 	{#if alatKind}
 		<div class="mt-4">
-			<h2 class="flex items-center gap-1.5 text-base font-extrabold">
-				<Icon name="zap" size={18} /> Alat Interaktif
+			<h2 class="flex items-center gap-1.5 text-base font-semibold">
+				<Icon name="zap" size={18} /> Alat interaktif
 			</h2>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Main sebentar dengan alat ini sebelum lanjut ke kuis — semua berjalan langsung di perangkatmu.
@@ -850,20 +849,20 @@
 				{/if}
 			</div>
 			<p class="mt-2 text-sm">
-				<a class="font-bold text-[#177245] underline" href="/alat">Lihat semua alat interaktif</a>
+				<a class="font-medium text-[#177245] underline" href="/alat">Lihat semua alat interaktif</a>
 			</p>
 		</div>
 	{/if}
 
 	<!-- Tanya Jawab per Bab -->
 	<div class="card mt-4 p-4">
-		<h2 class="flex items-center gap-2 text-base font-extrabold"><Icon name="message" size={18} /> Tanya tentang Bab Ini</h2>
+		<h2 class="flex items-center gap-2 text-base font-semibold"><Icon name="message" size={18} /> Tanya tentang bab ini</h2>
 		<p class="mt-1 text-xs text-[#5f6b62]">
 			Ada yang belum paham dari bab ini? Tanyakan di sini — pertanyaan yang disetujui admin tampil untuk semua pembaca bab ini.
 		</p>
 		{#if chapter.locked}
-			<p class="mt-3 rounded-lg bg-[#ece9dc] px-3 py-2 text-sm font-bold text-[#3f4a42]">
-				<Icon name="lock" size={14} class="inline-block align-[-2px]" /> Beli produk untuk bisa bertanya tentang bab ini.
+			<p class="mt-3 rounded-lg bg-[#ece9dc] px-3 py-2 text-sm font-medium text-[#3f4a42]">
+				<Icon name="lock" size={16} class="inline-block align-[-2px]" /> Beli produk untuk bisa bertanya tentang bab ini.
 			</p>
 		{:else}
 			<form
@@ -885,11 +884,11 @@
 				></textarea>
 				<div class="mt-2 flex items-center gap-2">
 					<button type="submit" class="btn btn-primary text-xs" disabled={qaSending || !qaText.trim()}>
-						{#if qaSending}Mengirim...{:else}<Icon name="message" size={15} /> Kirim Pertanyaan{/if}
+						{#if qaSending}Mengirim...{:else}<Icon name="message" size={16} /> Kirim pertanyaan{/if}
 					</button>
 					<span class="text-xs text-[#5f6b62]">{qaText.length}/300 karakter</span>
 					{#if qaMsg}
-						<span class="text-xs font-bold {qaMsg.startsWith('Pertanyaan terkirim') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{qaMsg}</span>
+						<span class="text-xs font-medium {qaMsg.startsWith('Pertanyaan terkirim') ? 'text-[#065f46]' : 'text-[#b91c1c]'}">{qaMsg}</span>
 					{/if}
 				</div>
 			</form>
@@ -899,25 +898,25 @@
 		{:else if qaError}
 			<p class="err mt-3">{qaError}</p>
 		{:else if qaList.length === 0}
-			<p class="mt-3 text-sm text-[#5f6b62]">Belum ada pertanyaan untuk bab ini. Jadilah yang pertama bertanya!</p>
+			<p class="mt-3 text-sm text-[#5f6b62]">Belum ada pertanyaan untuk bab ini. Jadilah yang pertama bertanya</p>
 		{:else}
 			<div class="mt-3 space-y-3">
 				{#each qaList as q (q.id)}
-					<div class="card !rounded-lg p-3 text-sm">
+					<div class="card p-3 text-sm">
 						<p class="flex flex-wrap items-center gap-1.5">
-							<span class="font-extrabold">{q.asker_name}</span>
+							<span class="font-semibold">{q.asker_name}</span>
 							{#if q.mine}<span class={qaBadge(q.status)}>{q.status_label}</span>{/if}
 						</p>
 						<p class="mt-1 leading-relaxed">{q.question}</p>
 						{#if q.answer}
 							<div class="mt-2 rounded-lg bg-[#ecfdf5] px-3 py-2">
-								<p class="text-xs font-extrabold text-[#065f46]">
-									<Icon name="check-circle" size={13} class="inline-block align-[-2px]" /> Jawaban Admin
+								<p class="text-xs font-semibold text-[#065f46]">
+									<Icon name="check-circle" size={16} class="inline-block align-[-2px]" /> Jawaban Admin
 								</p>
 								<p class="mt-0.5 leading-relaxed">{q.answer}</p>
 							</div>
 						{:else if q.status === "approved"}
-							<p class="mt-2 text-xs font-bold text-[#5f6b62]">Menunggu jawaban admin.</p>
+							<p class="mt-2 text-xs font-medium text-[#5f6b62]">Menunggu jawaban admin.</p>
 						{/if}
 					</div>
 				{/each}
@@ -925,7 +924,7 @@
 		{/if}
 	</div>
 
-	<!-- Glosarium: arti istilah yang diketuk di Teks Fokus -->
+	<!-- Glosarium: arti istilah yang diketuk di Teks fokus -->
 	<BottomSheet
 		open={glossaryOpen}
 		title={selectedTerm?.term ?? "Istilah"}
@@ -964,10 +963,10 @@
 		/* Izinkan scroll vertikal halaman; gerakan horizontal ditangani pointer. */
 		touch-action: pan-y;
 		transition:
-			transform 0.2s ease-out,
-			opacity 0.2s ease-out,
-			background-color 0.2s ease-out,
-			border-color 0.2s ease-out;
+			transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+			background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+			border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 		will-change: transform;
 	}
 	.fc-card.fc-dragging {
@@ -981,13 +980,13 @@
 	}
 	.fc-teks {
 		font-size: 1rem;
-		font-weight: 800;
+		font-weight: 600;
 		line-height: 1.5;
 	}
 	.fc-petunjuk {
-		font-size: 0.65rem;
-		font-weight: 700;
-		color: #9aa096;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #6e675c;
 	}
 	.fc-label {
 		position: absolute;
@@ -995,7 +994,7 @@
 		padding: 0.25rem 0.75rem;
 		border-radius: 999px;
 		font-size: 0.75rem;
-		font-weight: 800;
+		font-weight: 600;
 		pointer-events: none;
 	}
 	.fc-label-kanan {

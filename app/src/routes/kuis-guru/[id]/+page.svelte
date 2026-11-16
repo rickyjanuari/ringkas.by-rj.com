@@ -159,7 +159,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/kuis-guru")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Kuis Buatan Guru
+	<Icon name="chevron-left" size={18} /> Kembali ke kuis buatan guru
 </button>
 
 {#if loading}
@@ -167,7 +167,7 @@
 {:else if error || !detail}
 	<p class="err mt-6">{error || "Kuis tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 text-xl font-extrabold leading-snug">{detail.title}</h1>
+	<h1 class="mt-3 text-xl font-semibold leading-snug">{detail.title}</h1>
 	<p class="text-sm text-[#5f6b62]">
 		{detail.class_name} • {detail.subject} • Kelas {detail.grade} • {detail.question_count} soal
 	</p>
@@ -175,14 +175,14 @@
 	<!-- ======================= MODE GURU: REKAP ======================= -->
 	{#if detail.is_teacher}
 		<div class="card mt-4 p-4">
-			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="chart" size={16} /> Rekap Kelas</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="chart" size={16} /> Rekap kelas</h2>
 			{#if recapLoading}
 				<p class="mt-3 text-center text-sm font-semibold text-[#5f6b62]">Memuat rekap...</p>
 			{:else if recapError}
 				<p class="err mt-3">{recapError}</p>
 			{:else if recap}
 				<div class="mt-3 flex flex-wrap gap-2">
-					<span class="badge badge-leaf">{recap.submitted_count} dari {recap.total_students} siswa sudah mengerjakan</span>
+					<span class="tabular-nums badge badge-leaf">{recap.submitted_count} dari {recap.total_students} siswa sudah mengerjakan</span>
 					<span class="badge badge-sun">
 						Rata-rata kelas: {recap.average_percent === null ? "-" : `${recap.average_percent}%`}
 					</span>
@@ -192,9 +192,9 @@
 				{:else}
 					<div class="mt-3 space-y-2">
 						{#each recap.students as s (s.id)}
-							<div class="card !rounded-lg flex items-center justify-between gap-2 p-3">
+							<div class="card flex items-center justify-between gap-2 p-3">
 								<div class="min-w-0">
-									<p class="text-sm font-extrabold">{s.name}</p>
+									<p class="text-sm font-semibold">{s.name}</p>
 									<p class="text-xs text-[#5f6b62]">
 										{#if s.submitted}
 											Sudah mengerjakan
@@ -218,11 +218,11 @@
 	<!-- ======================= MODE SISWA ======================= -->
 	{:else if detail.submitted}
 		<div class="card mt-4 border-[#177245] p-4">
-			<p class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]">
+			<p class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]">
 				<Icon name="check-circle" size={16} /> Kamu sudah mengerjakan kuis ini
 			</p>
 			{#if detail.my_score !== null && detail.my_max_score !== null}
-				<p class="mt-2 text-center text-xl font-extrabold">Skormu: {detail.my_score} / {detail.my_max_score}</p>
+				<p class="tabular-nums mt-2 text-center text-xl font-semibold">Skormu: {detail.my_score} / {detail.my_max_score}</p>
 			{/if}
 			<p class="mt-1 text-center text-sm text-[#5f6b62]">Setiap kuis guru hanya bisa dikerjakan satu kali.</p>
 		</div>
@@ -230,25 +230,24 @@
 		<div class="card mt-4 p-4">
 			<p class="text-sm leading-relaxed">Kuis ini dibuat oleh gurumu untuk kelas <b>{detail.class_name}</b>. Ada {detail.question_count} soal — kerjakan dengan tenang, jawaban hanya bisa dikirim satu kali.</p>
 			<button type="button" class="btn btn-primary mt-3" disabled={qLoading} onclick={mulai}>
-				{#if qLoading}Memuat soal...{:else}<Icon name="play" size={16} /> Mulai Mengerjakan{/if}
+				{#if qLoading}Memuat soal...{:else}<Icon name="play" size={16} /> Mulai mengerjakan{/if}
 			</button>
 			{#if quizError}<p class="err mt-3">{quizError}</p>{/if}
 		</div>
 	{:else if !result && currentQ}
 		<div class="card mt-4 border-[#177245] p-4">
-			<p class="text-xs font-bold text-[#5f6b62]">Soal {qIndex + 1} dari {totalQ} • {currentQ.points} poin</p>
+			<p class="tabular-nums text-xs font-medium text-[#5f6b62]">Soal {qIndex + 1} dari {totalQ} • {currentQ.points} poin</p>
 			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#177245] transition-all"
-					style="width: {((qIndex + 1) / Math.max(totalQ, 1)) * 100}%"
+					class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((qIndex + 1) / Math.max(totalQ, 1))})"
 				></div>
 			</div>
-			<p class="mt-3 text-base font-bold leading-snug">{currentQ.question}</p>
+			<p class="mt-3 text-base font-semibold leading-snug">{currentQ.question}</p>
 			{#if currentQ.type === "pg" && Array.isArray(currentQ.options)}
 				<div class="mt-3 space-y-2">
 					{#each currentQ.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 								String(currentQ.id)
 							] === opt
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -266,14 +265,14 @@
 					{/each}
 				</div>
 			{:else if currentQ.type === "pg_kompleks" && Array.isArray(currentQ.options)}
-				<p class="mt-2 text-xs font-bold text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
+				<p class="mt-2 text-xs font-medium text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
 				<div class="mt-2 space-y-2">
 					{#each currentQ.options as opt (opt)}
 						{@const picked = Array.isArray(answers[String(currentQ.id)])
 							? (answers[String(currentQ.id)] as string[])
 							: []}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {picked.includes(
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {picked.includes(
 								opt
 							)
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -307,7 +306,7 @@
 							? (answers[String(currentQ.id)] as Record<string, string>)[String(li)] ?? ""
 							: ""}
 						<div class="flex items-center gap-2 text-sm">
-							<span class="flex-1 font-bold">{li + 1}. {item}</span>
+							<span class="flex-1 font-medium">{li + 1}. {item}</span>
 							<select
 								class="input !w-40 !py-1.5 text-xs"
 								value={picked}
@@ -358,7 +357,7 @@
 						disabled={submitting}
 						onclick={kirimKuis}
 					>
-						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -366,21 +365,21 @@
 		</div>
 	{:else if result}
 		<div class="card mt-4 border-[#177245] p-4">
-			<p class="text-center text-xl font-extrabold">
+			<p class="text-center text-xl font-semibold">
 				Skormu: {result.score} / {result.max_score}
 				{#if result.score === result.max_score}
-					<span class="inline-flex items-center gap-1.5"><Icon name="trophy" size={20} /> Nilai Sempurna!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="trophy" size={18} /> Nilai sempurna</span>
 				{:else if result.score >= result.max_score * 0.7}
-					<span class="inline-flex items-center gap-1.5"><Icon name="check-circle" size={20} /> Hebat!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="check-circle" size={18} /> Hebat</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 				{/if}
 			</p>
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
-					<div class="card !rounded-lg p-3 text-sm">
-						<p class="font-bold">
-							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
+					<div class="card p-3 text-sm">
+						<p class="font-medium">
+							{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
 						</p>
 						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>

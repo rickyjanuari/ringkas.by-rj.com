@@ -150,11 +150,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Akun
+	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="school" size={22} class="shrink-0" /> Kuis Buatan Guru
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="school" size={18} class="shrink-0" /> Kuis buatan guru
 </h1>
 <p class="text-sm text-[#5f6b62]">Rakit kuis dari bank soal untuk kelasmu, lalu lihat siapa saja yang sudah mengerjakan.</p>
 
@@ -165,18 +165,18 @@
 {:else}
 	{#if classes.length === 0}
 		<div class="card mt-4 p-4">
-			<p class="flex items-center gap-1.5 text-sm font-extrabold"><Icon name="info" size={16} /> Kamu belum punya kelas</p>
+			<p class="flex items-center gap-1.5 text-sm font-semibold"><Icon name="info" size={16} /> Kamu belum punya kelas</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">Buat kelas dulu di halaman Akun (butuh produk yang sudah lunas), lalu kembali ke sini untuk merakit kuis.</p>
 			<button type="button" class="btn btn-primary mt-3" onclick={() => goto("/akun")}>
-				<Icon name="users" size={16} /> Ke Halaman Akun
+				<Icon name="users" size={16} /> Ke halaman akun
 			</button>
 		</div>
 	{:else}
 		<!-- Buat kuis baru -->
 		<div class="card mt-4 p-4">
-			<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="plus" size={16} /> Buat Kuis Baru</h2>
+			<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="plus" size={16} /> Buat kuis baru</h2>
 
-			<label class="mt-3 block text-xs font-bold text-[#5f6b62]" for="kelas">Kelas</label>
+			<label class="mt-3 block text-xs font-medium text-[#5f6b62]" for="kelas">Kelas</label>
 			<select id="kelas" class="input mt-1" bind:value={classId} onchange={muatBank}>
 				<option value="">— Pilih kelas —</option>
 				{#each classes as c (c.id)}
@@ -185,7 +185,7 @@
 			</select>
 
 			{#if selectedClass}
-				<label class="mt-3 block text-xs font-bold text-[#5f6b62]" for="judul">Judul kuis</label>
+				<label class="mt-3 block text-xs font-medium text-[#5f6b62]" for="judul">Judul kuis</label>
 				<input
 					id="judul"
 					class="input mt-1"
@@ -213,7 +213,7 @@
 							bind:value={searchText}
 						/>
 					</div>
-					<p class="mt-2 text-xs font-bold text-[#5f6b62]">
+					<p class="mt-2 text-xs font-medium text-[#5f6b62]">
 						{filteredBank.length} soal ditampilkan • {selectedIds.length} dari 30 soal dipilih
 					</p>
 					<div class="mt-2 max-h-[420px] space-y-2 overflow-y-auto pr-1">
@@ -221,29 +221,29 @@
 							{@const qid = Number(q.id)}
 							{@const picked = selectedIds.includes(qid)}
 							<label
-								class="card flex cursor-pointer items-start gap-2 !rounded-lg px-3 py-2.5 text-sm {picked
+								class="card flex cursor-pointer items-start gap-2 px-3 py-2.5 text-sm {picked
 									? '!border-[#177245] bg-[#ece9dc]'
 									: ''}"
 							>
 								<input type="checkbox" class="mt-1 shrink-0" checked={picked} onchange={() => togglePilih(qid)} />
 								<span class="min-w-0">
-									<span class="font-bold">{q.question}</span>
+									<span class="font-medium">{q.question}</span>
 									<span class="mt-1 flex flex-wrap gap-1">
 										<span class="badge badge-leaf">{typeLabel(q.type)}</span>
-										<span class="badge badge-gray">{q.points} poin</span>
+										<span class="tabular-nums badge badge-gray">{q.points} poin</span>
 										<span class="badge badge-gray">{q.origin}</span>
 									</span>
 									{#if picked}
-										<span class="mt-1 block text-xs font-bold text-[#177245]">Kunci: {q.answer_label || "-"}</span>
+										<span class="mt-1 block text-xs font-medium text-[#177245]">Kunci: {q.answer_label || "-"}</span>
 									{/if}
 								</span>
 							</label>
 						{/each}
 					</div>
-					{#if saveMsg}<p class="ok-msg mt-3">{saveMsg}</p>{/if}
+					{#if saveMsg}<p class="tabular-nums ok-msg mt-3">{saveMsg}</p>{/if}
 					{#if saveError}<p class="err mt-3">{saveError}</p>{/if}
 					<button type="button" class="btn btn-leaf mt-3" disabled={!canSave || saving} onclick={simpanKuis}>
-						{#if saving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan Kuis ({selectedIds.length} soal){/if}
+						{#if saving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan kuis ({selectedIds.length} soal){/if}
 					</button>
 				{/if}
 			{/if}
@@ -252,19 +252,19 @@
 
 	<!-- Daftar kuis saya -->
 	<div class="card mt-4 p-4">
-		<h2 class="flex items-center gap-1.5 text-sm font-extrabold text-[#177245]"><Icon name="file-text" size={16} /> Kuis Buatan Saya</h2>
+		<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="file-text" size={16} /> Kuis buatan saya</h2>
 		{#if quizzes.length === 0}
 			<p class="mt-2 text-sm text-[#5f6b62]">Belum ada kuis. Rakit kuis pertamamu di atas ya.</p>
 		{:else}
 			<div class="mt-2 space-y-2">
 				{#each quizzes as q (q.id)}
-					<div class="card !rounded-lg p-3">
-						<p class="text-sm font-extrabold">{q.title}</p>
+					<div class="card p-3">
+						<p class="text-sm font-semibold">{q.title}</p>
 						<p class="mt-0.5 text-xs text-[#5f6b62]">
 							{q.class_name} • {q.subject} Kelas {q.grade} • {q.question_count} soal • {q.submissions} siswa sudah mengerjakan
 						</p>
 						<a href="/kuis-guru/{q.id}" class="btn btn-outline mt-2">
-							<Icon name="chart" size={15} /> Lihat Rekap
+							<Icon name="chart" size={16} /> Lihat Rekap
 						</a>
 					</div>
 				{/each}

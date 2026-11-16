@@ -48,16 +48,16 @@
 				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {$settingsStore.theme ===
 				o.value
 					? 'bg-[#177245] text-white'
-					: 'bg-[#ece9dc] text-[#177245]'}"
+					: 'bg-[#ece9dc] text-[#3f4a42]'}"
 			>
 				<Icon name={o.icon} size={18} />
 			</span>
 			<span class="min-w-0 flex-1">
-				<span class="block text-sm font-extrabold">{o.label}</span>
+				<span class="block text-sm font-semibold">{o.label}</span>
 				<span class="block text-xs text-[#5f6b62]">{o.desc}</span>
 			</span>
 			{#if menyimpanNilai === o.value}
-				<span class="text-xs font-bold text-[#5f6b62]">Menyimpan...</span>
+				<span class="text-xs font-medium text-[#5f6b62]">Menyimpan...</span>
 			{/if}
 		</button>
 	{/each}

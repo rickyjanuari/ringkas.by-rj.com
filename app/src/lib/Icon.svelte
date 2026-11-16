@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Ikon garis bersama gaya Lucide: viewBox 24, stroke-width 2,
+	// Ikon garis bersama gaya Lucide: viewBox 24, stroke-width 1.5,
 	// stroke currentColor, fill none, round caps/joins.
 	const paths: Record<string, string> = {
 		home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -128,7 +128,7 @@
 
 	let {
 		name,
-		size = 20,
+		size = 18,
 		class: cls = ""
 	}: { name: keyof typeof paths | string; size?: number; class?: string } = $props();
 </script>
@@ -140,7 +140,7 @@
 	viewBox="0 0 24 24"
 	fill="none"
 	stroke="currentColor"
-	stroke-width="2"
+	stroke-width="1.5"
 	stroke-linecap="round"
 	stroke-linejoin="round"
 	class={cls}

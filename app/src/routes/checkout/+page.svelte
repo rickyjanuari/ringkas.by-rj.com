@@ -80,7 +80,7 @@
 			const data = await api<{ products: ProductPublic[] }>("/api/catalog");
 			catalog = data.products ?? [];
 			// Bila kembali ke halaman ini dan ada order terakhir yang masih PENDING,
-			// tampilkan lagi supaya bisa "Lanjutkan Bayar".
+			// tampilkan lagi supaya bisa "Lanjutkan bayar".
 			const lastId = localStorage.getItem(LAST_ORDER_KEY);
 			if (lastId && $cart.length === 0) {
 				const restored = await loadOrder(lastId);
@@ -121,7 +121,7 @@
 				total_after: number;
 			}>(`/api/voucher/validate?code=${encodeURIComponent(code)}&total=${total}`);
 			appliedVoucher = { code: data.code, discount: data.discount, total_after: data.total_after };
-			voucherMsg = `Voucher ${data.code} dipakai — hemat ${formatRupiah(data.discount)}!`;
+			voucherMsg = `Voucher ${data.code} dipakai — hemat ${formatRupiah(data.discount)}`;
 		} catch (e) {
 			voucherError = e instanceof Error ? e.message : "Voucher tidak bisa dipakai.";
 			appliedVoucher = null;
@@ -225,9 +225,9 @@
 		aria-label="Kembali"
 		onclick={() => goto("/keranjang")}
 	>
-		<Icon name="chevron-left" size={24} />
+		<Icon name="chevron-left" size={18} />
 	</button>
-	<h1 class="min-w-0 flex-1 truncate text-center text-base font-bold">Checkout</h1>
+	<h1 class="min-w-0 flex-1 truncate text-center text-base font-semibold">Checkout</h1>
 	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
 </div>
 
@@ -240,14 +240,14 @@
 	<div class="card mt-4 p-4 text-center lg:mx-auto lg:max-w-xl">
 		{#if order.status === "EXPIRED"}
 			<p class="flex justify-center"><Icon name="alarm-clock" size={40} class="text-[#b91c1c]" /></p>
-			<p class="mt-2 text-lg font-extrabold">Kode QRIS Kedaluwarsa</p>
+			<p class="mt-2 text-lg font-semibold">Kode QRIS kedaluwarsa</p>
 			<p class="mt-1 text-sm text-[#3f4a42]">
-				Nomor order: <b>{order.id}</b>. Silakan buat pembayaran baru dari keranjang.
+				Nomor order: <b class="font-semibold">{order.id}</b>. Silakan buat pembayaran baru dari keranjang.
 			</p>
-			<a href="/keranjang" class="btn btn-primary mt-4 w-full">Kembali ke Keranjang</a>
+			<a href="/keranjang" class="btn btn-primary mt-4 w-full">Kembali ke keranjang</a>
 		{:else}
-			<p class="text-lg font-extrabold">Scan QRIS untuk Membayar</p>
-			<p class="mt-1 text-sm text-[#5f6b62]">Nomor order: <b>{order.id}</b></p>
+			<p class="text-lg font-semibold">Scan QRIS untuk membayar</p>
+			<p class="mt-1 text-sm text-[#5f6b62]">Nomor order: <b class="font-semibold">{order.id}</b></p>
 			{#if order.qris_url && isImageUrl(order.qris_url)}
 				<img
 					src={order.qris_url}
@@ -257,11 +257,11 @@
 			{:else if order.qris_url}
 				<p class="mt-4 break-all rounded-xl bg-[#f7f5ef] p-3 text-xs">{order.qris_url}</p>
 			{/if}
-			<p class="mt-3 text-2xl font-extrabold text-[#177245]">
+			<p class="mt-3 text-2xl font-semibold tabular-nums text-[#177245]">
 				{formatRupiah(order.total_amount ?? order.total)}
 			</p>
 			{#if order.is_gift}
-				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-bold text-[#22302a]">
+				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-semibold text-[#22302a]">
 					<Icon name="package" size={16} class="shrink-0" />
 					<span>
 						Hadiah untuk {order.gift_recipient_name ?? order.gift_recipient_email} — aksesnya
@@ -270,13 +270,13 @@
 				</p>
 			{/if}
 			{#if order.donated}
-				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-bold text-[#065f46]">
+				<p class="mx-auto mt-2 flex max-w-md items-center justify-center gap-1.5 rounded-xl bg-[#e7f7ef] px-3 py-2 text-sm font-semibold text-[#065f46]">
 					<Icon name="thumbs-up" size={16} class="shrink-0" />
 					<span>Kamu mendonasikan 1 akses produk ini.</span>
 				</p>
 			{/if}
 			{#if order.discount_amount}
-				<p class="mt-1 text-sm font-bold text-[#065f46]">
+				<p class="mt-1 text-sm font-semibold text-[#065f46]">
 					Diskon voucher{#if order.voucher_code} ({order.voucher_code}){/if}: -{formatRupiah(
 						order.discount_amount
 					)}
@@ -294,7 +294,7 @@
 					rel="noopener noreferrer"
 					class="btn btn-outline btn-block mt-4"
 				>
-					<Icon name="link" size={16} /> Lanjutkan Bayar (Buka Pembayaran)
+					<Icon name="link" size={16} /> Lanjutkan bayar (buka pembayaran)
 				</a>
 			{/if}
 			<button
@@ -303,22 +303,22 @@
 				disabled={checking}
 				onclick={cekStatus}
 			>
-				{#if checking}Memeriksa...{:else}<Icon name="refresh" size={16} /> Cek Status Pembayaran{/if}
+				{#if checking}Memeriksa...{:else}<Icon name="refresh" size={16} /> Cek status pembayaran{/if}
 			</button>
 			{#if statusMsg}
 				<p class="ok-msg mt-3 text-left">{statusMsg}</p>
 			{/if}
 			<p class="mt-3 text-xs text-[#5f6b62]">
-				Sudah bayar tapi status belum berubah? Tekan "Cek Status" lagi setelah beberapa detik.
+				Sudah bayar tapi status belum berubah? Tekan "Cek status" lagi setelah beberapa detik.
 			</p>
 		{/if}
 	</div>
 {:else if items.length === 0}
 	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
 		<p class="flex justify-center"><Icon name="shopping-cart" size={40} class="text-[#177245]" /></p>
-		<p class="mt-2 font-bold">Keranjangmu kosong</p>
+		<p class="mt-2 font-semibold">Keranjangmu kosong</p>
 		<p class="mt-1 text-sm text-[#5f6b62]">Tidak ada yang perlu dibayar sekarang.</p>
-		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat Katalog</a>
+		<a href="/katalog" class="btn btn-primary mt-4"><Icon name="search" size={16} /> Lihat katalog</a>
 	</div>
 {:else}
 	<!-- Desktop: dua kolom — form kiri, ringkasan order sticky kanan -->
@@ -326,27 +326,27 @@
 		<div class="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-[72px] lg:self-start">
 	<!-- Ringkasan order -->
 	<div class="card mt-4 p-4 lg:mt-0">
-		<h2 class="text-sm font-extrabold text-[#3f4a42]">Ringkasan Order</h2>
+		<h2 class="text-sm font-semibold text-[#3f4a42]">Ringkasan order</h2>
 		<div class="mt-2 space-y-2">
 			{#each items as p (p.id)}
 				<div class="flex justify-between gap-2 text-sm">
 					<span class="line-clamp-1 font-semibold">{p.title}</span>
-					<span class="shrink-0 font-bold">{formatRupiah(p.price)}</span>
+					<span class="shrink-0 font-semibold tabular-nums">{formatRupiah(p.price)}</span>
 				</div>
 			{/each}
 		</div>
 		<div class="mt-3 flex justify-between border-t border-dashed border-[#e7e2d2] pt-3">
-			<span class="font-extrabold">Total Bayar</span>
-			<span class="text-lg font-extrabold text-[#177245]">{formatRupiah(grandTotal)}</span>
+			<span class="font-semibold">Total bayar</span>
+			<span class="text-lg font-semibold tabular-nums text-[#177245]">{formatRupiah(grandTotal)}</span>
 		</div>
 		{#if donateOn}
-			<div class="mt-2 flex justify-between text-sm font-bold text-[#065f46]">
+			<div class="mt-2 flex justify-between text-sm font-semibold text-[#065f46]">
 				<span>Donasi 1 akses</span>
 				<span>{formatRupiah(donationAmount)}</span>
 			</div>
 		{/if}
 		{#if appliedVoucher}
-			<div class="mt-2 flex justify-between text-sm font-bold text-[#065f46]">
+			<div class="mt-2 flex justify-between text-sm font-semibold text-[#065f46]">
 				<span>Diskon ({appliedVoucher.code})</span>
 				<span>-{formatRupiah(appliedVoucher.discount)}</span>
 			</div>
@@ -357,11 +357,11 @@
 		<div class="min-w-0 lg:col-start-1 lg:row-start-1">
 	<!-- Kode voucher -->
 	<div class="card mt-3 p-4 lg:mt-0">
-		<label class="lbl" for="voucher">Kode Voucher (opsional)</label>
+		<label class="lbl" for="voucher">Kode voucher (opsional)</label>
 		{#if appliedVoucher}
 			<p class="ok-msg flex items-center justify-between gap-2">
-				<span><Icon name="receipt" size={15} class="inline-block align-[-2px]" /> Voucher {appliedVoucher.code} aktif — hemat {formatRupiah(appliedVoucher.discount)}</span>
-				<button type="button" class="shrink-0 font-extrabold underline" onclick={hapusVoucher}>
+				<span><Icon name="receipt" size={16} class="inline-block align-[-2px]" /> Voucher {appliedVoucher.code} aktif — hemat {formatRupiah(appliedVoucher.discount)}</span>
+				<button type="button" class="shrink-0 font-semibold underline" onclick={hapusVoucher}>
 					Hapus
 				</button>
 			</p>
@@ -418,8 +418,8 @@
 		<label class="flex cursor-pointer items-start gap-2.5">
 			<input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-[#177245]" bind:checked={giftOn} />
 			<span>
-				<span class="flex items-center gap-1.5 font-extrabold">
-					<Icon name="package" size={17} /> Beli sebagai hadiah
+				<span class="flex items-center gap-1.5 font-semibold">
+					<Icon name="package" size={16} /> Beli sebagai hadiah
 				</span>
 				<span class="mt-0.5 block text-xs text-[#5f6b62]">
 					Produk dikirim ke email penerima. Aksesnya milik penerima — bukan akunmu.
@@ -455,7 +455,7 @@
 					<textarea
 						id="gift-pesan"
 						class="input min-h-16 resize-y"
-						placeholder="Tulis pesan untuk penerima..."
+						placeholder="Tulis pesan untuk penerima"
 						maxlength={200}
 						bind:value={giftMessage}
 					></textarea>
@@ -477,8 +477,8 @@
 		<label class="flex cursor-pointer items-start gap-2.5">
 			<input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-[#177245]" bind:checked={donateOn} />
 			<span>
-				<span class="flex items-center gap-1.5 font-extrabold">
-					<Icon name="thumbs-up" size={17} /> Beli 1, donasi 1
+				<span class="flex items-center gap-1.5 font-semibold">
+					<Icon name="thumbs-up" size={16} /> Beli 1, donasi 1
 				</span>
 				<span class="mt-0.5 block text-xs text-[#5f6b62]">
 					Berbagi satu akses belajar untuk anak yang membutuhkan.

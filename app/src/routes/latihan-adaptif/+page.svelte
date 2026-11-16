@@ -286,11 +286,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Beranda
+	<Icon name="chevron-left" size={18} /> Kembali ke beranda
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="target" size={22} class="shrink-0" /> Latihan Adaptif
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="target" size={18} class="shrink-0" /> Latihan adaptif
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Soal menyesuaikan jawabanmu: dua benar beruntun, soal berikutnya lebih sulit. Satu salah, soal
@@ -300,7 +300,7 @@
 {#if !started}
 	<div class="card mt-4 space-y-4 p-4">
 		<div>
-			<p class="text-sm font-extrabold">Pilih kelas</p>
+			<p class="text-sm font-semibold">Pilih kelas</p>
 			<div class="mt-2 flex flex-wrap gap-2">
 				{#each PRODUCTS as p (p)}
 					<button
@@ -315,7 +315,7 @@
 			</div>
 		</div>
 		<div>
-			<p class="text-sm font-extrabold">Pilih mapel</p>
+			<p class="text-sm font-semibold">Pilih mapel</p>
 			{#if subjectsLoading}
 				<p class="mt-2 text-xs text-[#5f6b62]">Memuat daftar mapel...</p>
 			{/if}
@@ -336,7 +336,7 @@
 			{/if}
 		</div>
 		<button type="button" class="btn btn-primary btn-block" onclick={mulaiSesi}>
-			<Icon name="rocket" size={16} /> Mulai Latihan (10 soal)
+			<Icon name="rocket" size={16} /> Mulai latihan (10 soal)
 		</button>
 		<p class="text-xs text-[#5f6b62]">
 			Mulai dari level Sedang. Latihan ini gratis untuk semua akun yang sudah masuk. Skornya bisa
@@ -347,10 +347,10 @@
 	<div class="card mt-4 border-[#177245] p-4">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<p class="text-sm font-extrabold leading-snug">
-					Latihan Adaptif {subject} • Kelas {product.slice(1)}
+				<p class="text-sm font-semibold leading-snug">
+					Latihan adaptif {subject} • Kelas {product.slice(1)}
 				</p>
-				<p class="mt-0.5 text-xs font-bold text-[#177245]">
+				<p class="mt-0.5 text-xs font-medium text-[#177245]">
 					Level saat ini: {LEVEL_LABEL[currentLevel]} • Soal {Math.min(idx + 1, SESSION_LEN)} dari {SESSION_LEN}
 				</p>
 			</div>
@@ -358,8 +358,7 @@
 		</div>
 		<div class="mt-2 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 			<div
-				class="h-full bg-[#177245] transition-all"
-				style="width: {((idx + 1) / SESSION_LEN) * 100}%"
+				class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((idx + 1) / SESSION_LEN)})"
 			></div>
 		</div>
 
@@ -368,19 +367,19 @@
 		{:else if error && !current}
 			<p class="err mt-3">{error}</p>
 			<button type="button" class="btn btn-outline btn-block mt-3" onclick={sesiBaru}>
-				Pilih Kelas/Mapel Lain
+				Pilih kelas/mapel lain
 			</button>
 		{:else if current}
 			{#if current.origin_title}
 				<p class="mt-3 text-xs text-[#5f6b62]">Dari: {current.origin_title}</p>
 			{/if}
-			<p class="mt-1 text-base font-bold leading-snug">{current.question}</p>
+			<p class="mt-1 text-base font-semibold leading-snug">{current.question}</p>
 
 			{#if current.type === "pg" && Array.isArray(current.options)}
 				<div class="mt-3 space-y-2">
 					{#each current.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answer ===
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answer ===
 							opt
 								? '!border-[#177245] bg-[#ece9dc]'
 								: ''}"
@@ -398,12 +397,12 @@
 					{/each}
 				</div>
 			{:else if current.type === "pg_kompleks" && Array.isArray(current.options)}
-				<p class="mt-2 text-xs font-bold text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
+				<p class="mt-2 text-xs font-medium text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
 				<div class="mt-2 space-y-2">
 					{#each current.options as opt (opt)}
 						{@const picked = Array.isArray(answer) ? (answer as string[]) : []}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {picked.includes(
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {picked.includes(
 								opt
 							)
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -443,7 +442,7 @@
 							? (answer as Record<string, string>)[String(li)] ?? ""
 							: ""}
 						<div class="flex items-center gap-2 text-sm">
-							<span class="flex-1 font-bold">{li + 1}. {item}</span>
+							<span class="flex-1 font-medium">{li + 1}. {item}</span>
 							<select
 								class="input !w-40 !py-1.5 text-xs"
 								value={picked}
@@ -484,25 +483,25 @@
 						? 'bg-[#ecfdf5] text-[#065f46]'
 						: 'bg-[#fef2f2] text-[#991b1b]'}"
 				>
-					<p class="font-extrabold">
+					<p class="font-semibold">
 						{#if feedback.correct}
-							<Icon name="check-circle" size={15} class="inline-block align-[-2px]" /> Benar! (+{feedback.earned} dari {feedback.points} poin)
+							<Icon name="check-circle" size={16} class="tabular-nums inline-block align-[-2px]" /> Benar! (+{feedback.earned} dari {feedback.points} poin)
 						{:else}
-							<Icon name="x-circle" size={15} class="inline-block align-[-2px]" /> Belum tepat ({feedback.earned} dari {feedback.points} poin)
+							<Icon name="x-circle" size={16} class="tabular-nums inline-block align-[-2px]" /> Belum tepat ({feedback.earned} dari {feedback.points} poin)
 						{/if}
 					</p>
 					<p class="mt-1">{feedback.discussion}</p>
 					{#if levelNote}
-						<p class="mt-2 font-bold">
-							<Icon name="zap" size={14} class="inline-block align-[-2px]" /> {levelNote}
+						<p class="mt-2 font-medium">
+							<Icon name="zap" size={16} class="inline-block align-[-2px]" /> {levelNote}
 						</p>
 					{/if}
 				</div>
 				<button type="button" class="btn btn-primary btn-block mt-3" onclick={soalBerikutnya}>
 					{#if idx + 1 >= SESSION_LEN}
-						<Icon name="check" size={16} /> Lihat Ringkasan
+						<Icon name="check" size={16} /> Lihat ringkasan
 					{:else}
-						Soal Berikutnya <Icon name="chevron-right" size={16} />
+						Soal berikutnya <Icon name="chevron-right" size={16} />
 					{/if}
 				</button>
 			{:else}
@@ -512,7 +511,7 @@
 					disabled={checking || answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)}
 					onclick={periksaJawaban}
 				>
-					{#if checking}Memeriksa...{:else}<Icon name="check" size={16} /> Periksa Jawaban{/if}
+					{#if checking}Memeriksa...{:else}<Icon name="check" size={16} /> Periksa jawaban{/if}
 				</button>
 			{/if}
 			{#if error}
@@ -522,14 +521,14 @@
 	</div>
 {:else}
 	<div class="card mt-4 border-[#177245] p-4">
-		<p class="text-center text-xl font-extrabold">
+		<p class="text-center text-xl font-semibold">
 			Skor: {totalEarned} / {totalPoints}
 			{#if totalPoints > 0 && totalEarned === totalPoints}
-				<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+				<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 			{:else if totalPoints > 0 && totalEarned >= totalPoints * 0.7}
-				<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+				<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 			{:else}
-				<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+				<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 			{/if}
 		</p>
 		<p class="mt-1 text-center text-sm text-[#5f6b62]">
@@ -538,9 +537,9 @@
 
 		<div class="mt-3 space-y-2">
 			{#each results as r, i (r.question_id)}
-				<div class="card !rounded-lg p-3 text-sm">
-					<p class="font-bold">
-						{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if}
+				<div class="card p-3 text-sm">
+					<p class="font-medium">
+						{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if}
 						— Soal {i + 1} ({r.earned}/{r.points} poin)
 					</p>
 					<p class="mt-1 text-[#3f4a42]">{r.question}</p>
@@ -549,7 +548,7 @@
 		</div>
 
 		{#if saved && savedScore}
-			<p class="ok-msg mt-3">
+			<p class="tabular-nums ok-msg mt-3">
 				Tersimpan ke riwayat — skor {savedScore.score} / {savedScore.max_score}.
 			</p>
 		{:else}
@@ -559,7 +558,7 @@
 				disabled={saving}
 				onclick={simpanKeRiwayat}
 			>
-				{#if saving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan ke Riwayat{/if}
+				{#if saving}Menyimpan...{:else}<Icon name="save" size={16} /> Simpan ke riwayat{/if}
 			</button>
 			{#if saveError}
 				<p class="err mt-2">{saveError}</p>
@@ -568,7 +567,7 @@
 
 		<div class="mt-3 flex gap-2">
 			<button type="button" class="btn btn-outline flex-1" onclick={sesiBaru}>
-				<Icon name="refresh" size={16} /> Latihan Lagi
+				<Icon name="refresh" size={16} /> Latihan lagi
 			</button>
 			<a href={`/belajar/${product}`} class="btn btn-primary flex-1">
 				<Icon name="book-open" size={16} /> Kembali ke Belajar

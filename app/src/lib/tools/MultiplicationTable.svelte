@@ -58,10 +58,10 @@
 		skorTotal += 1;
 		if (nilai === sa * sb) {
 			skorBenar += 1;
-			umpan = `Hebat! ${sa} × ${sb} = ${sa * sb}.`;
+			umpan = `Hebat ${sa} × ${sb} = ${sa * sb}.`;
 			umpanBenar = true;
 		} else {
-			umpan = `Belum tepat — ${sa} × ${sb} = ${sa * sb}. Coba soal baru, yuk!`;
+			umpan = `Belum tepat — ${sa} × ${sb} = ${sa * sb}. Coba soal baru, yuk`;
 			umpanBenar = false;
 		}
 		soalBaru();
@@ -69,15 +69,15 @@
 </script>
 
 <div class="card p-4">
-	<h3 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-		<Icon name="target" size={18} /> Tabel Perkalian
+	<h3 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+		<Icon name="target" size={18} /> Tabel perkalian
 	</h3>
 	<p class="mt-1 text-sm text-[#5f6b62]">
 		Ketuk angka di tepi untuk menyorot satu baris atau kolom. Ketuk kotak di tengah untuk melihat hasilnya.
 	</p>
 
 	<div class="mt-3 overflow-x-auto pb-1">
-		<table class="mx-auto border-separate border-spacing-0.5 text-center text-sm font-bold">
+		<table class="tabular-nums mx-auto border-separate border-spacing-0.5 text-center text-sm font-medium">
 			<thead>
 				<tr>
 					<th class="h-9 w-9 rounded-md bg-[#ece9dc] text-[#5f6b62]">×</th>
@@ -136,11 +136,11 @@
 	</div>
 
 	{#if pilih}
-		<p class="ok-msg mt-3 text-center text-2xl font-extrabold">
+		<p class="tabular-nums ok-msg mt-3 text-center text-2xl font-semibold">
 			{pilih.b} × {pilih.k} = {pilih.b * pilih.k}
 		</p>
 	{:else}
-		<p class="mt-3 text-center text-sm font-bold text-[#5f6b62]">
+		<p class="mt-3 text-center text-sm font-medium text-[#5f6b62]">
 			Belum ada kotak yang dipilih. Coba ketuk satu kotak, yuk!
 		</p>
 	{/if}
@@ -148,18 +148,18 @@
 	<div class="mt-4 border-t border-[#e7e2d2] pt-4">
 		{#if !latihan}
 			<button type="button" class="btn btn-sun btn-block" onclick={mulaiLatihan}>
-				<Icon name="zap" size={16} /> Mulai Latihan Acak
+				<Icon name="zap" size={16} /> Mulai latihan acak
 			</button>
 		{:else}
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<h4 class="flex items-center gap-1.5 text-sm font-extrabold">
+				<h4 class="flex items-center gap-1.5 text-sm font-semibold">
 					<Icon name="star" size={16} /> Latihan Acak
 				</h4>
 				<span class="badge badge-leaf">
 					Skor: {skorBenar} benar dari {skorTotal} soal
 				</span>
 			</div>
-			<p class="mt-3 text-center text-2xl font-extrabold">{sa} × {sb} = ?</p>
+			<p class="tabular-nums mt-3 text-center text-2xl font-semibold">{sa} × {sb} = ?</p>
 			<form
 				class="mt-3 flex gap-2"
 				onsubmit={(e) => {
@@ -168,7 +168,7 @@
 				}}
 			>
 				<input
-					class="input text-center text-lg font-extrabold"
+					class="input text-center text-lg font-semibold"
 					type="number"
 					min="0"
 					inputmode="numeric"
@@ -184,7 +184,7 @@
 				<p class="mt-3 {umpanBenar ? 'ok-msg' : 'err'}">{umpan}</p>
 			{/if}
 			<button type="button" class="btn btn-ghost mt-3 text-xs" onclick={() => (latihan = false)}>
-				<Icon name="x" size={14} /> Tutup Latihan
+				<Icon name="x" size={16} /> Tutup latihan
 			</button>
 		{/if}
 	</div>

@@ -57,7 +57,7 @@
 	}
 </script>
 
-<div class="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-[#f7f5ef] shadow-[0_0_40px_rgb(23_114_69/0.08)] lg:max-w-7xl">
+<div class="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-[#f7f5ef] shadow-[0_1px_2px_rgb(0_0_0/0.05)] lg:max-w-7xl">
 	<!-- Header mobile (tetap seperti semula) -->
 	<header class="sticky top-0 z-40 border-b border-[#e7e2d2] bg-[#fffdf7]/95 backdrop-blur lg:hidden">
 		<div class="flex items-center gap-2 px-4 py-3">
@@ -69,20 +69,20 @@
 					height="24"
 					class="datasaver-hide h-6 w-6 shrink-0"
 				/>
-				<span class="text-[19px] font-extrabold tracking-tight text-[#22302a]">Ringkas</span>
+				<span class="text-[19px] font-semibold text-[#22302a]">Ringkas</span>
 			</a>
-			<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-bold text-[#92400e] sm:inline">
-				Teman Belajar
+			<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-medium text-[#92400e] sm:inline">
+				Teman belajar
 			</span>
 			{#if dataSaver}
-				<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-bold text-[#115c39]">
-					<Icon name="zap" size={12} /> Mode Hemat Data
+				<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-medium text-[#115c39]">
+					<Icon name="zap" size={16} /> Mode hemat data
 				</span>
 			{/if}
 			<div class="ml-auto flex items-center gap-2">
 				{#if $auth.user}
-					<a href="/akun" class="flex items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-bold text-[#177245]">
-						<Icon name="flame" size={14} /> {$auth.user.name.split(" ")[0]}
+					<a href="/akun" class="flex items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-medium text-[#177245]">
+						<Icon name="flame" size={16} /> {$auth.user.name.split(" ")[0]}
 					</a>
 				{:else}
 					<a href="/akun" class="btn btn-ghost !px-3 !py-1.5 text-xs">Masuk</a>
@@ -102,17 +102,17 @@
 					height="24"
 					class="datasaver-hide h-6 w-6 shrink-0"
 				/>
-				<span class="text-[19px] font-extrabold tracking-tight text-[#22302a]">Ringkas</span>
-				<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-bold text-[#92400e] xl:inline">
-					Teman Belajar
+				<span class="text-[19px] font-semibold text-[#22302a]">Ringkas</span>
+				<span class="ml-1 hidden rounded-full bg-[#fbeecd] px-2 py-0.5 text-[11px] font-medium text-[#92400e] xl:inline">
+					Teman belajar
 				</span>
 				{#if dataSaver}
-					<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-bold text-[#115c39]">
-						<Icon name="zap" size={12} /> Mode Hemat Data
+					<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-[#dcefe2] px-2 py-0.5 text-[11px] font-medium text-[#115c39]">
+						<Icon name="zap" size={16} /> Mode hemat data
 					</span>
 				{/if}
 			</a>
-			<nav class="flex shrink-0 items-center gap-1 text-sm font-bold" aria-label="Menu utama">
+			<nav class="flex shrink-0 items-center gap-1 text-sm font-semibold" aria-label="Menu utama">
 				<a href="/" class="navlink" class:active={tabActive("/")}>Beranda</a>
 				<a href="/katalog" class="navlink" class:active={tabActive("/katalog")}>Katalog</a>
 				<a href="/pesanan" class="navlink" class:active={tabActive("/pesanan")}>Pesanan</a>
@@ -125,7 +125,7 @@
 				<input
 					class="input !rounded-full !py-1.5 !pl-9 text-sm"
 					type="search"
-					placeholder="Cari produk atau bab..."
+					placeholder="Cari produk atau bab"
 					bind:value={headerQ}
 					aria-label="Cari di katalog"
 				/>
@@ -135,17 +135,17 @@
 				class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#177245] hover:bg-[#ece9dc]"
 				aria-label="Keranjang"
 			>
-				<Icon name="shopping-cart" size={22} />
+				<Icon name="shopping-cart" size={18} />
 				{#if $cartCount > 0}
 					<span
-						class="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e11d48] px-1 text-[11px] font-extrabold text-white"
+						class="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e11d48] px-1 text-[11px] font-semibold text-white"
 						>{$cartCount}</span
 					>
 				{/if}
 			</a>
 			{#if $auth.user}
-				<a href="/akun" class="flex shrink-0 items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-bold text-[#177245]">
-					<Icon name="flame" size={14} /> {$auth.user.name.split(" ")[0]}
+				<a href="/akun" class="flex shrink-0 items-center gap-1.5 rounded-full bg-[#ece9dc] px-2.5 py-1.5 text-xs font-medium text-[#177245]">
+					<Icon name="flame" size={16} /> {$auth.user.name.split(" ")[0]}
 				</a>
 			{:else}
 				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Masuk</a>
@@ -160,7 +160,7 @@
 
 		<footer class="mt-8 rounded-2xl bg-[#145c39] p-5 text-center text-white lg:mt-12 lg:flex lg:items-center lg:justify-between lg:gap-6 lg:px-8 lg:py-6 lg:text-left">
 			<div>
-				<p class="flex items-center justify-center gap-2 text-base font-extrabold lg:justify-start">
+				<p class="flex items-center justify-center gap-2 text-base font-semibold lg:justify-start">
 					<img
 						src="/logo/logo-ringkas-icon-emerald.svg"
 						alt=""
@@ -170,9 +170,9 @@
 					/>
 					<span>Ringkas</span>
 				</p>
-				<p class="mt-1 text-xs text-white/75">Rangkuman Materi SD, SMP, SMA</p>
+				<p class="mt-1 text-xs text-white/75">Rangkuman materi SD kelas 1–6</p>
 			</div>
-			<nav class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-bold text-white lg:mt-0">
+			<nav class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-white lg:mt-0">
 				<a href="/blog">Blog</a>
 				<a href="/faq">FAQ</a>
 				<a href="/update">Update</a>
@@ -185,33 +185,33 @@
 
 	{#if !hideTabs}
 		<nav
-			class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 items-stretch border-t border-[#e7e2d2] bg-[#fffdf7] px-1 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-4px_20px_rgb(23_114_69/0.08)] lg:hidden"
+			class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[430px] -translate-x-1/2 items-stretch border-t border-[#e7e2d2] bg-[#fffdf7] px-1 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-8px_24px_rgb(0_0_0/0.06)] lg:hidden"
 		>
 			<a href="/" class="tablink" class:active={tabActive("/")} aria-label="Beranda">
-				<Icon name="home" size={22} />Beranda
+				<Icon name="home" size={18} />Beranda
 			</a>
 			<a href="/katalog" class="tablink" class:active={tabActive("/katalog")} aria-label="Katalog">
-				<Icon name="library" size={22} />Katalog
+				<Icon name="library" size={18} />Katalog
 			</a>
 			<button
 				type="button"
 				onclick={goCart}
-				class="relative mx-1 -mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#f2b33d] text-[#22302a] shadow-lg shadow-[#f2b33d/40] ring-4 ring-[#fffdf7]"
+				class="relative mx-1 -mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#f2b33d] text-[#22302a] shadow-[0_8px_24px_rgb(0_0_0/0.06)] ring-4 ring-[#fffdf7]"
 				aria-label="Keranjang"
 			>
 				<Icon name="shopping-cart" size={26} />
 				{#if $cartCount > 0}
 					<span
-						class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e11d48] px-1 text-[11px] font-extrabold text-white"
+						class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e11d48] px-1 text-[11px] font-semibold text-white"
 						>{$cartCount}</span
 					>
 				{/if}
 			</button>
 			<a href="/pesanan" class="tablink" class:active={tabActive("/pesanan")} aria-label="Pesanan">
-				<Icon name="receipt" size={22} />Pesanan
+				<Icon name="receipt" size={18} />Pesanan
 			</a>
 			<a href="/akun" class="tablink" class:active={tabActive("/akun")} aria-label="Akun">
-				<Icon name="user" size={22} />Akun
+				<Icon name="user" size={18} />Akun
 			</a>
 		</nav>
 	{/if}

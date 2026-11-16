@@ -75,7 +75,7 @@
 			.filter((t): t is TryoutRingkas => !!t)
 	);
 
-	// ---- Level & XP + Hitung Mundur SAS (gagal diam-diam) ----
+	// ---- Level & XP + Hitung mundur SAS (gagal diam-diam) ----
 	type XpMini = {
 		totalXp: number;
 		level: number;
@@ -120,32 +120,32 @@
 		{
 			icon: "book-open",
 			kicker: "Belajar jadi ringan",
-			title: "Rangkuman Materi SD, SMP, SMA",
+			title: "Rangkuman materi SD kelas 1–6",
 			text: "Teman belajar kamu: rangkuman kilat, kuis seru, dan simulasi SAS — semuanya ringkas dan mudah dipahami.",
-			cta: "Cari Materi",
+			cta: "Cari materi",
 			ctaIcon: "search",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #177245, #115c39)"
+			bg: "#177245"
 		},
 		{
 			icon: "trophy",
 			kicker: "Simulasi SAS per mapel",
 			title: "Latihan SAS sesuai struktur baku",
 			text: "Kelas 1–2: 25 soal • Kelas 3: 35 soal • Kelas 4: 38 soal • Kelas 5: 39 soal • Kelas 6: 40 soal. Ada pilihan ganda, benar/salah, menjodohkan, isian, dan uraian.",
-			cta: "Coba Simulasi",
+			cta: "Coba simulasi",
 			ctaIcon: "target",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #115c39, #177245)"
+			bg: "#115c39"
 		},
 		{
 			icon: "receipt",
-			kicker: "Paket SAS Kelas 1–6",
+			kicker: "Paket SAS kelas 1–6",
 			title: "Paket SAS Rp17–21 ribu",
 			text: "Satu paket per kelas, beli sekali lewat KlikQRIS, langsung bisa dipakai latihan di Ruang Belajar.",
-			cta: "Lihat Paket SAS",
+			cta: "Lihat paket SAS",
 			ctaIcon: "shopping-cart",
 			href: "/katalog",
-			bg: "linear-gradient(135deg, #177245, #f2b33d)"
+			bg: "#f2b33d"
 		}
 	];
 	let slideIdx = $state(0);
@@ -268,7 +268,7 @@
 
 <!-- Banner pengumuman -->
 {#if announcementShown && !bannerClosed}
-	<div class="mb-3 flex items-start gap-2 rounded-xl bg-[#177245] px-3 py-2.5 text-sm font-bold text-white" role="status">
+	<div class="mb-3 flex items-start gap-2 rounded-xl bg-[#177245] px-3 py-2.5 text-sm font-semibold text-white" role="status">
 		<Icon name="sparkles" size={18} class="mt-0.5 shrink-0" />
 		<p class="flex-1">{announcementText}</p>
 		<button
@@ -294,17 +294,17 @@
 		onmouseleave={() => (paused = false)}
 	>
 		<div
-			class="flex transition-transform duration-500 ease-in-out"
+			class="flex transition-transform duration-500 ease-signature"
 			style="transform: translateX(-{slideIdx * 100}%)"
 		>
 			{#each slides as s, i (s.title)}
-				<div class="w-full shrink-0 px-5 py-6 text-white lg:px-10 lg:py-10" style="background: {s.bg}">
-					<p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#f2b33d]">
-						<Icon name={s.icon} size={14} /> {s.kicker}
+				<div class="w-full shrink-0 px-5 py-6 lg:px-10 lg:py-10 {i === 2 ? 'text-[#22302a]' : 'text-white'}" style="background: {s.bg}">
+					<p class="flex items-center gap-1.5 text-xs font-semibold {i === 2 ? 'text-[#22302a]' : 'text-[#fbeecd]'}">
+						<Icon name={s.icon} size={16} /> {s.kicker}
 					</p>
-					<h1 class="mt-1 text-2xl font-extrabold leading-snug lg:text-4xl">{s.title}</h1>
-					<p class="mt-1 max-w-2xl text-sm text-white/90 lg:text-base">{i === 2 && promoText ? promoText : s.text}</p>
-					<a href={s.href} class="btn btn-sun mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
+					<h1 class="mt-1 text-2xl font-semibold leading-snug lg:text-4xl">{#if i === 0}Rangkuman <span class="u-pencil">materi</span> SD kelas 1–6{:else}{s.title}{/if}</h1>
+					<p class="mt-1 max-w-2xl text-sm lg:text-base {i === 2 ? 'text-[#22302a]/80' : 'text-white/90'}">{i === 2 && promoText ? promoText : s.text}</p>
+					<a href={s.href} class="btn {i === 2 ? 'btn-primary' : 'btn-sun'} mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
 				</div>
 			{/each}
 		</div>
@@ -334,7 +334,7 @@
 			{#each slides as _, i (i)}
 				<button
 					type="button"
-					class="h-2 rounded-full transition-all {i === slideIdx ? 'w-5 bg-white' : 'w-2 bg-white/50'}"
+					class="h-2 rounded-full transition-colors {i === slideIdx ? (slideIdx === 2 ? 'w-5 bg-[#22302a]' : 'w-5 bg-white') : slideIdx === 2 ? 'w-2 bg-[#22302a]/30' : 'w-2 bg-white/50'}"
 					aria-label="Ke slide {i + 1}"
 					onclick={() => {
 						slideIdx = i;
@@ -344,25 +344,25 @@
 			{/each}
 		</div>
 	</div>
-	<div class="flex divide-x divide-[#e7e2d2] text-center text-xs font-bold text-[#3f4a42]">
+	<div class="flex divide-x divide-[#e7e2d2] text-center text-xs font-medium text-[#3f4a42]">
 		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="check" size={14} class="text-[#177245]" /> Rangkuman kilat
+			<Icon name="check" size={16} class="text-[#177245]" /> Rangkuman kilat
 		</div>
 		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="gamepad-2" size={14} class="text-[#177245]" /> Kuis interaktif
+			<Icon name="gamepad-2" size={16} class="text-[#177245]" /> Kuis interaktif
 		</div>
 		<div class="flex flex-1 items-center justify-center gap-1 px-2 py-3">
-			<Icon name="trophy" size={14} class="text-[#177245]" /> Simulasi SAS
+			<Icon name="trophy" size={16} class="text-[#177245]" /> Simulasi SAS
 		</div>
 	</div>
 </section>
 
-<!-- Peta Belajar -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Peta Belajar">
+<!-- Peta belajar -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Peta belajar">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="map" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="map" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Peta Belajar</h2>
+			<h2 class="text-base font-semibold">Peta belajar</h2>
 			<p class="text-sm text-[#5f6b62]">Ikuti jalur bab per kelas — node terbuka saat bab selesai.</p>
 		</div>
 	</div>
@@ -380,77 +380,77 @@
 	</div>
 </section>
 
-<!-- Soal Cerita Sehari-hari -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Soal Cerita Sehari-hari">
+<!-- Soal cerita sehari-hari -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Soal cerita sehari-hari">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="message" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="message" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Soal Cerita Sehari-hari</h2>
+			<h2 class="text-base font-semibold">Soal cerita sehari-hari</h2>
 			<p class="text-sm text-[#5f6b62]">Soal Matematika dan Bahasa Indonesia dari situasi nyata — belanja di warung, berbagi kue, antrean.</p>
 		</div>
-		<a href="/soal-cerita" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+		<a href="/soal-cerita" class="btn btn-leaf shrink-0">Mulai latihan</a>
 	</div>
 </section>
 
 <!-- Simulasi ANBK Kelas 5 -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
+<section class="card mt-8 p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="graduation-cap" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="graduation-cap" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Simulasi ANBK Kelas 5</h2>
+			<h2 class="text-base font-semibold">Simulasi ANBK Kelas 5</h2>
 			<p class="text-sm text-[#5f6b62]">Latihan Asesmen Nasional: Literasi dan Numerasi, 20 soal tiap paket, 60 menit.</p>
 		</div>
 		<a href="/anbk" class="btn btn-leaf shrink-0">Lihat ANBK</a>
 	</div>
 </section>
 
-<!-- Latihan Adaptif -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Latihan Adaptif">
+<!-- Latihan adaptif -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Latihan adaptif">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="target" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="target" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Latihan Adaptif</h2>
+			<h2 class="text-base font-semibold">Latihan adaptif</h2>
 			<p class="text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
 		</div>
-		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai latihan</a>
 	</div>
 </section>
 
-<!-- Latihan Tanpa Habis -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Latihan Tanpa Habis">
+<!-- Latihan tanpa habis -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Latihan tanpa habis">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="refresh" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="refresh" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Latihan Tanpa Habis</h2>
+			<h2 class="text-base font-semibold">Latihan tanpa habis</h2>
 			<p class="text-sm text-[#5f6b62]">Soal hitung dengan angka yang selalu baru — tidak pernah habis, kapan pun kamu mau latihan.</p>
 		</div>
-		<a href="/latihan-tanpa-habis" class="btn btn-leaf shrink-0">Mulai Latihan</a>
+		<a href="/latihan-tanpa-habis" class="btn btn-leaf shrink-0">Mulai latihan</a>
 	</div>
 </section>
 
 <!-- Portofolioku (hanya bila login) -->
 {#if $auth.user}
-	<section class="card mt-4 p-4 lg:p-5" aria-label="Portofolioku">
+	<section class="card mt-8 p-4 lg:p-5" aria-label="Portofolioku">
 		<div class="flex items-center gap-3">
-			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="pen" size={24} /></span>
+			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="pen" size={24} /></span>
 			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-extrabold">Portofolioku</h2>
+				<h2 class="text-base font-semibold">Portofolioku</h2>
 				<p class="text-sm text-[#5f6b62]">Pamerkan karyamu — orang tua dan gurumu bisa memberi bintang dan komentar.</p>
 			</div>
-			<a href="/portofolio" class="btn btn-leaf shrink-0">Lihat Karya</a>
+			<a href="/portofolio" class="btn btn-leaf shrink-0">Lihat karya</a>
 		</div>
 	</section>
 
 	<!-- Saklar cepat aksesibilitas & hemat data -->
 	{#if homeSettings}
-		<section class="card mt-4 p-4 lg:p-5" aria-label="Aksesibilitas dan Hemat Data">
+		<section class="card mt-8 p-4 lg:p-5" aria-label="Aksesibilitas dan Hemat Data">
 			<div class="flex items-center gap-3">
-				<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="eye" size={24} /></span>
+				<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="eye" size={24} /></span>
 				<div class="min-w-0 flex-1">
-					<h2 class="text-base font-extrabold">Aksesibilitas &amp; Hemat Data</h2>
+					<h2 class="text-base font-semibold">Aksesibilitas &amp; hemat data</h2>
 					<p class="text-sm text-[#5f6b62]">Atur tampilan supaya lebih nyaman dibaca dan lebih ringan.</p>
 				</div>
-				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Semua Pengaturan</a>
+				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Semua pengaturan</a>
 			</div>
 			<div class="mt-3 flex flex-wrap gap-2">
 				<button
@@ -460,7 +460,7 @@
 					disabled={togglingKey !== null}
 					onclick={() => togglePengaturan("readable_font")}
 				>
-					<Icon name="book-open" size={14} /> Font ramah baca
+					<Icon name="book-open" size={16} /> Font ramah baca
 				</button>
 				<button
 					type="button"
@@ -469,7 +469,7 @@
 					disabled={togglingKey !== null}
 					onclick={() => togglePengaturan("data_saver")}
 				>
-					<Icon name="zap" size={14} /> Mode hemat data
+					<Icon name="zap" size={16} /> Mode hemat data
 				</button>
 			</div>
 		</section>
@@ -478,40 +478,40 @@
 
 <!-- Level & XP mini (hanya bila login) -->
 {#if $auth.user}
-	<section class="card mt-4 p-4 lg:p-5" aria-label="Level dan XP">
+	<section class="card mt-8 p-4 lg:p-5" aria-label="Level dan XP">
 		<div class="flex items-center gap-3">
 			{#if homeXp}
 				<Avatar stage={homeXp.stage} size={48} />
 			{:else}
-				<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="sprout" size={24} /></span>
+				<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="sprout" size={24} /></span>
 			{/if}
 			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-extrabold">Level &amp; XP</h2>
+				<h2 class="text-base font-semibold">Level &amp; XP</h2>
 				{#if homeXp}
-					<p class="text-sm text-[#5f6b62]">Level {homeXp.level} • {homeXp.totalXp} XP • {homeXp.stageName}</p>
+					<p class="text-sm tabular-nums text-[#5f6b62]">Level {homeXp.level} • {homeXp.totalXp} XP • {homeXp.stageName}</p>
 					<div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 						<div
-							class="h-full bg-[#177245] transition-all"
-							style="width: {homeXp.xpForNextLevel > 0
-								? Math.min(100, Math.round((homeXp.xpIntoLevel / homeXp.xpForNextLevel) * 100))
-								: 100}%"
+							class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature"
+							style="transform: scaleX({homeXp.xpForNextLevel > 0
+								? Math.min(100, Math.round((homeXp.xpIntoLevel / homeXp.xpForNextLevel) * 100)) / 100
+								: 1})"
 						></div>
 					</div>
 				{:else}
 					<p class="text-sm text-[#5f6b62]">Kumpulkan XP dari bab, kuis, dan cerita.</p>
 				{/if}
 			</div>
-			<a href="/akun" class="btn btn-leaf shrink-0">Lihat Akun</a>
+			<a href="/akun" class="btn btn-leaf shrink-0">Lihat akun</a>
 		</div>
 	</section>
 {/if}
 
-<!-- Hitung Mundur SAS -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Hitung Mundur SAS">
+<!-- Hitung mundur SAS -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Hitung mundur SAS">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="calendar" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="calendar" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Hitung Mundur SAS</h2>
+			<h2 class="text-base font-semibold">Hitung mundur SAS</h2>
 			{#if homeExamFailed}
 				<p class="text-sm text-[#5f6b62]">Tanggal SAS belum bisa dimuat.</p>
 			{:else if homeExam === null}
@@ -526,28 +526,28 @@
 	</div>
 </section>
 
-<!-- Cerita Edukasi -->
-<section class="card mt-4 p-4 lg:p-5" aria-label="Cerita Edukasi">
+<!-- Cerita edukasi -->
+<section class="card mt-8 p-4 lg:p-5" aria-label="Cerita edukasi">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="book-open" size={24} /></span>
+		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="book-open" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-extrabold">Cerita Edukasi</h2>
+			<h2 class="text-base font-semibold">Cerita edukasi</h2>
 			<p class="text-sm text-[#5f6b62]">Baca cerita pendek, lalu jawab kuis pemahamannya dan kumpulkan XP.</p>
 		</div>
-		<a href="/cerita" class="btn btn-leaf shrink-0">Baca Cerita</a>
+		<a href="/cerita" class="btn btn-leaf shrink-0">Baca cerita</a>
 	</div>
 </section>
 
-<!-- Tryout Mendatang -->
+<!-- Tryout mendatang -->
 {#if tryoutBerikut.length > 0}
-	<section class="card mt-4 p-4 lg:p-5" aria-label="Tryout Mendatang">
+	<section class="card mt-8 p-4 lg:p-5" aria-label="Tryout mendatang">
 		<div class="flex items-center gap-3">
-			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#177245]"><Icon name="trophy" size={24} /></span>
+			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="trophy" size={24} /></span>
 			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-extrabold">Tryout Mendatang</h2>
+				<h2 class="text-base font-semibold">Tryout mendatang</h2>
 				<p class="text-sm text-[#5f6b62]">Ujian bersama per kelas — daftar, kerjakan saat waktunya tiba, dan lihat peringkatmu.</p>
 			</div>
-			<a href="/tryout" class="btn btn-outline shrink-0 text-xs">Semua Tryout</a>
+			<a href="/tryout" class="btn btn-outline shrink-0 text-xs">Semua tryout</a>
 		</div>
 		<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 			{#each tryoutBerikut as t (t.id)}
@@ -558,12 +558,12 @@
 						</span>
 						{#if t.is_free}<span class="badge badge-leaf">Gratis</span>{/if}
 					</p>
-					<p class="mt-1.5 text-sm font-extrabold leading-snug">{t.title}</p>
-					<p class="mt-0.5 text-xs font-bold text-[#5f6b62]">
+					<p class="mt-1.5 text-sm font-semibold leading-snug">{t.title}</p>
+					<p class="mt-0.5 text-xs font-medium tabular-nums text-[#5f6b62]">
 						Kelas {t.grade} • {t.question_count} soal • {t.duration_minutes} menit • {t.participants} peserta
 					</p>
-					<p class="mt-1 text-xs font-bold text-[#177245]">
-						<Icon name="clock" size={13} class="inline-block align-[-2px]" /> {hitungMundurTryout(t)}
+					<p class="mt-1 text-xs font-medium text-[#177245]">
+						<Icon name="clock" size={16} class="inline-block align-[-2px]" /> {hitungMundurTryout(t)}
 					</p>
 				</a>
 			{/each}
@@ -572,13 +572,13 @@
 {/if}
 
 <!-- Chip jenjang -->
-<div class="mt-5 flex gap-2 overflow-x-auto pb-1 lg:mt-6">
+<div class="mt-8 flex gap-2 overflow-x-auto pb-1 lg:mt-8">
 	{#each jenjangList as j (j)}
 		<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
 			{#if j === "Semua"}
-				<Icon name="sparkles" size={14} /> Semua
+				<Icon name="sparkles" size={16} /> Semua
 			{:else}
-				<Icon name="backpack" size={14} /> {j}
+				<Icon name="backpack" size={16} /> {j}
 			{/if}
 		</button>
 	{/each}
@@ -603,7 +603,7 @@
 			>
 				<div class="h-1.5 shrink-0" style="background: {gt.accent}" aria-hidden="true"></div>
 				<div
-					class="flex h-24 items-center justify-center px-3 text-center text-sm font-extrabold text-white lg:h-36 lg:text-base"
+					class="flex h-24 items-center justify-center px-3 text-center text-sm font-semibold text-white lg:h-36 lg:text-base"
 					style="background: {p.cover_color}"
 				>
 					<span class="leading-tight">{p.cover_label}</span>
@@ -621,18 +621,18 @@
 							{/if}
 						</p>
 					{/if}
-					<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-bold leading-snug">{p.title}</h2>
+					<h2 class="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-snug">{p.title}</h2>
 					<p class="mt-0.5 text-[11px] font-semibold text-[#5f6b62]">
 						{p.jenjang} • {p.mapel} • {p.pages} hlm
 					</p>
 					<div class="mt-2 flex items-end justify-between gap-1">
 						<div>
 							{#if p.strikethrough_price}
-								<p class="text-[11px] font-semibold text-[#9aa096] line-through">
+								<p class="text-[11px] font-semibold text-[#6e675c] line-through">
 									{formatRupiah(p.strikethrough_price)}
 								</p>
 							{/if}
-							<p class="text-sm font-extrabold text-[#177245]">{formatRupiah(p.price)}</p>
+							<p class="text-sm font-semibold tabular-nums text-[#177245]">{formatRupiah(p.price)}</p>
 						</div>
 						<button
 							type="button"

@@ -92,7 +92,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/cerita")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Daftar Cerita
+	<Icon name="chevron-left" size={18} /> Kembali ke daftar cerita
 </button>
 
 {#if loading}
@@ -100,8 +100,8 @@
 {:else if error || !story}
 	<p class="err mt-6">{error || "Cerita tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-		<Icon name="book-open" size={22} class="shrink-0" /> {story.title}
+	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+		<Icon name="book-open" size={18} class="shrink-0" /> {story.title}
 	</h1>
 	<p class="text-sm text-[#5f6b62]">
 		Kelas {story.grade} • {total} soal pemahaman
@@ -112,40 +112,39 @@
 			{#each story.paragraphs as p (p.slice(0, 40))}
 				<p class="text-base leading-relaxed">{p}</p>
 			{/each}
-			<p class="rounded-lg bg-[#fbeecd] p-3 text-sm font-bold text-[#92400e]">
+			<p class="rounded-lg bg-[#fbeecd] p-3 text-sm font-medium text-[#92400e]">
 				Pesan moral: {story.moral}
 			</p>
 			<button type="button" class="btn btn-primary btn-block" onclick={() => (started = true)}>
-				<Icon name="help-circle" size={16} /> Mulai Kuis Pemahaman ({total} soal)
+				<Icon name="help-circle" size={16} /> Mulai kuis pemahaman ({total} soal)
 			</button>
 		</div>
 	{:else}
 		<div class="card mt-4 border-[#177245] p-4">
 			<div class="flex items-start justify-between gap-2">
 				<div>
-					<p class="text-sm font-extrabold leading-snug">Kuis Pemahaman — {story.title}</p>
-					<p class="mt-0.5 text-xs font-bold text-[#177245]">{total} soal • 1 poin per soal</p>
+					<p class="text-sm font-semibold leading-snug">Kuis Pemahaman — {story.title}</p>
+					<p class="mt-0.5 text-xs font-medium text-[#177245]">{total} soal • 1 poin per soal</p>
 				</div>
 				<button type="button" class="btn btn-ghost shrink-0 !px-2 !py-1 text-xs" onclick={bacaLagi}>
-					<Icon name="book-open" size={14} /> Baca Lagi
+					<Icon name="book-open" size={16} /> Baca lagi
 				</button>
 			</div>
 
 			{#if !result && current}
-				<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
+				<p class="tabular-nums mt-3 text-xs font-medium text-[#5f6b62]">Soal {qIdx + 1} dari {total}</p>
 				<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 					<div
-						class="h-full bg-[#177245] transition-all"
-						style="width: {((qIdx + 1) / Math.max(total, 1)) * 100}%"
+						class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((qIdx + 1) / Math.max(total, 1))})"
 					></div>
 				</div>
-				<p class="mt-3 text-base font-bold leading-snug">{current.question}</p>
+				<p class="mt-3 text-base font-semibold leading-snug">{current.question}</p>
 
 				{#if current.type === "pg" && Array.isArray(current.options)}
 					<div class="mt-3 space-y-2">
 						{#each current.options as opt (opt)}
 							<label
-								class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+								class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 									String(current.index)
 								] === opt
 									? '!border-[#177245] bg-[#ece9dc]'
@@ -207,7 +206,7 @@
 							disabled={submitting}
 							onclick={kirimJawaban}
 						>
-							{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+							{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 						</button>
 					{/if}
 				</div>
@@ -215,26 +214,26 @@
 					<p class="err mt-3">{submitError}</p>
 				{/if}
 			{:else if result}
-				<p class="mt-3 text-center text-xl font-extrabold">
+				<p class="mt-3 text-center text-xl font-semibold">
 					Skor: {result.score} / {result.max_score}
 					{#if result.score === result.max_score}
-						<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+						<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 					{:else if result.score >= result.max_score * 0.7}
-						<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+						<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 					{:else}
-						<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+						<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 					{/if}
 				</p>
 				{#if result.xpEarned > 0}
-					<p class="ok-msg mt-3 text-center font-extrabold">
+					<p class="tabular-nums ok-msg mt-3 text-center font-semibold">
 						Kamu mendapat +{result.xpEarned} XP
 					</p>
 				{/if}
 				<div class="mt-3 space-y-2">
 					{#each result.review as r (r.index)}
-						<div class="card !rounded-lg p-3 text-sm">
-							<p class="font-bold">
-								{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.index)}
+						<div class="card p-3 text-sm">
+							<p class="font-medium">
+								{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.index)}
 							</p>
 							<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 						</div>
@@ -242,10 +241,10 @@
 				</div>
 				<div class="mt-3 flex gap-2">
 					<button type="button" class="btn btn-outline flex-1" onclick={bacaLagi}>
-						<Icon name="book-open" size={16} /> Baca Lagi
+						<Icon name="book-open" size={16} /> Baca lagi
 					</button>
 					<button type="button" class="btn btn-primary flex-1" onclick={() => goto("/cerita")}>
-						<Icon name="chevron-right" size={16} /> Baca Cerita Lain
+						<Icon name="chevron-right" size={16} /> Baca cerita lain
 					</button>
 				</div>
 			{/if}

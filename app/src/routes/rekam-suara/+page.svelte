@@ -334,7 +334,7 @@
 				body: JSON.stringify({ stars })
 			});
 			recordings = recordings.map((r) => (r.id === id ? { ...r, stars } : r));
-			ratingMsg = "Bintang tersimpan. Terima kasih!";
+			ratingMsg = "Bintang tersimpan. Terima kasih";
 		} catch (e) {
 			ratingMsg = e instanceof Error ? e.message : "Gagal memberi bintang.";
 		} finally {
@@ -344,11 +344,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Akun
+	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug">
-	<Icon name="book-open" size={22} class="shrink-0" /> Rekam Suara Baca Nyaring
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
+	<Icon name="book-open" size={18} class="shrink-0" /> Rekam suara baca nyaring
 </h1>
 <p class="text-sm text-[#5f6b62]">
 	Baca nyaring satu bagian bab, rekam suaramu (maksimal 60 detik), lalu kirim. Orang tua atau
@@ -367,7 +367,7 @@
 	{:else if products.length === 0}
 		<p class="text-sm text-[#5f6b62]">
 			Belum ada produk yang dibeli. Bab pertama tiap produk bisa dicoba gratis — buka dulu satu bab
-			dari <a class="font-bold text-[#177245] underline" href="/belajar">Ruang Belajar</a>.
+			dari <a class="font-medium text-[#177245] underline" href="/belajar">Ruang belajar</a>.
 		</p>
 	{:else}
 		<select
@@ -408,7 +408,7 @@
 {#if chapterId}
 	<!-- Perekam -->
 	<div class="card mt-4 p-4">
-		<p class="text-sm font-bold">Rekam bacaanmu</p>
+		<p class="text-sm font-medium">Rekam bacaanmu</p>
 		<label class="lbl mt-3" for="teks">Teks yang dibaca (maks. 300 karakter)</label>
 		<textarea
 			id="teks"
@@ -423,7 +423,7 @@
 		<div class="mt-2 flex flex-wrap items-center gap-2">
 			{#if !recording}
 				<button type="button" class="btn btn-primary" onclick={mulaiRekam} disabled={!micSupported}>
-					<Icon name="play" size={18} /> Mulai Merekam
+					<Icon name="play" size={18} /> Mulai merekam
 				</button>
 			{:else}
 				<button type="button" class="btn btn-danger" onclick={berhentiRekam}>
@@ -431,7 +431,7 @@
 				</button>
 			{/if}
 			{#if recording}
-				<span class="flex items-center gap-2 text-sm font-bold text-[#b91c1c]">
+				<span class="flex items-center gap-2 text-sm font-medium text-[#b91c1c]">
 					<span class="inline-block h-3 w-3 animate-pulse rounded-full bg-[#b91c1c]"></span>
 					Merekam... {formatWaktu(elapsed)}
 				</span>
@@ -447,7 +447,7 @@
 
 		{#if audioBlob && audioUrl}
 			<div class="mt-3 rounded-xl bg-[#f7f5ef] p-3">
-				<p class="text-sm font-bold">Dengarkan dulu hasil rekamanmu ({formatWaktu(elapsed)})</p>
+				<p class="text-sm font-medium">Dengarkan dulu hasil rekamanmu ({formatWaktu(elapsed)})</p>
 				<audio class="mt-2 w-full" controls src={audioUrl}></audio>
 				<button
 					type="button"
@@ -467,7 +467,7 @@
 
 	<!-- Daftar rekaman -->
 	<div class="card mt-4 p-4">
-		<p class="text-sm font-bold">Rekaman di bab ini</p>
+		<p class="text-sm font-medium">Rekaman di bab ini</p>
 		{#if recordingsLoading}
 			<p class="mt-2 text-sm text-[#5f6b62]">Memuat rekaman...</p>
 		{:else if listError}
@@ -482,7 +482,7 @@
 					<div class="rounded-xl border border-[#e7e2d2] bg-[#fffdf7] p-3">
 						<div class="flex items-start justify-between gap-2">
 							<div class="min-w-0">
-								<p class="font-bold">{r.name}</p>
+								<p class="font-medium">{r.name}</p>
 								<p class="text-sm text-[#5f6b62]">{r.text_label}</p>
 								<p class="mt-1 text-xs text-[#5f6b62]">
 									{formatWaktu(r.duration_seconds)} · {formatTanggal(r.created_at)}
@@ -490,9 +490,9 @@
 							</div>
 							{#if r.stars}
 								<span
-									class="flex shrink-0 items-center gap-1 rounded-full bg-[#fbeecd] px-2 py-1 text-xs font-extrabold"
+									class="flex shrink-0 items-center gap-1 rounded-full bg-[#fbeecd] px-2 py-1 text-xs font-semibold"
 								>
-									<Icon name="star" size={14} class="text-[#f2b33d]" />
+									<Icon name="star" size={16} class="text-[#f2b33d]" />
 									{r.stars}/5
 								</span>
 							{/if}
@@ -523,7 +523,7 @@
 										>
 											<Icon
 												name="star"
-												size={20}
+												size={18}
 												class={r.stars && n <= r.stars ? "text-[#f2b33d]" : "text-[#c9c2ae]"}
 											/>
 										</button>

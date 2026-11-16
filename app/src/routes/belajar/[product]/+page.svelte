@@ -42,7 +42,7 @@
 	let simTimeLeft = $state(0);
 	let certLoading = $state(false);
 	let certError = $state("");
-	// ---- Mode Ujian Fokus ----
+	// ---- Mode ujian fokus ----
 	let focusOn = $state(false);
 	let focusSwitches = $state(0);
 	let focusUsed = $state(false);
@@ -76,7 +76,7 @@
 		return () => clearInterval(t);
 	});
 
-	// Mode Ujian Fokus: hitung setiap kali anak pindah tab/jendela.
+	// Mode ujian fokus: hitung setiap kali anak pindah tab/jendela.
 	// Satu episode "pergi" dihitung sekali (flag away mencegah dobel
 	// dari visibilitychange + blur yang datang berbarengan). Tidak ada
 	// auto-submit dan tidak ada kunci navigasi — hanya peringatan.
@@ -87,7 +87,7 @@
 			if (away) return;
 			away = true;
 			focusSwitches += 1;
-			focusWarn = `Kamu pindah tab/jendela. Tetap fokus, ya! (Pindah ${focusSwitches}×)`;
+			focusWarn = `Kamu pindah tab/jendela. Tetap fokus, ya (pindah ${focusSwitches}×)`;
 			if (focusWarnTimer) clearTimeout(focusWarnTimer);
 			focusWarnTimer = setTimeout(() => {
 				focusWarn = "";
@@ -170,13 +170,13 @@
 				/* tracker opsional */
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Gagal memuat Ruang Belajar.";
+			error = e instanceof Error ? e.message : "Gagal memuat Ruang belajar.";
 		} finally {
 			loading = false;
 		}
 	});
 
-	// Video pendek: tombol "Lanjut ke Kuis" di dalam iframe mengirim
+	// Video pendek: tombol "Lanjut ke kuis" di dalam iframe mengirim
 	// postMessage ringkas:lanjut-kuis — arahkan ke kuis bab itu.
 	onMount(() => {
 		function onMsg(e: MessageEvent) {
@@ -200,8 +200,8 @@
 			});
 			doneSet = new Set([...doneSet, chapterId]);
 			notice = data.sticker
-				? "Bab selesai — kamu dapat 1 stiker baru!"
-				: "Bab ditandai selesai. Hebat!";
+				? "Bab selesai — kamu dapat 1 stiker baru"
+				: "Bab ditandai selesai, hebat";
 		} catch (e) {
 			notice = e instanceof Error ? e.message : "Gagal menandai bab selesai.";
 		} finally {
@@ -343,7 +343,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto(`/produk/${productId}`)}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Produk
+	<Icon name="chevron-left" size={18} /> Kembali ke produk
 </button>
 
 {#if loading}
@@ -351,7 +351,10 @@
 {:else if error || !pack}
 	<p class="err mt-6">{error || "Ruang belajar tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold leading-snug"><Icon name="book-open" size={22} class="shrink-0" /> {pack.product.title}</h1>
+	{@const kataKunci = pack.product.title.split(" ")[0]}
+	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug"><Icon name="book-open" size={18} class="shrink-0" />
+		<span class="u-pencil">{kataKunci}</span>{pack.product.title.slice(kataKunci.length)}
+	</h1>
 	<p class="text-sm text-[#5f6b62]">
 		{pack.product.jenjang} • {pack.product.mapel} • {pack.chapters.length} bab
 	</p>
@@ -366,40 +369,40 @@
 	<div class="mt-3 h-1.5 rounded-full" style="background: {gtBelajar.accent}" aria-hidden="true"></div>
 
 	<a href="/peta-belajar/{productId}" class="btn btn-outline mt-3">
-		<Icon name="map" size={16} /> Lihat Peta Belajar
+		<Icon name="map" size={16} /> Lihat peta belajar
 	</a>
 	<div class="mt-2 flex flex-wrap gap-2">
 		<a href="/soal-cerita" class="btn btn-outline">
-			<Icon name="message" size={16} /> Latihan Soal Cerita
+			<Icon name="message" size={16} /> Latihan soal cerita
 		</a>
 		<a href="/soal-sulitku" class="btn btn-outline">
-			<Icon name="target" size={16} /> Soal Sulitku
+			<Icon name="target" size={16} /> Soal sulitku
 		</a>
 		<a href="/latihan-adaptif" class="btn btn-outline">
-			<Icon name="zap" size={16} /> Latihan Adaptif
+			<Icon name="zap" size={16} /> Latihan adaptif
 		</a>
 		<a href="/latihan-tanpa-habis" class="btn btn-outline">
-			<Icon name="refresh" size={16} /> Latihan Tanpa Habis
+			<Icon name="refresh" size={16} /> Latihan tanpa habis
 		</a>
 		<a href="/kuis-guru" class="btn btn-outline">
-			<Icon name="school" size={16} /> Kuis Buatan Guru
+			<Icon name="school" size={16} /> Kuis buatan guru
 		</a>
 		<a href="/rekam-suara?product={productId}" class="btn btn-outline">
 			<Icon name="play" size={16} /> Rekam Suara
 		</a>
 		{#if productId === "k5"}
 			<a href="/anbk" class="btn btn-outline">
-				<Icon name="graduation-cap" size={16} /> Simulasi ANBK Kelas 5
+				<Icon name="graduation-cap" size={16} /> Simulasi ANBK kelas 5
 			</a>
 		{/if}
 		<a href="/rapor" class="btn btn-outline">
-			<Icon name="graduation-cap" size={16} /> Unduh Rapor Semester
+			<Icon name="graduation-cap" size={16} /> Unduh Rapor semester
 		</a>
 	</div>
 
 	{#if pack.externalUrl}
 		<div class="card mt-3 p-4">
-			<p class="flex items-center gap-1.5 text-sm font-extrabold"><Icon name="link" size={15} /> Produk Eksternal</p>
+			<p class="flex items-center gap-1.5 text-sm font-semibold"><Icon name="link" size={16} /> Produk eksternal</p>
 			<p class="mt-0.5 text-sm text-[#5f6b62]">Produk ini juga tersedia sebagai tautan eksternal.</p>
 			<a href={pack.externalUrl} target="_blank" rel="noopener noreferrer" class="btn btn-sun mt-2 w-full">
 				Buka Produk
@@ -409,38 +412,38 @@
 
 	{#if pack.simLocked}
 		<p class="err mt-3">
-			<Icon name="lock" size={15} class="inline-block align-[-2px]" /> Simulasi SAS sedang dikunci oleh orang tuamu. Bab dan kuis tetap bisa dibuka.
+			<Icon name="lock" size={16} class="inline-block align-[-2px]" /> Simulasi SAS sedang dikunci oleh orang tuamu. Bab dan kuis tetap bisa dibuka.
 		</p>
 	{/if}
 
 	{#if notice}
-		<p class="ok-msg mt-3">{notice}</p>
+		<p class="tabular-nums ok-msg mt-3">{notice}</p>
 	{/if}
 
-	<!-- Desktop: dua kolom — Daftar Bab kiri, Simulasi SAS kanan -->
+	<!-- Desktop: dua kolom — Daftar bab kiri, Simulasi SAS kanan -->
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
 		<div class="min-w-0">
-	<!-- Daftar Bab -->
-	<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold"><Icon name="library" size={18} /> Daftar Bab</h2>
+	<!-- Daftar bab -->
+	<h2 class="mt-6 flex items-center gap-2 text-base font-semibold"><Icon name="library" size={18} /> Daftar bab</h2>
 	{#if pack.chapters.length === 0}
 		<p class="mt-2 text-sm text-[#5f6b62]">Bab untuk produk ini akan segera hadir.</p>
 	{:else}
 		{#each chaptersBySubject as [subject, list] (subject)}
-			<h3 class="mt-4 text-sm font-extrabold text-[#177245]">{subject}</h3>
+			<h3 class="mt-4 text-sm font-semibold text-[#177245]">{subject}</h3>
 			<div class="mt-2 space-y-3">
 				{#each list as ch (ch.id)}
 					<div class="card p-3">
 						<div class="flex items-start gap-3">
 							<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#177245]"><Icon name="file-text" size={18} /></span>
 							<div class="min-w-0 flex-1">
-								<p class="text-sm font-bold leading-snug">{ch.title}</p>
+								<p class="text-sm font-medium leading-snug">{ch.title}</p>
 								<p class="mt-1 flex flex-wrap gap-1">
-									{#if ch.free}<span class="badge badge-leaf">GRATIS</span>{/if}
-									{#if ch.locked}<span class="badge badge-gray"><Icon name="lock" size={12} /> Terkunci</span>{/if}
+									{#if ch.free}<span class="badge badge-leaf">Gratis</span>{/if}
+									{#if ch.locked}<span class="badge badge-gray"><Icon name="lock" size={16} /> Terkunci</span>{/if}
 								</p>
 								<p class="text-xs text-[#5f6b62]">
 									Kelas {ch.grade} • Semester {ch.semester}
-									{#if doneSet.has(ch.id)}• <Icon name="check" size={13} class="inline-block align-[-2px]" /> Selesai{/if}
+									{#if doneSet.has(ch.id)}• <Icon name="check" size={16} class="inline-block align-[-2px]" /> Selesai{/if}
 								</p>
 							</div>
 							<button
@@ -449,7 +452,7 @@
 								disabled={markingId === ch.id || ch.locked}
 								onclick={() => tandaiSelesai(ch.id)}
 							>
-								{#if doneSet.has(ch.id)}<Icon name="check" size={14} /> Selesai{:else}Tandai Selesai{/if}
+								{#if doneSet.has(ch.id)}<Icon name="check" size={16} /> Selesai{:else}Tandai selesai{/if}
 							</button>
 						</div>
 
@@ -471,14 +474,14 @@
 											href={`/belajar/${productId}/${ch.id}`}
 											class="btn btn-primary flex-1 text-xs"
 										>
-											<Icon name="file-text" size={14} /> Lanjut ke Kuis
+											<Icon name="file-text" size={16} /> Lanjut ke kuis
 										</a>
 										<button
 											type="button"
 											class="btn btn-outline text-xs"
 											onclick={() => (playingVideo = null)}
 										>
-											Tutup Video
+											Tutup video
 										</button>
 									</div>
 								{:else}
@@ -487,7 +490,7 @@
 										class="btn btn-sun w-full text-xs"
 										onclick={() => (playingVideo = ch.id)}
 									>
-										<Icon name="play" size={14} /> Tonton Video Pembelajaran
+										<Icon name="play" size={16} /> Tonton video pembelajaran
 										{ch.video_duration ? `(${ch.video_duration})` : ""}
 									</button>
 								{/if}
@@ -512,14 +515,14 @@
 											href={`/belajar/${productId}/${ch.id}`}
 											class="btn btn-primary flex-1 text-xs"
 										>
-											<Icon name="file-text" size={14} /> Lanjut ke Kuis
+											<Icon name="file-text" size={16} /> Lanjut ke kuis
 										</a>
 										<button
 											type="button"
 											class="btn btn-outline text-xs"
 											onclick={() => (playingShort = null)}
 										>
-											Tutup Video
+											Tutup video
 										</button>
 									</div>
 								{:else}
@@ -528,7 +531,7 @@
 										class="btn btn-sun w-full text-xs"
 										onclick={() => (playingShort = ch.id)}
 									>
-										<Icon name="play" size={14} /> Tonton Video Pendek (60 detik)
+										<Icon name="play" size={16} /> Tonton video pendek (60 detik)
 										{ch.short_duration ? `(${ch.short_duration})` : ""}
 									</button>
 								{/if}
@@ -539,10 +542,10 @@
 						{#if ch.flashcards.length > 0}
 							<button
 								type="button"
-								class="mt-2 w-full text-left text-xs font-bold text-[#177245]"
+								class="mt-2 w-full text-left text-xs font-medium text-[#177245]"
 								onclick={() => (openFlash = openFlash === ch.id ? null : ch.id)}
 							>
-								<Icon name="layers" size={14} class="inline-block align-[-2px]" /> Kartu Flashcard ({ch.flashcards.length}) <Icon name={openFlash === ch.id ? "chevron-down" : "chevron-right"} size={14} class="inline-block align-[-2px]" />
+								<Icon name="layers" size={16} class="inline-block align-[-2px]" /> Kartu flashcard ({ch.flashcards.length}) <Icon name={openFlash === ch.id ? "chevron-down" : "chevron-right"} size={16} class="inline-block align-[-2px]" />
 							</button>
 							{#if openFlash === ch.id}
 								<div class="mt-2 grid grid-cols-2 gap-2">
@@ -550,13 +553,13 @@
 										{@const key = `${ch.id}-${i}`}
 										<button
 											type="button"
-											class="min-h-20 rounded-xl border p-2 text-center text-xs font-bold {flipped[key]
+											class="min-h-20 rounded-xl border p-2 text-center text-xs font-medium {flipped[key]
 												? 'border-[#177245] bg-[#ecfdf5] text-[#065f46]'
 												: 'border-[#e7e2d2] bg-[#fffdf7] text-[#22302a]'}"
 											onclick={() => (flipped = { ...flipped, [key]: !flipped[key] })}
 										>
 											{flipped[key] ? fc.back : fc.front}
-											<span class="mt-1 block text-[10px] font-semibold text-[#9aa096]">
+											<span class="mt-1 block text-xs font-semibold text-[#6e675c]">
 												{flipped[key] ? "Jawaban — ketuk untuk membalik" : "Ketuk untuk membalik"}
 											</span>
 										</button>
@@ -567,14 +570,14 @@
 
 						{#if ch.locked}
 							<a href={`/produk/${productId}`} class="btn btn-sun btn-block mt-3 text-xs">
-								<Icon name="lock" size={14} /> Beli untuk membuka
+								<Icon name="lock" size={16} /> Beli untuk membuka
 							</a>
 						{:else}
 							<a
 								href={`/belajar/${productId}/${ch.id}`}
 								class="btn btn-outline btn-block mt-3 text-xs"
 							>
-								<Icon name="book-open" size={14} /> Baca Bab & Kerjakan Kuis
+								<Icon name="book-open" size={16} /> Baca bab & kerjakan kuis
 							</a>
 						{/if}
 					</div>
@@ -587,7 +590,7 @@
 		<div class="min-w-0">
 	<!-- Simulasi SAS -->
 	{#if pack.simulations.length > 0}
-		<h2 class="mt-6 flex items-center gap-2 text-base font-extrabold"><Icon name="trophy" size={18} /> Simulasi SAS</h2>
+		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold"><Icon name="trophy" size={18} /> Simulasi SAS</h2>
 		<p class="text-xs text-[#5f6b62]">Latihan seperti ujian sebenarnya — ada waktu dan skor.</p>
 		{#if simNotice}
 			<p class="err mt-3">{simNotice}</p>
@@ -600,28 +603,28 @@
 			<div class="card mt-3 border-[#177245] p-4">
 				<div class="flex items-start justify-between gap-2">
 					<div>
-						<p class="text-sm font-extrabold leading-snug">{activeSim.title}</p>
-						<p class="mt-0.5 text-xs font-bold text-[#177245]">
-							<Icon name="timer" size={14} class="inline-block align-[-2px]" /> Sisa waktu: {simClock(simTimeLeft)} • {activeSim.total_minutes} menit • {simTotal} soal
+						<p class="text-sm font-semibold leading-snug">{activeSim.title}</p>
+						<p class="mt-0.5 text-xs font-medium text-[#177245]">
+							<Icon name="timer" size={16} class="tabular-nums inline-block align-[-2px]" /> Sisa waktu: {simClock(simTimeLeft)} • {activeSim.total_minutes} menit • {simTotal} soal
 						</p>
 					</div>
 					<button type="button" class="btn btn-ghost shrink-0 !px-2 !py-1 text-xs" onclick={tutupSimulasi}>
-						<Icon name="x" size={14} /> Tutup
+						<Icon name="x" size={16} /> Tutup
 					</button>
 				</div>
 
 				{#if focusOn}
-					<div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-[#ecfdf5] px-3 py-2 text-xs font-bold text-[#065f46]">
-						<Icon name="eye" size={14} /> Mode Ujian Fokus aktif
-						<span class="rounded-full bg-[#fffdf7] px-2 py-0.5">Pindah tab: {focusSwitches}×</span>
+					<div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-[#ecfdf5] px-3 py-2 text-xs font-medium text-[#065f46]">
+						<Icon name="eye" size={16} /> Mode ujian fokus aktif
+						<span class="tabular-nums rounded-full bg-[#fffdf7] px-2 py-0.5">Pindah tab: {focusSwitches}×</span>
 						<button type="button" class="ml-auto underline" onclick={keluarModeFokus}>
-							<Icon name="minimize" size={13} class="inline-block align-[-2px]" /> Keluar dari Mode Fokus
+							<Icon name="minimize" size={16} class="inline-block align-[-2px]" /> Keluar dari mode fokus
 						</button>
 					</div>
 				{/if}
 				{#if focusWarn}
-					<p class="mt-2 rounded-lg bg-[#fef3c7] px-3 py-2 text-xs font-bold text-[#92400e]">
-						<Icon name="alert" size={14} class="inline-block align-[-2px]" /> {focusWarn}
+					<p class="mt-2 rounded-lg bg-[#fef3c7] px-3 py-2 text-xs font-medium text-[#92400e]">
+						<Icon name="alert" size={16} class="inline-block align-[-2px]" /> {focusWarn}
 					</p>
 				{/if}
 				{#if focusNotice}
@@ -629,20 +632,19 @@
 				{/if}
 
 				{#if !simResult && simCurrent}
-					<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {simIdx + 1} dari {simTotal}</p>
+					<p class="tabular-nums mt-3 text-xs font-medium text-[#5f6b62]">Soal {simIdx + 1} dari {simTotal}</p>
 					<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 						<div
-							class="h-full bg-[#177245] transition-all"
-							style="width: {((simIdx + 1) / Math.max(simTotal, 1)) * 100}%"
+							class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((simIdx + 1) / Math.max(simTotal, 1))})"
 						></div>
 					</div>
-					<p class="mt-3 text-base font-bold leading-snug">{simCurrent.question}</p>
+					<p class="mt-3 text-base font-semibold leading-snug">{simCurrent.question}</p>
 
 					{#if simCurrent.type === "pg" && Array.isArray(simCurrent.options)}
 						<div class="mt-3 space-y-2">
 							{#each simCurrent.options as opt (opt)}
 								<label
-									class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {simAnswers[
+									class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {simAnswers[
 										String(simCurrent.id)
 									] === opt
 										? '!border-[#177245] bg-[#ece9dc]'
@@ -660,14 +662,14 @@
 							{/each}
 						</div>
 					{:else if simCurrent.type === "pg_kompleks" && Array.isArray(simCurrent.options)}
-						<p class="mt-2 text-xs font-bold text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
+						<p class="mt-2 text-xs font-medium text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
 						<div class="mt-2 space-y-2">
 							{#each simCurrent.options as opt (opt)}
 								{@const picked = Array.isArray(simAnswers[String(simCurrent.id)])
 									? (simAnswers[String(simCurrent.id)] as string[])
 									: []}
 								<label
-									class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {picked.includes(
+									class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {picked.includes(
 										opt
 									)
 										? '!border-[#177245] bg-[#ece9dc]'
@@ -705,7 +707,7 @@
 									? (simAnswers[String(simCurrent.id)] as Record<string, string>)[String(li)] ?? ""
 									: ""}
 								<div class="flex items-center gap-2 text-sm">
-									<span class="flex-1 font-bold">{li + 1}. {item}</span>
+									<span class="flex-1 font-medium">{li + 1}. {item}</span>
 									<select
 										class="input !w-40 !py-1.5 text-xs"
 										value={picked}
@@ -757,7 +759,7 @@
 								disabled={simSubmitting}
 								onclick={kirimSimulasi}
 							>
-								{#if simSubmitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+								{#if simSubmitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 							</button>
 						{/if}
 					</div>
@@ -768,14 +770,14 @@
 					{#if simResult.score === simResult.max_score && simResult.max_score > 0}
 						<Confetti fire={true} />
 					{/if}
-					<p class="mt-3 text-center text-xl font-extrabold">
+					<p class="mt-3 text-center text-xl font-semibold">
 						Skor: {simResult.score} / {simResult.max_score}
 						{#if simResult.score === simResult.max_score}
-							<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+							<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 						{:else if simResult.score >= simResult.max_score * 0.7}
-							<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+							<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 						{:else}
-							<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+							<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 						{/if}
 					</p>
 					{#if simResult.passed && simResult.attempt_id}
@@ -785,7 +787,7 @@
 							disabled={certLoading}
 							onclick={unduhSertifikat}
 						>
-							{#if certLoading}Mengunduh...{:else}<Icon name="award" size={16} /> Unduh Sertifikat{/if}
+							{#if certLoading}Mengunduh...{:else}<Icon name="award" size={16} /> Unduh sertifikat{/if}
 						</button>
 						{#if certError}
 							<p class="err mt-2">{certError}</p>
@@ -793,25 +795,25 @@
 					{/if}
 					{#if focusUsed}
 						<div class="mt-3 rounded-lg bg-[#f7f5ef] p-3 text-sm">
-							<p class="font-bold">
-								<Icon name="eye" size={15} class="inline-block align-[-2px]" /> Mode Ujian Fokus
+							<p class="font-medium">
+								<Icon name="eye" size={16} class="inline-block align-[-2px]" /> Mode ujian fokus
 							</p>
 							<p class="mt-0.5 text-[#3f4a42]">
 								Kamu pindah tab {simFocusSwitches}× selama simulasi ini.
 							</p>
 							<a
 								href="/akun"
-								class="mt-1 inline-flex items-center gap-1 text-sm font-bold text-[#177245]"
+								class="mt-1 inline-flex items-center gap-1 text-sm font-medium text-[#177245]"
 							>
-								<Icon name="chart" size={14} /> Lihat Prediksi Nilai SAS
+								<Icon name="chart" size={16} /> Lihat prediksi nilai SAS
 							</a>
 						</div>
 					{/if}
 					<div class="mt-3 space-y-2">
 						{#each simResult.review as r (r.questionId)}
-							<div class="card !rounded-lg p-3 text-sm">
-								<p class="font-bold">
-									{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qTextSim(r.questionId)}
+							<div class="card p-3 text-sm">
+								<p class="font-medium">
+									{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qTextSim(r.questionId)}
 								</p>
 								<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 							</div>
@@ -827,7 +829,7 @@
 							simTimeLeft = (activeSim?.total_minutes ?? 0) * 60;
 						}}
 					>
-						<Icon name="refresh" size={16} /> Ulangi Simulasi
+						<Icon name="refresh" size={16} /> Ulangi simulasi
 					</button>
 				{/if}
 			</div>
@@ -837,21 +839,21 @@
 				<div class="card p-4">
 					<div class="flex items-start justify-between gap-2">
 						<div>
-							<p class="text-sm font-extrabold leading-snug">{sim.title}</p>
+							<p class="text-sm font-semibold leading-snug">{sim.title}</p>
 							<p class="mt-0.5 text-xs text-[#5f6b62]">
 								{sim.subject} • Kelas {sim.grade} • Paket {sim.paket}
 							</p>
 						</div>
 						<span class="flex shrink-0 flex-wrap justify-end gap-1">
-							{#if sim.free}<span class="badge badge-leaf">GRATIS</span>{/if}
-							{#if sim.locked}<span class="badge badge-gray"><Icon name="lock" size={12} /> Terkunci</span>{/if}
+							{#if sim.free}<span class="badge badge-leaf">Gratis</span>{/if}
+							{#if sim.locked}<span class="badge badge-gray"><Icon name="lock" size={16} /> Terkunci</span>{/if}
 							<span class="badge badge-brand">SAS</span>
 						</span>
 					</div>
-					<div class="mt-3 flex gap-2 text-center text-xs font-bold">
-						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="timer" size={14} /> {sim.total_minutes} menit</span>
-						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="file-text" size={14} /> {simQuestionCount(sim)} soal</span>
-						<span class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="star" size={14} /> {sim.max_points} poin</span>
+					<div class="mt-3 flex gap-2 text-center text-xs font-medium">
+						<span class="tabular-nums flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="timer" size={16} /> {sim.total_minutes} menit</span>
+						<span class="tabular-nums flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="file-text" size={16} /> {simQuestionCount(sim)} soal</span>
+						<span class="tabular-nums flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f7f5ef] px-2 py-2"><Icon name="star" size={16} /> {sim.max_points} poin</span>
 					</div>
 					{#if sim.locked}
 						<a href={`/produk/${productId}`} class="btn btn-sun btn-block mt-3">
@@ -864,7 +866,7 @@
 							disabled={pack.simLocked}
 							onclick={() => mulaiSimulasi(sim)}
 						>
-							{#if pack.simLocked}<Icon name="lock" size={16} /> Dikunci Orang Tua{:else}<Icon name="rocket" size={16} /> Mulai Simulasi{/if}
+							{#if pack.simLocked}<Icon name="lock" size={16} /> Dikunci orang tua{:else}<Icon name="rocket" size={16} /> Mulai simulasi{/if}
 						</button>
 						<button
 							type="button"
@@ -872,9 +874,9 @@
 							disabled={pack.simLocked}
 							onclick={() => mulaiSimulasi(sim, true)}
 						>
-							<Icon name="maximize" size={16} /> Mulai dengan Mode Fokus
+							<Icon name="maximize" size={16} /> Mulai dengan mode fokus
 						</button>
-						<p class="mt-1 text-center text-[11px] text-[#5f6b62]">
+						<p class="mt-1 text-center text-xs text-[#5f6b62]">
 							Mode Fokus: layar penuh + peringatan kalau pindah tab.
 						</p>
 					{/if}
@@ -885,7 +887,7 @@
 		</div>
 	</div>
 
-	<p class="mt-6 text-center text-xs text-[#9aa096]">
-		Harga produk: {formatRupiah(pack.product.price)} • Semangat belajarnya!
+	<p class="mt-6 text-center text-xs text-[#6e675c]">
+		Harga produk: {formatRupiah(pack.product.price)} • Semangat belajarnya
 	</p>
 {/if}

@@ -1,6 +1,6 @@
 <div class="mt-4 space-y-3">
 	<div class="card p-4">
-		<p class="font-extrabold">Apa itu Ringkas?</p>
+		<p class="font-semibold">Apa itu Ringkas?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
 			Ringkas adalah teman belajar untuk anak SD: rangkuman materi per bab yang ringkas, kuis per bab,
 			flashcard, dan simulasi SAS per mata pelajaran. Tagline kami: Rangkuman Materi SD, SMP, SMA —
@@ -8,7 +8,7 @@
 		</p>
 	</div>
 	<div class="card p-4">
-		<p class="font-extrabold">Bagaimana cara membeli produk?</p>
+		<p class="font-semibold">Bagaimana cara membeli produk?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
 			Pilih produk di Katalog, masukkan ke Keranjang, lalu checkout. Pembayaran hanya lewat KlikQRIS:
 			scan kode QR yang muncul, dan pesananmu berubah menjadi LUNAS setelah pembayaran terkonfirmasi.
@@ -16,14 +16,14 @@
 		</p>
 	</div>
 	<div class="card p-4">
-		<p class="font-extrabold">Di mana materi saya setelah membayar?</p>
+		<p class="font-semibold">Di mana materi saya setelah membayar?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
 			Buka tab Pesanan — pesanan LUNAS punya tombol Belajar dan unduhan PDF. Ada juga link produk
 			eksternal (misalnya Google Drive) bila tersedia untuk produk itu.
 		</p>
 	</div>
 	<div class="card p-4">
-		<p class="font-extrabold">Apa itu simulasi SAS?</p>
+		<p class="font-semibold">Apa itu simulasi SAS?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
 			Simulasi Sumatif Akhir Semester per mata pelajaran, dengan jumlah soal dan waktu sesuai struktur
 			baku per kelas: Kelas 1–2 sebanyak 25 soal (60 menit), Kelas 3 sebanyak 35 soal (70 menit),
@@ -32,7 +32,7 @@
 		</p>
 	</div>
 	<div class="card p-4">
-		<p class="font-extrabold">Apakah progres belajar saya tersimpan?</p>
+		<p class="font-semibold">Apakah progres belajar saya tersimpan?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
 			Ya, bila kamu masuk dengan akun. Bab yang selesai, streak harian, stiker, dan nilai kuis
 			tersimpan di Akun, bagian Tracker Belajar. Catatan dan bookmark yang kamu buat juga tersimpan di
@@ -40,9 +40,9 @@
 		</p>
 	</div>
 	<div class="card p-4">
-		<p class="font-extrabold">Bagaimana cara menghubungi admin?</p>
+		<p class="font-semibold">Bagaimana cara menghubungi admin?</p>
 		<p class="mt-1 text-sm text-[#3f4a42]">
-			Lewat tombol WhatsApp di halaman produk atau di Pesanan Saya. Pesan WhatsApp terbuka dengan teks
+			Lewat tombol WhatsApp di halaman produk atau di Pesanan saya. Pesan WhatsApp terbuka dengan teks
 			siap kirim — bukan pengiriman otomatis dari server.
 		</p>
 	</div>

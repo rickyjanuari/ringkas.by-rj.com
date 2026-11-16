@@ -12,23 +12,23 @@
 	}
 </script>
 
-<h1 class="mt-3 text-xl font-extrabold leading-snug">Alat Interaktif</h1>
+<h1 class="mt-3 text-xl font-semibold leading-snug">Alat interaktif</h1>
 <p class="mt-1 text-sm text-[#5f6b62]">
 	Tiga alat main sambil belajar Matematika. Semuanya berjalan langsung di perangkatmu — tanpa perlu masuk atau menunggu.
 </p>
 
 <div class="mt-4 space-y-4">
-	<!-- Garis Bilangan -->
+	<!-- Garis bilangan -->
 	<div class="card p-4">
 		<div class="flex flex-wrap items-start justify-between gap-2">
 			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-					<Icon name="target" size={18} /> Garis Bilangan
+				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+					<Icon name="target" size={18} /> Garis bilangan
 				</h2>
 				<p class="mt-1 text-sm leading-relaxed">
 					Lompat maju dan mundur di garis 0–20, lalu lihat kalimat penjumlahannya.
 				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • Kelas 1–2</span></p>
+				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 1–2</span></p>
 			</div>
 			<button type="button" class="btn {terbuka === 'garis' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("garis")}>
 				{#if terbuka === "garis"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}
@@ -39,17 +39,17 @@
 		{/if}
 	</div>
 
-	<!-- Tabel Perkalian -->
+	<!-- Tabel perkalian -->
 	<div class="card p-4">
 		<div class="flex flex-wrap items-start justify-between gap-2">
 			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-					<Icon name="target" size={18} /> Tabel Perkalian
+				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+					<Icon name="target" size={18} /> Tabel perkalian
 				</h2>
 				<p class="mt-1 text-sm leading-relaxed">
 					Lihat hasil 1–10 × 1–10 dengan sekali ketuk, lalu uji diri dengan Latihan Acak.
 				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • Kelas 3–4</span></p>
+				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 3–4</span></p>
 			</div>
 			<button type="button" class="btn {terbuka === 'perkalian' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("perkalian")}>
 				{#if terbuka === "perkalian"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}
@@ -60,17 +60,17 @@
 		{/if}
 	</div>
 
-	<!-- Kalkulator Pecahan -->
+	<!-- Kalkulator pecahan -->
 	<div class="card p-4">
 		<div class="flex flex-wrap items-start justify-between gap-2">
 			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-					<Icon name="target" size={18} /> Kalkulator Pecahan
+				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+					<Icon name="target" size={18} /> Kalkulator pecahan
 				</h2>
 				<p class="mt-1 text-sm leading-relaxed">
 					Jumlah, kurang, kali, dan bagi pecahan — hasilnya disederhanakan dan digambar sebagai potongan lingkaran.
 				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • Kelas 5–6</span></p>
+				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 5–6</span></p>
 			</div>
 			<button type="button" class="btn {terbuka === 'pecahan' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("pecahan")}>
 				{#if terbuka === "pecahan"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}

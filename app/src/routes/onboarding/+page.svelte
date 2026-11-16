@@ -80,17 +80,17 @@
 	<div class="lg:mx-auto lg:max-w-xl">
 		<div class="flex flex-col items-center text-center">
 			<Mascot expression="semangat" size={88} />
-			<h1 class="mt-2 text-xl font-extrabold">Kenalan dulu, yuk!</h1>
+			<h1 class="mt-2 text-xl font-semibold">Kenalan dulu, yuk</h1>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Tiga langkah cepat sebelum mulai belajar di Ringkas.
 			</p>
 		</div>
 
 		<!-- Penanda langkah -->
-		<div class="mt-5 flex items-center justify-center gap-2" aria-label="Langkah {langkah} dari 3">
+		<div class="tabular-nums mt-5 flex items-center justify-center gap-2" aria-label="Langkah {langkah} dari 3">
 			{#each [1, 2, 3] as n (n)}
 				<span
-					class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-extrabold {n === langkah
+					class="tabular-nums flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold {n === langkah
 						? 'bg-[#177245] text-white'
 						: n < langkah
 							? 'bg-[#ece9dc] text-[#177245]'
@@ -104,9 +104,9 @@
 				{/if}
 			{/each}
 		</div>
-		<p class="mt-2 text-center text-xs font-bold text-[#5f6b62]">Langkah {langkah} dari 3</p>
+		<p class="tabular-nums mt-2 text-center text-xs font-medium text-[#5f6b62]">Langkah {langkah} dari 3</p>
 
-		<h2 class="mt-4 text-center text-lg font-extrabold">{judulLangkah}</h2>
+		<h2 class="mt-4 text-center text-lg font-semibold">{judulLangkah}</h2>
 
 		{#if langkah === 1}
 			<p class="mt-1 text-center text-sm text-[#5f6b62]">
@@ -123,7 +123,7 @@
 						onclick={() => (kelas = k)}
 					>
 						<Icon name="graduation-cap" size={28} class="text-[#177245]" />
-						<span class="text-base font-extrabold">Kelas {k}</span>
+						<span class="text-base font-semibold">Kelas {k}</span>
 						<span class="text-xs text-[#5f6b62]">SD</span>
 					</button>
 				{/each}
@@ -146,7 +146,7 @@
 						}}
 					>
 						<Avatar stage={t.stage} size={72} />
-						<span class="text-base font-extrabold">{t.nama}</span>
+						<span class="text-base font-semibold">{t.nama}</span>
 						<span class="text-center text-xs text-[#5f6b62]">{t.ket}</span>
 					</button>
 				{/each}
@@ -158,9 +158,9 @@
 						<Icon name="target" size={30} />
 					</span>
 				</p>
-				<p class="mt-3 text-base font-extrabold">Selesaikan 1 bab</p>
+				<p class="mt-3 text-base font-semibold">Selesaikan 1 bab</p>
 				<p class="mt-1 text-sm text-[#5f6b62]">
-					Buka Ruang Belajar Kelas {kelas ?? 1}, pilih satu bab, dan selesaikan
+					Buka ruang belajar kelas {kelas ?? 1}, pilih satu bab, dan selesaikan
 					kuisnya. Satu bab selesai, satu langkah maju.
 				</p>
 				<button
@@ -172,7 +172,7 @@
 					{#if menyimpan}
 						Menyimpan...
 					{:else}
-						Mulai Misi Pertama <Icon name="arrow-right" size={16} />
+						Mulai misi pertama <Icon name="arrow-right" size={16} />
 					{/if}
 				</button>
 			</div>

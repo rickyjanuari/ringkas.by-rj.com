@@ -129,7 +129,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/anbk")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Simulasi ANBK
+	<Icon name="chevron-left" size={18} /> Kembali ke simulasi ANBK
 </button>
 
 {#if loading}
@@ -145,29 +145,28 @@
 	<div class="card mt-3 border-[#177245] p-4">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<p class="text-sm font-extrabold leading-snug">{pack.simulation.title}</p>
-				<p class="mt-0.5 text-xs font-bold text-[#177245]">
-					<Icon name="timer" size={14} class="inline-block align-[-2px]" /> Sisa waktu: {clock(timeLeft)} • {pack.simulation.total_minutes} menit • {total} soal
+				<p class="text-sm font-semibold leading-snug">{pack.simulation.title}</p>
+				<p class="mt-0.5 text-xs font-medium text-[#177245]">
+					<Icon name="timer" size={16} class="tabular-nums inline-block align-[-2px]" /> Sisa waktu: {clock(timeLeft)} • {pack.simulation.total_minutes} menit • {total} soal
 				</p>
 			</div>
 			<span class="badge badge-brand shrink-0">ANBK</span>
 		</div>
 
 		{#if !result && current}
-			<p class="mt-3 text-xs font-bold text-[#5f6b62]">Soal {idx + 1} dari {total}</p>
+			<p class="tabular-nums mt-3 text-xs font-medium text-[#5f6b62]">Soal {idx + 1} dari {total}</p>
 			<div class="mt-1 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
 				<div
-					class="h-full bg-[#177245] transition-all"
-					style="width: {((idx + 1) / Math.max(total, 1)) * 100}%"
+					class="h-full w-full origin-left bg-[#177245] transition-transform duration-300 ease-signature" style="transform: scaleX({((idx + 1) / Math.max(total, 1))})"
 				></div>
 			</div>
-			<p class="mt-3 whitespace-pre-line text-base font-bold leading-snug">{current.question}</p>
+			<p class="mt-3 whitespace-pre-line text-base font-semibold leading-snug">{current.question}</p>
 
 			{#if current.type === "pg" && Array.isArray(current.options)}
 				<div class="mt-3 space-y-2">
 					{#each current.options as opt (opt)}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {answers[
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {answers[
 								String(current.id)
 							] === opt
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -185,14 +184,14 @@
 					{/each}
 				</div>
 			{:else if current.type === "pg_kompleks" && Array.isArray(current.options)}
-				<p class="mt-2 text-xs font-bold text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
+				<p class="mt-2 text-xs font-medium text-[#5f6b62]">Boleh pilih lebih dari satu jawaban.</p>
 				<div class="mt-2 space-y-2">
 					{#each current.options as opt (opt)}
 						{@const picked = Array.isArray(answers[String(current.id)])
 							? (answers[String(current.id)] as string[])
 							: []}
 						<label
-							class="card flex cursor-pointer items-center gap-2 !rounded-lg px-3 py-2.5 text-sm {picked.includes(
+							class="card flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm {picked.includes(
 								opt
 							)
 								? '!border-[#177245] bg-[#ece9dc]'
@@ -230,7 +229,7 @@
 							? (answers[String(current.id)] as Record<string, string>)[String(li)] ?? ""
 							: ""}
 						<div class="flex items-center gap-2 text-sm">
-							<span class="flex-1 font-bold">{li + 1}. {item}</span>
+							<span class="flex-1 font-medium">{li + 1}. {item}</span>
 							<select
 								class="input !w-40 !py-1.5 text-xs"
 								value={picked}
@@ -282,7 +281,7 @@
 						disabled={submitting}
 						onclick={kirimJawaban}
 					>
-						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim Jawaban{/if}
+						{#if submitting}Memeriksa...{:else}<Icon name="check" size={16} /> Kirim jawaban{/if}
 					</button>
 				{/if}
 			</div>
@@ -290,14 +289,14 @@
 				<p class="err mt-3">{submitError}</p>
 			{/if}
 		{:else if result}
-			<p class="mt-3 text-center text-xl font-extrabold">
+			<p class="mt-3 text-center text-xl font-semibold">
 				Skor: {result.score} / {result.max_score}
 				{#if result.score === result.max_score}
-					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={20} /> Nilai Sempurna!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="party-popper" size={18} /> Nilai sempurna</span>
 				{:else if result.score >= result.max_score * 0.7}
-					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={20} /> Hebat!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="thumbs-up" size={18} /> Hebat</span>
 				{:else}
-					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={20} /> Terus berlatih ya!</span>
+					<span class="inline-flex items-center gap-1.5"><Icon name="zap" size={18} /> Terus berlatih ya</span>
 				{/if}
 			</p>
 			{#if result.passed && result.attempt_id}
@@ -307,7 +306,7 @@
 					disabled={certLoading}
 					onclick={unduhSertifikat}
 				>
-					{#if certLoading}Mengunduh...{:else}<Icon name="award" size={16} /> Unduh Sertifikat{/if}
+					{#if certLoading}Mengunduh...{:else}<Icon name="award" size={16} /> Unduh sertifikat{/if}
 				</button>
 				{#if certError}
 					<p class="err mt-2">{certError}</p>
@@ -315,9 +314,9 @@
 			{/if}
 			<div class="mt-3 space-y-2">
 				{#each result.review as r (r.questionId)}
-					<div class="card !rounded-lg p-3 text-sm">
-						<p class="font-bold">
-							{#if r.correct}<Icon name="check-circle" size={15} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={15} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
+					<div class="card p-3 text-sm">
+						<p class="font-medium">
+							{#if r.correct}<Icon name="check-circle" size={16} class="inline-block align-[-2px] text-[#065f46]" /> Benar{:else}<Icon name="x-circle" size={16} class="inline-block align-[-2px] text-[#b91c1c]" /> Belum tepat{/if} — {qText(r.questionId)}
 						</p>
 						<p class="mt-1 text-[#3f4a42]">{r.discussion}</p>
 					</div>
@@ -341,7 +340,7 @@
 						timeLeft = (pack?.simulation.total_minutes ?? 0) * 60;
 					}}
 				>
-					<Icon name="refresh" size={16} /> Ulangi Simulasi
+					<Icon name="refresh" size={16} /> Ulangi simulasi
 				</button>
 			</div>
 		{/if}

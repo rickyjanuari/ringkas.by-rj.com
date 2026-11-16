@@ -92,13 +92,13 @@
 				</svg>
 			{/each}
 		</div>
-		<figcaption class="text-center text-xs font-bold text-[#5f6b62]">{label}</figcaption>
+		<figcaption class="text-center text-xs font-medium text-[#5f6b62]">{label}</figcaption>
 	</figure>
 {/snippet}
 
 <div class="card p-4">
-	<h3 class="flex items-center gap-1.5 text-base font-extrabold text-[#177245]">
-		<Icon name="target" size={18} /> Kalkulator Pecahan
+	<h3 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
+		<Icon name="target" size={18} /> Kalkulator pecahan
 	</h3>
 	<p class="mt-1 text-sm text-[#5f6b62]">
 		Pilih dua pecahan dan satu operasi. Hasilnya langsung disederhanakan, lengkap dengan gambarnya.
@@ -109,16 +109,16 @@
 		<div class="flex items-end gap-1.5">
 			<div>
 				<label class="lbl text-center" for="pk-n1">Pembilang</label>
-				<select id="pk-n1" class="input !w-[4.5rem] text-center text-lg font-extrabold" bind:value={n1}>
+				<select id="pk-n1" class="tabular-nums input !w-[4.5rem] text-center text-lg font-semibold" bind:value={n1}>
 					{#each Array.from({ length: 13 }, (_, i) => i) as n (n)}
 						<option value={n}>{n}</option>
 					{/each}
 				</select>
 			</div>
-			<span class="pb-3 text-xl font-extrabold text-[#5f6b62]">/</span>
+			<span class="pb-3 text-xl font-semibold text-[#5f6b62]">/</span>
 			<div>
 				<label class="lbl text-center" for="pk-d1">Penyebut</label>
-				<select id="pk-d1" class="input !w-[4.5rem] text-center text-lg font-extrabold" bind:value={d1}>
+				<select id="pk-d1" class="tabular-nums input !w-[4.5rem] text-center text-lg font-semibold" bind:value={d1}>
 					{#each Array.from({ length: 12 }, (_, i) => i + 1) as d (d)}
 						<option value={d}>{d}</option>
 					{/each}
@@ -129,7 +129,7 @@
 		<!-- Operasi -->
 		<div>
 			<label class="lbl text-center" for="pk-op">Operasi</label>
-			<select id="pk-op" class="input !w-[4.5rem] text-center text-lg font-extrabold" bind:value={op}>
+			<select id="pk-op" class="tabular-nums input !w-[4.5rem] text-center text-lg font-semibold" bind:value={op}>
 				<option value="+">+</option>
 				<option value="−">−</option>
 				<option value="×">×</option>
@@ -141,16 +141,16 @@
 		<div class="flex items-end gap-1.5">
 			<div>
 				<label class="lbl text-center" for="pk-n2">Pembilang</label>
-				<select id="pk-n2" class="input !w-[4.5rem] text-center text-lg font-extrabold" bind:value={n2}>
+				<select id="pk-n2" class="tabular-nums input !w-[4.5rem] text-center text-lg font-semibold" bind:value={n2}>
 					{#each Array.from({ length: 13 }, (_, i) => i) as n (n)}
 						<option value={n}>{n}</option>
 					{/each}
 				</select>
 			</div>
-			<span class="pb-3 text-xl font-extrabold text-[#5f6b62]">/</span>
+			<span class="pb-3 text-xl font-semibold text-[#5f6b62]">/</span>
 			<div>
 				<label class="lbl text-center" for="pk-d2">Penyebut</label>
-				<select id="pk-d2" class="input !w-[4.5rem] text-center text-lg font-extrabold" bind:value={d2}>
+				<select id="pk-d2" class="tabular-nums input !w-[4.5rem] text-center text-lg font-semibold" bind:value={d2}>
 					{#each Array.from({ length: 12 }, (_, i) => i + 1) as d (d)}
 						<option value={d}>{d}</option>
 					{/each}
@@ -160,13 +160,13 @@
 	</div>
 
 	{#if bagiNol}
-		<p class="err mt-4 text-center">Tidak bisa membagi dengan nol, yuk pilih pecahan lain!</p>
+		<p class="err mt-4 text-center">Tidak bisa membagi dengan nol, yuk pilih pecahan lain</p>
 	{:else if hasil}
-		<p class="ok-msg mt-4 text-center text-2xl font-extrabold">
+		<p class="tabular-nums ok-msg mt-4 text-center text-2xl font-semibold">
 			{n1}/{d1} {op} {n2}/{d2} = {hasil.n}/{hasil.d}
 		</p>
 		{#if campuran}
-			<p class="mt-2 text-center text-base font-bold text-[#177245]">
+			<p class="mt-2 text-center text-base font-semibold text-[#177245]">
 				{#if campuran.sisa === 0}
 					Sebagai bilangan bulat: {campuran.bulat}
 				{:else}
@@ -187,7 +187,7 @@
 			{/if}
 		</div>
 		{#if sisaLingkaran}
-			<p class="mt-2 text-center text-xs font-bold text-[#5f6b62]">
+			<p class="mt-2 text-center text-xs font-medium text-[#5f6b62]">
 				Hasilnya lebih dari 2 lingkaran — masih ada {sisaLingkaran} lagi di luar gambar.
 			</p>
 		{/if}

@@ -9,6 +9,7 @@
 	--color-ink: #22302a;
 	--font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 	--font-serif: "Lora", Georgia, serif;
+	--ease-signature: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
@@ -43,7 +44,7 @@ h3 {
 	background: #fffdf7;
 	border: 1px solid #e7e2d2;
 	border-radius: 1rem;
-	box-shadow: 0 2px 12px rgb(23 114 69 / 0.06);
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 .btn {
@@ -51,17 +52,17 @@ h3 {
 	align-items: center;
 	justify-content: center;
 	gap: 0.4rem;
-	font-weight: 700;
-	border-radius: 0.9rem;
+	font-weight: 600;
+	border-radius: 0.625rem;
 	padding: 0.65rem 1rem;
 	font-size: 0.9rem;
 	line-height: 1.2;
 	cursor: pointer;
 	border: none;
 	transition:
-		transform 0.08s ease,
-		background 0.15s ease,
-		opacity 0.15s ease;
+		transform 0.12s cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 0.15s cubic-bezier(0.22, 1, 0.36, 1);
 	text-decoration: none;
 }
 .btn:active {
@@ -109,7 +110,7 @@ textarea.input {
 	width: 100%;
 	background: #fffdf7;
 	border: 1.5px solid #e7e2d2;
-	border-radius: 0.8rem;
+	border-radius: 0.625rem;
 	padding: 0.65rem 0.85rem;
 	font-size: 1rem;
 	font-family: inherit;
@@ -121,12 +122,12 @@ textarea.input {
 	box-shadow: 0 0 0 3px rgb(23 114 69 / 0.15);
 }
 .input::placeholder {
-	color: #9aa096;
+	color: #6e675c;
 }
 label.lbl {
 	display: block;
 	font-size: 0.8rem;
-	font-weight: 700;
+	font-weight: 600;
 	color: #3f4a42;
 	margin-bottom: 0.3rem;
 }
@@ -136,9 +137,9 @@ label.lbl {
 	align-items: center;
 	gap: 0.3rem;
 	padding: 0.4rem 0.85rem;
-	border-radius: 999px;
+	border-radius: 0.5rem;
 	font-size: 0.85rem;
-	font-weight: 700;
+	font-weight: 600;
 	background: #fffdf7;
 	border: 1.5px solid #e7e2d2;
 	color: #3f4a42;
@@ -156,9 +157,9 @@ label.lbl {
 	align-items: center;
 	gap: 0.25rem;
 	padding: 0.15rem 0.55rem;
-	border-radius: 999px;
+	border-radius: 0.375rem;
 	font-size: 0.7rem;
-	font-weight: 800;
+	font-weight: 600;
 	letter-spacing: 0.02em;
 }
 .badge-sun {
@@ -186,7 +187,7 @@ label.lbl {
 	background: #fef2f2;
 	border: 1px solid #fecaca;
 	color: #b91c1c;
-	border-radius: 0.8rem;
+	border-radius: 0.625rem;
 	padding: 0.7rem 0.9rem;
 	font-size: 0.9rem;
 }
@@ -194,7 +195,7 @@ label.lbl {
 	background: #ecfdf5;
 	border: 1px solid #a7f3d0;
 	color: #065f46;
-	border-radius: 0.8rem;
+	border-radius: 0.625rem;
 	padding: 0.7rem 0.9rem;
 	font-size: 0.9rem;
 }
@@ -207,8 +208,8 @@ label.lbl {
 	align-items: center;
 	gap: 2px;
 	font-size: 0.68rem;
-	font-weight: 700;
-	color: #9aa096;
+	font-weight: 600;
+	color: #6e675c;
 	text-decoration: none;
 	padding: 0.35rem 0;
 	flex: 1;
@@ -223,7 +224,7 @@ label.lbl {
 /* Tautan menu header desktop (hanya tampil di lg ke atas). */
 .navlink {
 	padding: 0.4rem 0.75rem;
-	border-radius: 999px;
+	border-radius: 0.5rem;
 	color: #3f4a42;
 	text-decoration: none;
 	white-space: nowrap;
@@ -319,12 +320,32 @@ label.lbl {
 	cursor: pointer;
 	font: inherit;
 	color: #177245;
-	font-weight: 800;
+	font-weight: 500;
 	text-decoration: underline dotted;
 	text-underline-offset: 3px;
 }
 .glossary-term:hover {
 	color: #115c39;
+}
+
+/* Cincin fokus keyboard yang terlihat (tombol, chip, tautan). */
+.btn:focus-visible,
+.chip:focus-visible,
+.tablink:focus-visible,
+.navlink:focus-visible,
+a:focus-visible {
+	outline: 2px solid #177245;
+	outline-offset: 2px;
+}
+
+/* Garis bawah coretan pensil — signature Ringkas: dipakai pada SATU
+   kata kunci judul halaman utama saja, bukan di mana-mana. */
+.u-pencil {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='8' viewBox='0 0 120 8' preserveAspectRatio='none'%3E%3Cpath d='M2 5 Q 18 2 32 5 T 62 5 T 92 5 T 118 4' fill='none' stroke='%23177245' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: 0 100%;
+	background-size: 100% 0.28em;
+	padding-bottom: 0.12em;
 }
 
 /* Hormati preferensi sistem: kurangi gerakan. */
@@ -336,7 +357,6 @@ label.lbl {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 	}
-	.map-ping,
 	.animate-pulse {
 		animation: none !important;
 	}
@@ -372,7 +392,7 @@ label.lbl {
 [data-theme="dark"] .card {
 	background: #24382d;
 	border-color: #3a5245;
-	box-shadow: 0 2px 12px rgb(0 0 0 / 0.25);
+	box-shadow: none;
 }
 [data-theme="dark"] .btn-primary {
 	background: #1e8a57;
@@ -532,6 +552,9 @@ label.lbl {
 [data-theme="dark"] .text-\[\#9aa096\] {
 	color: #93a89a;
 }
+[data-theme="dark"] .text-\[\#6e675c\] {
+	color: #93a89a;
+}
 [data-theme="dark"] .text-\[\#c9c4b2\],
 [data-theme="dark"] .text-\[\#c9c2ae\] {
 	color: #9fb0a2;
@@ -649,6 +672,7 @@ label.lbl {
 [data-theme="dark"][data-a11y-contrast="1"] .text-\[\#5f6b62\],
 [data-theme="dark"][data-a11y-contrast="1"] .text-\[\#3f4a42\],
 [data-theme="dark"][data-a11y-contrast="1"] .text-\[\#9aa096\],
+[data-theme="dark"][data-a11y-contrast="1"] .text-\[\#6e675c\],
 [data-theme="dark"][data-a11y-contrast="1"] .text-\[\#22302a\] {
 	color: #ffffff;
 }

@@ -82,7 +82,7 @@
 		} catch (e) {
 			enabled = prev;
 			tulisCache(prev);
-			pesanError = e instanceof Error ? e.message : "Gagal menyimpan pengaturan suara.";
+			pesanError = e instanceof Error ? e.message : "Gagal menyimpan pengaturan suara";
 		} finally {
 			menyimpan = false;
 		}
@@ -102,7 +102,7 @@
 		onclick={toggleSuara}
 	>
 		<span class="sound-knob" aria-hidden="true">
-			<Icon name={enabled ? "volume-2" : "volume-x"} size={14} />
+			<Icon name={enabled ? "volume-2" : "volume-x"} size={16} />
 		</span>
 		<span class="sound-state">{enabled ? "Aktif" : "Mati"}</span>
 	</button>
@@ -120,13 +120,13 @@
 	}
 	.sound-toggle-label {
 		font-size: 0.875rem;
-		font-weight: 800;
+		font-weight: 600;
 		color: #22302a;
 	}
 	.sound-switch {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.5rem;
 		min-height: 44px;
 		padding: 0.25rem 0.75rem 0.25rem 0.25rem;
 		border-radius: 999px;
@@ -134,10 +134,10 @@
 		background: #ffffff;
 		color: #5f6b62;
 		font: inherit;
-		font-size: 0.8rem;
-		font-weight: 800;
+		font-size: 0.75rem;
+		font-weight: 600;
 		cursor: pointer;
-		transition: background-color 0.18s ease-out, border-color 0.18s ease-out, color 0.18s ease-out;
+		transition: background-color 0.18s var(--ease-signature), border-color 0.18s var(--ease-signature), color 0.18s var(--ease-signature);
 	}
 	.sound-switch.on {
 		background: #177245;
@@ -169,7 +169,7 @@
 		width: 100%;
 		margin: 0;
 		font-size: 0.75rem;
-		font-weight: 700;
+		font-weight: 600;
 		color: #b91c1c;
 	}
 

@@ -107,11 +107,11 @@
 </script>
 
 <button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke Beranda
+	<Icon name="chevron-left" size={18} /> Kembali ke beranda
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-extrabold">
-	<Icon name="trophy" size={22} /> Tryout Terjadwal
+<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold">
+	<Icon name="trophy" size={18} /> Tryout terjadwal
 </h1>
 <p class="mt-1 text-sm text-[#5f6b62]">
 	Ujian bersama per kelas — soal acak lintas mapel dari bank simulasi. Daftar dulu, kerjakan saat
@@ -125,12 +125,12 @@
 	<button type="button" class="btn btn-primary mt-3" onclick={muat}>Coba lagi</button>
 {:else if tryouts.length === 0}
 	<div class="card mt-4 p-5 text-center">
-		<p class="text-sm font-bold">Belum ada tryout yang dijadwalkan.</p>
-		<p class="mt-1 text-sm text-[#5f6b62]">Cek lagi nanti ya — tryout baru diumumkan di Beranda.</p>
+		<p class="text-sm font-medium">Belum ada tryout yang dijadwalkan.</p>
+		<p class="mt-1 text-sm text-[#5f6b62]">Cek lagi nanti ya — tryout baru diumumkan di beranda.</p>
 	</div>
 {:else}
 	{#each groups as g (g.label)}
-		<h2 class="mt-5 text-base font-extrabold">{g.label}</h2>
+		<h2 class="mt-5 text-base font-semibold">{g.label}</h2>
 		<div class="mt-2 space-y-3">
 			{#each g.items as t (t.id)}
 				<div class="card p-4">
@@ -142,30 +142,30 @@
 									{t.is_free ? "Gratis" : "Pemilik Kelas " + t.grade}
 								</span>
 							</p>
-							<h3 class="mt-1.5 text-base font-extrabold leading-snug">{t.title}</h3>
+							<h3 class="mt-1.5 text-base font-semibold leading-snug">{t.title}</h3>
 							<p class="mt-0.5 text-sm text-[#5f6b62]">Kelas {t.grade}</p>
 						</div>
 						{#if t.submitted}
-							<span class="rounded-lg bg-[#ecfdf5] px-2.5 py-1.5 text-xs font-extrabold text-[#065f46]">
+							<span class="rounded-lg bg-[#ecfdf5] px-2.5 py-1.5 text-xs font-semibold text-[#065f46]">
 								Skormu: {t.my_score} / {t.my_max_score}
 							</span>
 						{/if}
 					</div>
-					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[#3f4a42]">
-						<span class="flex items-center gap-1"><Icon name="calendar" size={14} /> {formatTanggal(t.starts_at)}</span>
-						<span class="flex items-center gap-1"><Icon name="timer" size={14} /> {t.duration_minutes} menit</span>
-						<span class="flex items-center gap-1"><Icon name="file-text" size={14} /> {t.question_count} soal</span>
-						<span class="flex items-center gap-1"><Icon name="users" size={14} /> {t.participants} peserta • {t.submissions} sudah mengerjakan</span>
+					<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-[#3f4a42]">
+						<span class="flex items-center gap-1"><Icon name="calendar" size={16} /> {formatTanggal(t.starts_at)}</span>
+						<span class="tabular-nums flex items-center gap-1"><Icon name="timer" size={16} /> {t.duration_minutes} menit</span>
+						<span class="tabular-nums flex items-center gap-1"><Icon name="file-text" size={16} /> {t.question_count} soal</span>
+						<span class="flex items-center gap-1"><Icon name="users" size={16} /> {t.participants} peserta • {t.submissions} sudah mengerjakan</span>
 					</div>
-					<p class="mt-1.5 text-xs font-bold text-[#177245]"><Icon name="clock" size={13} class="inline-block align-[-2px]" /> {hitungMundur(t)}</p>
+					<p class="mt-1.5 text-xs font-medium text-[#177245]"><Icon name="clock" size={16} class="inline-block align-[-2px]" /> {hitungMundur(t)}</p>
 					<div class="mt-3 flex flex-wrap gap-2">
 						<a href="/tryout/{t.id}" class="btn {t.phase === 'live' ? 'btn-primary' : 'btn-outline'} text-xs">
 							{#if t.phase === "live"}
-								<Icon name="play" size={15} /> {t.registered ? (t.submitted ? "Lihat Hasil & Peringkat" : "Kerjakan Tryout") : "Lihat & Daftar"}
+								<Icon name="play" size={16} /> {t.registered ? (t.submitted ? "Lihat hasil & peringkat" : "Kerjakan Tryout") : "Lihat & daftar"}
 							{:else if t.phase === "upcoming"}
-								<Icon name="calendar" size={15} /> {t.registered ? "Sudah Terdaftar — Lihat Detail" : "Lihat & Daftar"}
+								<Icon name="calendar" size={16} /> {t.registered ? "Sudah terdaftar — lihat detail" : "Lihat & daftar"}
 							{:else}
-								<Icon name="trophy" size={15} /> Lihat Peringkat
+								<Icon name="trophy" size={16} /> Lihat Peringkat
 							{/if}
 						</a>
 						{#if t.phase !== "ended" && !loggedIn}
