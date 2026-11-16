@@ -317,7 +317,33 @@
 							aria-hidden="true"
 						></div>
 					{/if}
-					<div class="relative z-10">
+					{#if i === 1}
+						<!-- Kartu contoh soal: momen produk di slide 2, hanya desktop. -->
+						<div
+							class="datasaver-hide absolute bottom-6 right-6 z-10 hidden w-60 -rotate-2 rounded-xl border border-[#e7e2d2] bg-[#fffdf7] p-3 text-[#22302a] shadow-[0_10px_24px_rgb(0_0_0/0.25)] lg:block"
+							aria-hidden="true"
+						>
+							<p class="text-[11px] font-bold tracking-wide text-[#177245]">Contoh soal</p>
+							<p class="mt-1 text-sm font-semibold">7 × 8 = …</p>
+							<p class="mt-1.5 flex gap-1.5 text-xs font-semibold">
+								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">A. 54</span>
+								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">B. 56</span>
+								<span class="rounded-md border border-[#e7e2d2] px-2 py-1">C. 64</span>
+							</p>
+						</div>
+					{:else if i === 2}
+						<!-- Tumpukan sampul paket di slide 3, hanya desktop. -->
+						<div class="datasaver-hide absolute bottom-6 right-8 z-10 hidden lg:block" aria-hidden="true">
+							<div
+								class="w-44 rotate-2 rounded-xl border border-[#e7e2d2] bg-[#fffdf7] p-3 text-[#22302a] shadow-[0_10px_24px_rgb(0_0_0/0.2)]"
+							>
+								<p class="h-1.5 w-10 rounded-full bg-[#f2b33d]"></p>
+								<p class="mt-2 text-sm font-semibold leading-snug">Paket SAS</p>
+								<p class="text-xs font-medium text-[#5f6b62]">Kelas 1–6 • 25–40 soal</p>
+							</div>
+						</div>
+					{/if}
+					<div class="relative z-10 {i > 0 ? 'lg:pr-64' : ''}">
 						<p class="flex items-center gap-1.5 text-xs font-semibold {i === 2 ? 'text-[#22302a]' : 'text-[#fbeecd]'}">
 							<Icon name={s.icon} size={16} /> {s.kicker}
 						</p>
@@ -377,84 +403,79 @@
 	</div>
 </section>
 
-<!-- Peta belajar -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Peta belajar">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="map" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Peta belajar</h2>
-			<p class="text-sm text-[#5f6b62]">Ikuti jalur bab per kelas — node terbuka saat bab selesai.</p>
+<!-- Peta belajar — section unggulan: pita hijau + kartu kertas bertumpuk + jalur simpul kelas -->
+<section class="home-band home-band-leaf mt-8 lg:mt-10" aria-label="Peta belajar">
+	<p class="home-kicker">Mulai dari sini</p>
+	<h2 class="home-h2 mt-1">Peta belajar</h2>
+	<p class="mt-1 text-sm text-[#5f6b62] lg:text-base">Ikuti jalur bab per kelas — node terbuka saat bab selesai.</p>
+	<div class="card home-stack mt-4 p-4 lg:p-5">
+		<div class="home-path grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-6">
+			{#each [1, 2, 3, 4, 5, 6] as g (g)}
+				{@const gtChip = gradeTheme(g)}
+				<a href="/peta-belajar/k{g}" class="home-path-node flex flex-col items-center gap-1.5 text-center">
+					<span
+						class="flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-bold"
+						style="background: {gtChip.soft}; border-color: {gtChip.accent}; color: {gtChip.text}"
+					>
+						K{g}
+					</span>
+					<span class="text-xs font-semibold text-[#3f4a42]">Kelas {g}</span>
+				</a>
+			{/each}
 		</div>
-	</div>
-	<div class="mt-3 flex flex-wrap gap-2">
-		{#each [1, 2, 3, 4, 5, 6] as g (g)}
-			{@const gtChip = gradeTheme(g)}
-			<a
-				href="/peta-belajar/k{g}"
-				class="chip"
-				style="background: {gtChip.soft}; border-color: {gtChip.accent}; color: {gtChip.text}"
-			>
-				Kelas {g}
-			</a>
-		{/each}
 	</div>
 </section>
 
-<!-- Soal cerita sehari-hari -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Soal cerita sehari-hari">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="message" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Soal cerita sehari-hari</h2>
-			<p class="text-sm text-[#5f6b62]">Soal Matematika dan Bahasa Indonesia dari situasi nyata — belanja di warung, berbagi kue, antrean.</p>
-		</div>
-		<a href="/soal-cerita" class="btn btn-leaf shrink-0">Mulai latihan</a>
-	</div>
-</section>
+<!-- Cara berlatih — grid fitur 2 kolom (1 kolom di HP), ubin Soal cerita lebih lebar -->
+<section class="mt-12 lg:mt-14" aria-label="Cara berlatih">
+	<p class="home-kicker">Fitur belajar</p>
+	<h2 class="home-h2 mt-1">Cara berlatih</h2>
+	<div class="mt-4 grid gap-3 sm:grid-cols-2 lg:gap-4">
+		<!-- Soal cerita sehari-hari -->
+		<section class="card p-4 sm:col-span-2 lg:p-5" aria-label="Soal cerita sehari-hari">
+			<div class="flex items-start gap-3">
+				<span class="home-tint-sun flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="message" size={24} /></span>
+				<div class="min-w-0 flex-1">
+					<h3 class="text-base font-semibold">Soal cerita sehari-hari</h3>
+					<p class="mt-0.5 text-sm text-[#5f6b62]">Soal Matematika dan Bahasa Indonesia dari situasi nyata — belanja di warung, berbagi kue, antrean.</p>
+					<a href="/soal-cerita" class="btn btn-leaf mt-3">Mulai latihan</a>
+				</div>
+			</div>
+		</section>
 
-<!-- Simulasi ANBK Kelas 5 -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="graduation-cap" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Simulasi ANBK Kelas 5</h2>
-			<p class="text-sm text-[#5f6b62]">Latihan Asesmen Nasional: Literasi dan Numerasi, 20 soal tiap paket, 60 menit.</p>
-		</div>
-		<a href="/anbk" class="btn btn-leaf shrink-0">Lihat ANBK</a>
-	</div>
-</section>
+		<!-- Simulasi ANBK Kelas 5 -->
+		<section class="card p-4 lg:p-5" aria-label="Simulasi ANBK Kelas 5">
+			<span class="home-tint-teal flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="graduation-cap" size={24} /></span>
+			<h3 class="mt-3 text-base font-semibold">Simulasi ANBK Kelas 5</h3>
+			<p class="mt-0.5 text-sm text-[#5f6b62]">Latihan Asesmen Nasional: Literasi dan Numerasi, 20 soal tiap paket, 60 menit.</p>
+			<a href="/anbk" class="btn btn-leaf mt-3">Lihat ANBK</a>
+		</section>
 
-<!-- Latihan adaptif -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Latihan adaptif">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="target" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Latihan adaptif</h2>
-			<p class="text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
-		</div>
-		<a href="/latihan-adaptif" class="btn btn-leaf shrink-0">Mulai latihan</a>
-	</div>
-</section>
+		<!-- Latihan adaptif -->
+		<section class="card p-4 lg:p-5" aria-label="Latihan adaptif">
+			<span class="home-tint-blue flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="target" size={24} /></span>
+			<h3 class="mt-3 text-base font-semibold">Latihan adaptif</h3>
+			<p class="mt-0.5 text-sm text-[#5f6b62]">Soal menyesuaikan jawabanmu — benar jadi lebih sulit, salah jadi lebih mudah dulu.</p>
+			<a href="/latihan-adaptif" class="btn btn-leaf mt-3">Mulai latihan</a>
+		</section>
 
-<!-- Latihan tanpa habis -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Latihan tanpa habis">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="refresh" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Latihan tanpa habis</h2>
-			<p class="text-sm text-[#5f6b62]">Soal hitung dengan angka yang selalu baru — tidak pernah habis, kapan pun kamu mau latihan.</p>
-		</div>
-		<a href="/latihan-tanpa-habis" class="btn btn-leaf shrink-0">Mulai latihan</a>
+		<!-- Latihan tanpa habis -->
+		<section class="card p-4 lg:p-5" aria-label="Latihan tanpa habis">
+			<span class="home-tint-orange flex h-11 w-11 items-center justify-center rounded-xl"><Icon name="refresh" size={24} /></span>
+			<h3 class="mt-3 text-base font-semibold">Latihan tanpa habis</h3>
+			<p class="mt-0.5 text-sm text-[#5f6b62]">Soal hitung dengan angka yang selalu baru — tidak pernah habis, kapan pun kamu mau latihan.</p>
+			<a href="/latihan-tanpa-habis" class="btn btn-leaf mt-3">Mulai latihan</a>
+		</section>
 	</div>
 </section>
 
 <!-- Portofolioku (hanya bila login) -->
 {#if $auth.user}
-	<section class="card mt-8 p-4 lg:p-5" aria-label="Portofolioku">
+	<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Portofolioku">
 		<div class="flex items-center gap-3">
-			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="pen" size={24} /></span>
+			<span class="home-tint-sand flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="pen" size={24} /></span>
 			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-semibold">Portofolioku</h2>
+				<h2 class="text-lg font-semibold lg:text-xl">Portofolioku</h2>
 				<p class="text-sm text-[#5f6b62]">Pamerkan karyamu — orang tua dan gurumu bisa memberi bintang dan komentar.</p>
 			</div>
 			<a href="/portofolio" class="btn btn-leaf shrink-0">Lihat karya</a>
@@ -463,11 +484,12 @@
 
 	<!-- Saklar cepat aksesibilitas & hemat data -->
 	{#if homeSettings}
-		<section class="card mt-8 p-4 lg:p-5" aria-label="Aksesibilitas dan Hemat Data">
+		<section class="home-band home-band-sand mt-12" aria-label="Aksesibilitas dan Hemat Data">
+			<div class="card p-4 lg:p-5">
 			<div class="flex items-center gap-3">
-				<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="eye" size={24} /></span>
+				<span class="home-tint-leaf flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="eye" size={24} /></span>
 				<div class="min-w-0 flex-1">
-					<h2 class="text-base font-semibold">Aksesibilitas &amp; hemat data</h2>
+					<h2 class="text-lg font-semibold lg:text-xl">Aksesibilitas &amp; hemat data</h2>
 					<p class="text-sm text-[#5f6b62]">Atur tampilan supaya lebih nyaman dibaca dan lebih ringan.</p>
 				</div>
 				<a href="/akun" class="btn btn-ghost shrink-0 !px-3 !py-1.5 text-xs">Semua pengaturan</a>
@@ -492,21 +514,22 @@
 					<Icon name="zap" size={16} /> Mode hemat data
 				</button>
 			</div>
+			</div>
 		</section>
 	{/if}
 {/if}
 
 <!-- Level & XP mini (hanya bila login) -->
 {#if $auth.user}
-	<section class="card mt-8 p-4 lg:p-5" aria-label="Level dan XP">
+	<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Level dan XP">
 		<div class="flex items-center gap-3">
 			{#if homeXp}
 				<Avatar stage={homeXp.stage} size={48} />
 			{:else}
-				<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="sprout" size={24} /></span>
+				<span class="home-tint-sun flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"><Icon name="sprout" size={24} /></span>
 			{/if}
 			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-semibold">Level &amp; XP</h2>
+				<h2 class="text-lg font-semibold lg:text-xl">Level &amp; XP</h2>
 				{#if homeXp}
 					<p class="text-sm tabular-nums text-[#5f6b62]">Level {homeXp.level} • {homeXp.totalXp} XP • {homeXp.stageName}</p>
 					<div class="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e7e2d2]">
@@ -526,32 +549,35 @@
 	</section>
 {/if}
 
-<!-- Hitung mundur SAS -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Hitung mundur SAS">
-	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="calendar" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Hitung mundur SAS</h2>
-			{#if homeExamFailed}
-				<p class="text-sm text-[#5f6b62]">Tanggal SAS belum bisa dimuat.</p>
-			{:else if homeExam === null}
-				<p class="text-sm text-[#5f6b62]">Memuat tanggal SAS...</p>
-			{:else if homeExamNext}
-				<p class="text-sm text-[#5f6b62]">{homeExamLabel(homeExamNext)}</p>
-			{:else}
-				<p class="text-sm text-[#5f6b62]">Tanggal SAS belum diatur.</p>
-			{/if}
+<!-- Hitung mundur SAS — pita marigold pucat -->
+<section class="home-band home-band-sun mt-12" aria-label="Hitung mundur SAS">
+	<p class="home-kicker">Jangan sampai terlewat</p>
+	<h2 class="home-h2 mt-1">Hitung mundur SAS</h2>
+	<div class="card mt-3 p-4 lg:p-5">
+		<div class="flex items-center gap-3">
+			<span class="home-tint-orange flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="calendar" size={24} /></span>
+			<div class="min-w-0 flex-1">
+				{#if homeExamFailed}
+					<p class="text-sm text-[#5f6b62]">Tanggal SAS belum bisa dimuat.</p>
+				{:else if homeExam === null}
+					<p class="text-sm text-[#5f6b62]">Memuat tanggal SAS...</p>
+				{:else if homeExamNext}
+					<p class="text-sm font-semibold text-[#22302a]">{homeExamLabel(homeExamNext)}</p>
+				{:else}
+					<p class="text-sm text-[#5f6b62]">Tanggal SAS belum diatur.</p>
+				{/if}
+			</div>
+			<a href="/akun" class="btn btn-leaf shrink-0">Detail</a>
 		</div>
-		<a href="/akun" class="btn btn-leaf shrink-0">Detail</a>
 	</div>
 </section>
 
 <!-- Cerita edukasi -->
-<section class="card mt-8 p-4 lg:p-5" aria-label="Cerita edukasi">
+<section class="card home-lift mt-10 p-4 lg:p-5" aria-label="Cerita edukasi">
 	<div class="flex items-center gap-3">
-		<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="book-open" size={24} /></span>
+		<span class="home-tint-teal flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"><Icon name="book-open" size={24} /></span>
 		<div class="min-w-0 flex-1">
-			<h2 class="text-base font-semibold">Cerita edukasi</h2>
+			<h2 class="text-lg font-semibold lg:text-xl">Cerita edukasi</h2>
 			<p class="text-sm text-[#5f6b62]">Baca cerita pendek, lalu jawab kuis pemahamannya dan kumpulkan XP.</p>
 		</div>
 		<a href="/cerita" class="btn btn-leaf shrink-0">Baca cerita</a>
@@ -560,16 +586,16 @@
 
 <!-- Tryout mendatang -->
 {#if tryoutBerikut.length > 0}
-	<section class="card mt-8 p-4 lg:p-5" aria-label="Tryout mendatang">
-		<div class="flex items-center gap-3">
-			<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="trophy" size={24} /></span>
-			<div class="min-w-0 flex-1">
-				<h2 class="text-base font-semibold">Tryout mendatang</h2>
-				<p class="text-sm text-[#5f6b62]">Ujian bersama per kelas — daftar, kerjakan saat waktunya tiba, dan lihat peringkatmu.</p>
+	<section class="mt-12" aria-label="Tryout mendatang">
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0">
+				<p class="home-kicker">Ujian bersama</p>
+				<h2 class="home-h2 mt-1">Tryout mendatang</h2>
+				<p class="mt-1 text-sm text-[#5f6b62]">Ujian bersama per kelas — daftar, kerjakan saat waktunya tiba, dan lihat peringkatmu.</p>
 			</div>
-			<a href="/tryout" class="btn btn-outline shrink-0 text-xs">Semua tryout</a>
+			<a href="/tryout" class="btn btn-outline mt-1 shrink-0 text-xs">Semua tryout</a>
 		</div>
-		<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+		<div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 			{#each tryoutBerikut as t (t.id)}
 				<a href="/tryout/{t.id}" class="card !rounded-lg p-3">
 					<p class="flex flex-wrap items-center gap-1.5">
@@ -591,8 +617,12 @@
 	</section>
 {/if}
 
-<!-- Chip jenjang -->
-<div class="mt-8 flex gap-2 overflow-x-auto pb-1 lg:mt-8">
+<!-- Katalog — judul section + chip jenjang -->
+<div class="mt-12 lg:mt-14">
+	<p class="home-kicker">Katalog</p>
+	<h2 class="home-h2 mt-1">Materi dan paket SAS</h2>
+</div>
+<div class="mt-4 flex gap-2 overflow-x-auto pb-1">
 	{#each jenjangList as j (j)}
 		<button type="button" class="chip" class:active={jenjang === j} onclick={() => (jenjang = j)}>
 			{#if j === "Semua"}
@@ -615,7 +645,7 @@
 		{#each shown as p (p.id)}
 			{@const gt = gradeTheme(gradeOfProduct(p.id))}
 			<div
-				class="card cursor-pointer overflow-hidden"
+				class="card home-product cursor-pointer overflow-hidden"
 				onclick={() => buka(p.id)}
 				onkeydown={(e) => e.key === "Enter" && buka(p.id)}
 				role="button"
@@ -623,7 +653,7 @@
 			>
 				<div class="h-1.5 shrink-0" style="background: {gt.accent}" aria-hidden="true"></div>
 				<div
-					class="flex h-24 items-center justify-center px-3 text-center text-sm font-semibold text-white lg:h-36 lg:text-base"
+					class="flex h-24 items-center justify-center px-3 text-center text-sm font-semibold text-white shadow-[inset_0_-12px_20px_-12px_rgb(0_0_0/0.35)] lg:h-36 lg:text-base"
 					style="background: {p.cover_color}"
 				>
 					<span class="leading-tight">{p.cover_label}</span>

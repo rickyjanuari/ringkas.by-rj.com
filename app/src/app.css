@@ -697,3 +697,234 @@ a:focus-visible {
 	color: #3f4a42;
 }
 
+/* --- Homepage: ritme & kedalaman kertas (redesign 2026-11-16) --- */
+/* Pita latar bertinta: latar section bergantian (hijau pucat / pasir
+   hangat / marigold pucat, dari palet yang sudah ada) supaya tiap
+   section terlihat beda dari tetangganya. Pita membentang sampai tepi
+   kolom utama (margin negatif = padding <main>). */
+.home-band {
+	margin-inline: -1rem;
+	padding: 1.25rem 1rem;
+}
+@media (min-width: 1024px) {
+	.home-band {
+		margin-inline: -2rem;
+		padding: 1.75rem 2rem;
+	}
+}
+.home-band-leaf {
+	background: #e6f2ea;
+}
+.home-band-sand {
+	background: #f1ecdd;
+}
+.home-band-sun {
+	background: #fdf0cd;
+}
+
+/* Hierarki judul section: kicker kecil + judul Lora yang jelas lebih
+   besar dari judul kartu (judul kartu tetap text-base). */
+.home-kicker {
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: #177245;
+}
+.home-h2 {
+	font-size: 1.25rem;
+	line-height: 1.3;
+	font-weight: 600;
+	color: #22302a;
+}
+@media (min-width: 1024px) {
+	.home-h2 {
+		font-size: 1.5rem;
+	}
+}
+
+/* Kertas bertumpuk: dua lembar mengintip di belakang kartu unggulan
+   (fisik, cocok dengan dunia buku tulis). Bayangan tetap netral. */
+.home-stack {
+	position: relative;
+	z-index: 0;
+	box-shadow:
+		0 12px 28px rgb(34 48 42 / 0.14),
+		0 2px 6px rgb(34 48 42 / 0.08);
+}
+.home-stack::before,
+.home-stack::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: 1rem;
+	background: #fffdf7;
+	border: 1px solid #e7e2d2;
+	z-index: -1;
+}
+.home-stack::before {
+	transform: rotate(-1.4deg) translate(2px, 5px);
+}
+.home-stack::after {
+	transform: rotate(1deg) translate(-2px, 9px);
+}
+
+/* Kartu terangkat (Portofolio, Level & XP): bayangan netral lebih kuat. */
+.home-lift {
+	box-shadow:
+		0 10px 24px rgb(34 48 42 / 0.12),
+		0 2px 6px rgb(34 48 42 / 0.08);
+}
+
+/* Jalur Peta Belajar: garis putus-putus di belakang simpul kelas
+   (hanya sm ke atas, saat simpul sebaris); di HP simpul membungkus. */
+.home-path {
+	position: relative;
+}
+@media (min-width: 640px) {
+	.home-path::before {
+		content: "";
+		position: absolute;
+		left: 2rem;
+		right: 2rem;
+		top: 1.375rem;
+		border-top: 2px dashed #9db8a6;
+	}
+}
+.home-path-node {
+	position: relative;
+	z-index: 1;
+}
+
+/* Ubin ikon per fitur: tint masing-masing fitur, bukan semuanya beige. */
+.home-tint-leaf {
+	background: #dcefe2;
+	color: #0f5132;
+}
+.home-tint-sun {
+	background: #fdf0cd;
+	color: #7c4a03;
+}
+.home-tint-teal {
+	background: #d7efec;
+	color: #0b4f4a;
+}
+.home-tint-blue {
+	background: #d9eaf2;
+	color: #134a5e;
+}
+.home-tint-orange {
+	background: #fdeeda;
+	color: #92400e;
+}
+.home-tint-sand {
+	background: #efead9;
+	color: #5f6b62;
+}
+
+/* Kartu produk: bayangan lembut + "lembar kedua" mengintip di
+   kanan-bawah (solid offset shadow, bukan gradien). */
+.home-product {
+	box-shadow:
+		0 1px 2px rgb(34 48 42 / 0.06),
+		5px 5px 0 #efe9d8,
+		5px 5px 0 1px #e0d9c2,
+		0 10px 22px rgb(34 48 42 / 0.12);
+	transition:
+		transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.home-product:hover {
+	transform: translateY(-2px);
+}
+
+/* --- Homepage: mode gelap --- */
+[data-theme="dark"] .home-band-leaf {
+	background: #1e3a2c;
+}
+[data-theme="dark"] .home-band-sand {
+	background: #262b22;
+}
+[data-theme="dark"] .home-band-sun {
+	background: #3d2f16;
+}
+[data-theme="dark"] .home-kicker {
+	color: #4ade80;
+}
+[data-theme="dark"] .home-h2 {
+	color: #f3efe4;
+}
+[data-theme="dark"] .home-stack {
+	box-shadow: 0 12px 28px rgb(0 0 0 / 0.35);
+}
+[data-theme="dark"] .home-stack::before,
+[data-theme="dark"] .home-stack::after {
+	background: #24382d;
+	border-color: #3a5245;
+}
+[data-theme="dark"] .home-lift {
+	box-shadow:
+		0 10px 24px rgb(0 0 0 / 0.35),
+		0 2px 6px rgb(0 0 0 / 0.3);
+}
+[data-theme="dark"] .home-path::before {
+	border-color: #4a5f52;
+}
+[data-theme="dark"] .home-tint-leaf {
+	background: #2c4a38;
+	color: #6ee7b7;
+}
+[data-theme="dark"] .home-tint-sun {
+	background: #3d2f16;
+	color: #fcd34d;
+}
+[data-theme="dark"] .home-tint-teal {
+	background: #1f3d3a;
+	color: #5eead4;
+}
+[data-theme="dark"] .home-tint-blue {
+	background: #1e3a4a;
+	color: #7dd3fc;
+}
+[data-theme="dark"] .home-tint-orange {
+	background: #3d2a12;
+	color: #fdba74;
+}
+[data-theme="dark"] .home-tint-sand {
+	background: #33483b;
+	color: #d3d8cc;
+}
+[data-theme="dark"] .home-product {
+	box-shadow:
+		0 1px 2px rgb(0 0 0 / 0.3),
+		5px 5px 0 #1e2b23,
+		5px 5px 0 1px #33483b,
+		0 10px 22px rgb(0 0 0 / 0.35);
+}
+
+/* --- Homepage: kontras tinggi (lembar tumpukan disembunyikan,
+   pita jadi permukaan polos bergaris) --- */
+[data-a11y-contrast="1"] .home-band {
+	background: #ffffff;
+	border-block: 1px solid rgb(0 0 0 / 0.25);
+}
+[data-a11y-contrast="1"] .home-stack::before,
+[data-a11y-contrast="1"] .home-stack::after {
+	display: none;
+}
+[data-a11y-contrast="1"] .home-product {
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+}
+[data-theme="dark"][data-a11y-contrast="1"] .home-band {
+	background: #14231a;
+	border-color: rgb(255 255 255 / 0.35);
+}
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-leaf,
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-sun,
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-teal,
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-blue,
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-orange,
+[data-theme="dark"][data-a11y-contrast="1"] .home-tint-sand {
+	background: #14231a;
+	color: #ffffff;
+}
+
