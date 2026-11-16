@@ -394,6 +394,10 @@ a:focus-visible {
 	border-color: #3a5245;
 	box-shadow: none;
 }
+/* Hero slide 1: foto terang/hangat sedikit diredupkan di mode gelap. */
+[data-theme="dark"] .hero-scene {
+	filter: brightness(0.85);
+}
 [data-theme="dark"] .btn-primary {
 	background: #1e8a57;
 }

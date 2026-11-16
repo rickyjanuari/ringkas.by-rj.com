@@ -298,13 +298,33 @@
 			style="transform: translateX(-{slideIdx * 100}%)"
 		>
 			{#each slides as s, i (s.title)}
-				<div class="w-full shrink-0 px-5 py-6 lg:px-10 lg:py-10 {i === 2 ? 'text-[#22302a]' : 'text-white'}" style="background: {s.bg}">
-					<p class="flex items-center gap-1.5 text-xs font-semibold {i === 2 ? 'text-[#22302a]' : 'text-[#fbeecd]'}">
-						<Icon name={s.icon} size={16} /> {s.kicker}
-					</p>
-					<h1 class="mt-1 text-2xl font-semibold leading-snug lg:text-4xl">{#if i === 0}Rangkuman <span class="u-pencil">materi</span> SD kelas 1–6{:else}{s.title}{/if}</h1>
-					<p class="mt-1 max-w-2xl text-sm lg:text-base {i === 2 ? 'text-[#22302a]/80' : 'text-white/90'}">{i === 2 && promoText ? promoText : s.text}</p>
-					<a href={s.href} class="btn {i === 2 ? 'btn-primary' : 'btn-sun'} mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
+				<div class="relative w-full shrink-0 px-5 py-6 lg:px-10 lg:py-10 {i === 2 ? 'text-[#22302a]' : 'text-white'}" style="background: {s.bg}">
+					{#if i === 0}
+						<!-- Scene hero (unslop pass 8): foto memenuhi slide, headline duduk di ruang kosong atas yang tenang. -->
+						<img
+							src="/hero-scene.webp"
+							alt="Buku tulis anak yang terbuka di atas meja kayu dalam cahaya pagi, dengan pulpen tinta hijau, stabilo kuning, dan pot kecil berisi tunas"
+							width="2048"
+							height="1152"
+							fetchpriority="high"
+							class="hero-scene absolute inset-0 h-full w-full object-cover"
+							style="mask-image: linear-gradient(180deg, #000 86%, transparent 100%)"
+						/>
+						<!-- Scrim tipis di belakang blok teks saja, menghilang ke bawah supaya foto tetap hidup. -->
+						<div
+							class="pointer-events-none absolute inset-0"
+							style="background: linear-gradient(180deg, rgba(8, 26, 18, 0.45) 0%, rgba(8, 26, 18, 0.18) 45%, rgba(8, 26, 18, 0) 65%)"
+							aria-hidden="true"
+						></div>
+					{/if}
+					<div class="relative z-10">
+						<p class="flex items-center gap-1.5 text-xs font-semibold {i === 2 ? 'text-[#22302a]' : 'text-[#fbeecd]'}">
+							<Icon name={s.icon} size={16} /> {s.kicker}
+						</p>
+						<h1 class="mt-1 text-2xl font-semibold leading-snug lg:text-4xl">{#if i === 0}Rangkuman <span class="u-pencil">materi</span> SD kelas 1–6{:else}{s.title}{/if}</h1>
+						<p class="mt-1 max-w-2xl text-sm lg:text-base {i === 2 ? 'text-[#22302a]/80' : 'text-white/90'}">{i === 2 && promoText ? promoText : s.text}</p>
+						<a href={s.href} class="btn {i === 2 ? 'btn-primary' : 'btn-sun'} mt-4"><Icon name={s.ctaIcon} size={16} /> {s.cta}</a>
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -330,7 +350,7 @@
 		>
 			<Icon name="chevron-right" size={18} />
 		</button>
-		<div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
+		<div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5 {slideIdx === 0 ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]' : ''}">
 			{#each slides as _, i (i)}
 				<button
 					type="button"
