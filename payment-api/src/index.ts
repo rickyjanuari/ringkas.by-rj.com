@@ -7,6 +7,8 @@ type Bindings = {
   PAYMENT_ENVIRONMENT: "live" | "sandbox";
   SUMOPOD_API_KEY: string;
   SUMOPOD_WEBHOOK_SECRET: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
 };
 
 type AppKey = { application_id: string; allowed_origins: string[] };
@@ -174,6 +176,7 @@ app.post("/v1/webhooks/sumopod", async (c) => {
   } catch (error) {
     await db.query("rollback");
     console.error("sumopod webhook processing failed", error);
+    await sendTelegram(c.env, `⚠️ Payment webhook gagal diproses (${c.env.PAYMENT_ENVIRONMENT}). Periksa log API payment.`);
     return c.json({ error: "Webhook processing failed" }, 500);
   } finally {
     await db.end();
@@ -256,6 +259,65 @@ async function connect(env: Bindings) {
   return client;
 }
 
+async function monitorPayments(env: Bindings) {
+  const db = await connect(env);
+  try {
+    const result = await db.query<{ stale_pending: string; failed_webhooks: string }>(
+      `select
+         count(*) filter (where status = 'pending' and created_at < now() - interval '30 minutes') as stale_pending,
+         (select count(*) from core.payment_events
+          where processing_status = 'failed' and received_at > now() - interval '24 hours') as failed_webhooks
+       from core.payment_orders
+       where environment = $1`,
+      [env.PAYMENT_ENVIRONMENT],
+    );
+    const { stale_pending, failed_webhooks } = result.rows[0];
+    const fingerprint = `${stale_pending}:${failed_webhooks}`;
+    const previous = await db.query<{ last_fingerprint: string | null; last_alert_at: string | null }>(
+      "select last_fingerprint, last_alert_at from core.payment_monitor_state where environment = $1",
+      [env.PAYMENT_ENVIRONMENT],
+    );
+    const last = previous.rows[0];
+    const shouldAlert = (Number(stale_pending) || Number(failed_webhooks))
+      && (!last || last.last_fingerprint !== fingerprint || !last.last_alert_at
+        || Date.now() - new Date(last.last_alert_at).getTime() >= 6 * 60 * 60 * 1000);
+    if (shouldAlert) {
+      await sendTelegram(
+        env,
+        `⚠️ Payment monitor ${env.PAYMENT_ENVIRONMENT}\nPending >30m: ${stale_pending}\nWebhook gagal (24 jam): ${failed_webhooks}`,
+      );
+    }
+    await db.query(
+      `insert into core.payment_monitor_state (environment, last_fingerprint, last_alert_at, updated_at)
+       values ($1, $2, case when $3 then now() else null end, now())
+       on conflict (environment) do update set
+         last_fingerprint = excluded.last_fingerprint,
+         last_alert_at = case when $3 then now() else core.payment_monitor_state.last_alert_at end,
+         updated_at = now()`,
+      [env.PAYMENT_ENVIRONMENT, fingerprint, shouldAlert],
+    );
+  } catch (error) {
+    console.error("payment monitoring failed", error);
+    await sendTelegram(env, `⚠️ Payment monitor gagal berjalan (${env.PAYMENT_ENVIRONMENT}). Periksa log API payment.`);
+  } finally {
+    await db.end();
+  }
+}
+
+async function sendTelegram(env: Bindings, text: string) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }),
+    });
+    if (!response.ok) console.error("telegram alert failed", response.status);
+  } catch (error) {
+    console.error("telegram alert failed", error);
+  }
+}
+
 async function sha256(value: string) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
@@ -321,4 +383,9 @@ function toResponse(order: PaymentOrder) {
   };
 }
 
-export default app;
+export default {
+  fetch: app.fetch,
+  scheduled(_event: unknown, env: Bindings, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+    ctx.waitUntil(monitorPayments(env));
+  },
+};

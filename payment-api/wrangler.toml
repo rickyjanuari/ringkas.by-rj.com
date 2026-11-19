@@ -15,6 +15,9 @@ id = "154202a24b4b4e8f813a3cb25f029bed"
 SUMOPOD_API_URL = "https://api-pay.sumopod.com"
 PAYMENT_ENVIRONMENT = "live"
 
+[triggers]
+crons = ["*/15 * * * *"]
+
 # Secrets are deliberately absent from this file. Set all of these with
 # `wrangler secret put` before deployment:
 #   SUMOPOD_API_KEY

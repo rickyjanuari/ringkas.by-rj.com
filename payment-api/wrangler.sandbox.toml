@@ -14,6 +14,9 @@ id = "154202a24b4b4e8f813a3cb25f029bed"
 SUMOPOD_API_URL = "https://api-pay-sandbox.sumopod.com"
 PAYMENT_ENVIRONMENT = "sandbox"
 
+[triggers]
+crons = ["*/15 * * * *"]
+
 # Sandbox credentials are separate Cloudflare Worker secrets:
 #   SUMOPOD_API_KEY
 #   SUMOPOD_WEBHOOK_SECRET
