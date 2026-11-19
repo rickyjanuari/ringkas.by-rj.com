@@ -2737,6 +2737,19 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       if (p.active !== 1) return c.json({ error: `Produk ${p.title} sedang tidak aktif.` }, 400);
       products.push(p);
     }
+    // Backend adalah pengaman utama: UI bisa usang, keranjang bisa tersisa
+    // di localStorage, atau endpoint bisa dipanggil langsung. Produk yang
+    // sudah dimiliki akun ini tidak boleh ditagihkan kembali.
+    const alreadyOwned = await Promise.all(
+      products.map(async (product) => (await userHasPaidProduct(db, user.id, product.id)) ? product.title : null)
+    );
+    const ownedTitles = alreadyOwned.filter((title): title is string => title !== null);
+    if (ownedTitles.length) {
+      return c.json(
+        { error: `Produk sudah dimiliki: ${ownedTitles.join(", ")}. Buka dari Ruang Belajar.` },
+        409
+      );
+    }
     const total = products.reduce((sum, p) => sum + p.price, 0);
     const itemsKey = [...items].sort().join(",");
 

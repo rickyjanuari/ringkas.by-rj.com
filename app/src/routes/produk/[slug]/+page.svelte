@@ -102,14 +102,14 @@
 	});
 
 	function tambahKeranjang() {
-		if (!product) return;
+		if (!product || owned) return;
 		cart.add(product.id);
 		addedMsg = "Ditambahkan ke keranjang";
 		setTimeout(() => (addedMsg = ""), 2000);
 	}
 
 	function beliSekarang() {
-		if (!product) return;
+		if (!product || owned) return;
 		cart.add(product.id);
 		goto("/checkout");
 	}
@@ -353,12 +353,18 @@
 	<div
 		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[560px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)]"
 	>
-		<button type="button" class="btn btn-outline flex-1" onclick={tambahKeranjang}>
-			<Icon name="shopping-cart" size={16} /> Tambah ke keranjang
-		</button>
-		<button type="button" class="btn btn-primary flex-1" onclick={beliSekarang}>
-			<Icon name="zap" size={16} /> Beli sekarang
-		</button>
+		{#if owned}
+			<a href={`/belajar/${product.id}`} class="btn btn-leaf w-full">
+				<Icon name="book-open" size={16} /> Buka ruang belajar
+			</a>
+		{:else}
+			<button type="button" class="btn btn-outline flex-1" onclick={tambahKeranjang}>
+				<Icon name="shopping-cart" size={16} /> Tambah ke keranjang
+			</button>
+			<button type="button" class="btn btn-primary flex-1" onclick={beliSekarang}>
+				<Icon name="zap" size={16} /> Beli sekarang
+			</button>
+		{/if}
 	</div>
 	<div class="h-16"></div>
 {/if}
