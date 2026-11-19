@@ -16,6 +16,10 @@ export interface AppEnv {
   klikqrisApiKey: string;
   klikqrisMerchantId: string;
   klikqrisWebhookSecret: string;
+  /** Endpoint API payment pusat, hanya dipakai backend (bukan browser). */
+  paymentApiUrl: string;
+  /** API key khusus aplikasi untuk api.by-rj.com (secret Worker). */
+  paymentApiKey: string;
   resendApiKey: string;
   resendFrom: string;
   /** URL dasar situs, dipakai untuk tautan di email (bukan secret). */
@@ -47,6 +51,8 @@ function fromProcessEnv(): AppEnv {
     klikqrisApiKey: p.KLIKQRIS_API_KEY ?? "",
     klikqrisMerchantId: p.KLIKQRIS_MERCHANT_ID ?? "",
     klikqrisWebhookSecret: p.KLIKQRIS_WEBHOOK_SECRET ?? "",
+    paymentApiUrl: p.PAYMENT_API_URL ?? "",
+    paymentApiKey: p.PAYMENT_API_KEY ?? "",
     resendApiKey: p.RESEND_API_KEY ?? "",
     resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: p.APP_URL ?? "https://ringkas.by-rj.com",

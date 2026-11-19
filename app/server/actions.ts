@@ -28,7 +28,8 @@ import {
 } from "./totp.js";
 import QRCode from "qrcode";
 import type { ImageStorage } from "./storage.js";
-import { createQris, checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
+import { checkQrisStatus, verifyWebhookSignature } from "./klikqris.js";
+import { createCentralPayment, getCentralPayment, centralPaymentStatus } from "./payment-api.js";
 import { certificatePdf, receiptPdf, worksheetPdf, productPdf } from "./pdf.js";
 import {
   appUrl,
@@ -2849,15 +2850,45 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
 
     const orderId = `RM-${randomAlphaNum(12)}`;
     const orderItems = await expandBundleItems(db, products);
-    let qris;
+    let qris: {
+      qris_url: string | null;
+      direct_url: string | null;
+      total_amount: number | null;
+      expired_at: string | null;
+    };
+    // Kolom klikqris_order_id dipertahankan sebagai referensi payment
+    // provider demi kompatibilitas skema lama. Untuk API pusat, nilainya
+    // adalah payment_id dari api.by-rj.com, bukan order ID KlikQRIS.
+    let paymentReference = orderId;
     try {
-      qris = await createQris(orderId, chargeTotal, `Ringkas ${orderId}`);
+      const env = getEnv();
+      if (!env.paymentApiUrl || !env.paymentApiKey) {
+        throw new Error("Payment API belum dikonfigurasi");
+      }
+      const central = await createCentralPayment({
+        orderId,
+        amount: chargeTotal,
+        idempotencyKey: idempotencyKey ?? `auto-${orderId}`,
+        successReturnUrl: `${env.appUrl}/sukses?order=${encodeURIComponent(orderId)}`,
+        cancelReturnUrl: `${env.appUrl}/checkout?order=${encodeURIComponent(orderId)}`,
+        customerEmail: user.email,
+        customerName: user.name,
+        metadata: { source: "ringkas", user_id: user.id }
+      });
+      if (!central.payment_link_url) throw new Error("Payment API tidak mengembalikan tautan bayar.");
+      paymentReference = central.payment_id;
+      qris = {
+        qris_url: null,
+        direct_url: central.payment_link_url,
+        total_amount: central.amount,
+        expired_at: central.expires_at
+      };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("belum dikonfigurasi")) {
-        return c.json({ error: "KlikQRIS belum dikonfigurasi. Pembayaran belum bisa diproses." }, 503);
+        return c.json({ error: "Payment gateway belum dikonfigurasi. Pembayaran belum bisa diproses." }, 503);
       }
-      console.error("[checkout] createQris gagal:", err);
+      console.error("[checkout] pembuatan payment gagal:", err);
       return c.json({ error: "Pembayaran QRIS gagal dibuat, silakan coba lagi." }, 503);
     }
     await db.run(
@@ -2867,7 +2898,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       user.id,
       JSON.stringify(orderItems),
       finalTotal,
-      orderId,
+      paymentReference,
       qris.qris_url,
       qris.direct_url,
       qris.total_amount,
@@ -2922,7 +2953,21 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const order = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", c.req.param("order_id"));
     if (!order) return c.json({ error: "Order tidak ditemukan." }, 404);
     if (order.user_id !== user.id) return c.json({ error: "Order ini bukan milikmu." }, 403);
-    if (order.status === "PENDING" && getEnv().klikqrisApiKey && getEnv().klikqrisMerchantId) {
+    const env = getEnv();
+    const isCentralPayment = Boolean(order.klikqris_order_id && order.klikqris_order_id !== order.id);
+    if (order.status === "PENDING" && isCentralPayment && env.paymentApiUrl && env.paymentApiKey && order.klikqris_order_id) {
+      try {
+        const payment = await getCentralPayment(order.klikqris_order_id);
+        const status = centralPaymentStatus(payment.status);
+        if (status === "PAID") {
+          await db.run("UPDATE orders SET status = 'PAID', paid_at = ? WHERE id = ?", payment.paid_at ?? nowIso(), order.id);
+        } else if (status === "EXPIRED") {
+          await db.run("UPDATE orders SET status = 'EXPIRED' WHERE id = ?", order.id);
+        }
+      } catch (err) {
+        console.error("[payment/status] Payment API gagal:", err);
+      }
+    } else if (order.status === "PENDING" && env.klikqrisApiKey && env.klikqrisMerchantId) {
       try {
         const status = await checkQrisStatus(order.klikqris_order_id ?? order.id);
         if (status === "PAID" || status === "SUCCESS") {

@@ -30,6 +30,8 @@ export interface Env {
   KLIKQRIS_API_KEY?: string;
   KLIKQRIS_MERCHANT_ID?: string;
   KLIKQRIS_WEBHOOK_SECRET?: string;
+  PAYMENT_API_URL?: string;
+  PAYMENT_API_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM?: string;
   APP_URL?: string;
@@ -54,6 +56,8 @@ function initEnv(env: Env): void {
     klikqrisApiKey: env.KLIKQRIS_API_KEY ?? "",
     klikqrisMerchantId: env.KLIKQRIS_MERCHANT_ID ?? "",
     klikqrisWebhookSecret: env.KLIKQRIS_WEBHOOK_SECRET ?? "",
+    paymentApiUrl: env.PAYMENT_API_URL ?? "",
+    paymentApiKey: env.PAYMENT_API_KEY ?? "",
     resendApiKey: env.RESEND_API_KEY ?? "",
     resendFrom: env.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: env.APP_URL ?? "https://ringkas.by-rj.com",

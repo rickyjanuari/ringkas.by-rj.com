@@ -1,0 +1,35 @@
+name = "ringkas-sandbox"
+main = "server/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "sandbox.ringkas.by-rj.com", custom_domain = true },
+  { pattern = "sandbox-ringkas.by-rj.com", custom_domain = true }
+]
+
+[assets]
+directory = "./build"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ringkas-sandbox-db"
+database_id = "e4160835-c06f-44a4-b3c8-b7c1eb0c3789"
+migrations_dir = "server/migrations"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "ringkas-sandbox-images"
+
+[vars]
+APP_URL = "https://sandbox-ringkas.by-rj.com"
+PAYMENT_API_URL = "https://api-sandbox.by-rj.com"
+RESEND_FROM = ""
+TURNSTILE_SITE_KEY = ""
+
+# Secrets are configured on this Worker only:
+#   SESSION_SECRET
+#   PAYMENT_API_KEY

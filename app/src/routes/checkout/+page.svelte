@@ -36,10 +36,8 @@
 	let order = $state<OrderGift | null>(null);
 	let createError = $state("");
 	let statusMsg = $state("");
-	// Sumber gambar QR: hanya dipakai bila benar-benar berupa gambar
-	// (data URI atau URL berekstensi gambar). Bila gambar gagal dimuat,
-	// tampilkan pemberitahuan + tombol lanjut bayar, jangan biarkan
-	// area QR kosong — dan jangan pernah menampilkan URL/payload mentah.
+	// Order lama KlikQRIS dapat membawa gambar QR. Order baru SumoPod
+	// menggunakan hosted payment page, sehingga hanya membawa direct_url.
 	let qrFailedFor = $state<string | null>(null);
 	let qrSrc = $derived(order?.qris_url && isImageUrl(order.qris_url) ? order.qris_url : null);
 	let showQr = $derived(qrSrc !== null && qrFailedFor !== order?.id);
@@ -253,7 +251,7 @@
 			</p>
 			<a href="/keranjang" class="btn btn-primary mt-4 w-full">Kembali ke keranjang</a>
 		{:else}
-			<p class="text-lg font-semibold">Scan QRIS untuk membayar</p>
+			<p class="text-lg font-semibold">{showQr ? "Scan QRIS untuk membayar" : "Selesaikan pembayaran QRIS"}</p>
 			<p class="mt-1 text-sm text-[#5f6b62]">Nomor order: <b class="font-semibold">{order.id}</b></p>
 			{#key order.id}
 				{#if showQr}
@@ -263,20 +261,22 @@
 						onerror={() => (qrFailedFor = order?.id ?? null)}
 						class="mx-auto mt-4 h-60 w-60 rounded-2xl border border-[#e7e2d2] bg-white object-contain"
 					/>
+				{:else if order.direct_url}
+					<div class="mx-auto mt-4 max-w-sm rounded-2xl border border-[#d7eadc] bg-[#f1faf4] p-4 text-left">
+						<p class="text-sm font-semibold text-[#14532d]">Bayar di halaman QRIS aman</p>
+						<p class="mt-1 text-sm text-[#3f4a42]">
+							Tekan tombol di bawah. Kode QRIS dan pilihan pembayaran akan tampil di halaman SumoPod.
+						</p>
+						<ol class="mt-3 list-decimal space-y-1 pl-5 text-xs text-[#5f6b62]">
+							<li>Buka halaman pembayaran.</li>
+							<li>Scan QRIS dan selesaikan pembayaran.</li>
+							<li>Kembali ke sini untuk cek status.</li>
+						</ol>
+					</div>
 				{:else}
 					<div class="mx-auto mt-4 max-w-sm rounded-2xl border border-[#e7e2d2] bg-[#f7f5ef] p-4 text-left">
-						<p class="text-sm font-semibold">Kode QR tidak tampil</p>
-						{#if order.direct_url}
-							<p class="mt-1 text-sm text-[#5f6b62]">
-								Lanjutkan pembayaran lewat tombol "Lanjutkan bayar" di bawah — kode QR-nya ada di
-								halaman pembayaran.
-							</p>
-						{:else}
-							<p class="mt-1 text-sm text-[#5f6b62]">
-								Silakan buat pembayaran baru dari keranjang untuk mendapatkan kode QR yang baru.
-							</p>
-							<a href="/keranjang" class="btn btn-primary mt-3 w-full">Kembali ke keranjang</a>
-						{/if}
+						<p class="text-sm font-semibold">Tautan pembayaran tidak tersedia</p>
+						<a href="/keranjang" class="btn btn-primary mt-3 w-full">Kembali ke keranjang</a>
 					</div>
 				{/if}
 			{/key}
@@ -315,9 +315,9 @@
 					href={order.direct_url}
 					target="_blank"
 					rel="noopener noreferrer"
-					class="btn btn-outline btn-block mt-4"
+					class="btn btn-primary btn-block mt-4"
 				>
-					<Icon name="link" size={16} /> Lanjutkan bayar (buka pembayaran)
+					<Icon name="link" size={16} /> Bayar dengan QRIS
 				</a>
 			{/if}
 			<button
@@ -326,7 +326,7 @@
 				disabled={checking}
 				onclick={cekStatus}
 			>
-				{#if checking}Memeriksa...{:else}<Icon name="refresh" size={16} /> Cek status pembayaran{/if}
+				{#if checking}Memeriksa...{:else}<Icon name="refresh" size={16} /> Saya sudah bayar, cek status{/if}
 			</button>
 			{#if statusMsg}
 				<p class="ok-msg mt-3 text-left">{statusMsg}</p>

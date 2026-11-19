@@ -53,6 +53,8 @@ migrations_dir = "server/migrations"
 RESEND_FROM = "halo@ringkas.by-rj.com"
 # Bukan secret — URL dasar situs, dipakai untuk tautan di email otomatis.
 APP_URL = "https://ringkas.by-rj.com"
+# API payment pusat; key aplikasinya disimpan sebagai secret PAYMENT_API_KEY.
+PAYMENT_API_URL = "https://api.by-rj.com"
 # Bukan secret (site key publik) — diisi pemilik dari dashboard Cloudflare
 # Turnstile. Bila kosong, widget Turnstile tidak tampil dan verifikasi
 # dilewati (lihat src/routes/akun/+page.svelte). Secret pasangannya
