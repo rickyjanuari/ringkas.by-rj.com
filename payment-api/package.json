@@ -1,0 +1,21 @@
+{
+  "name": "by-rj-payment-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:dry": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "hono": "4.13.19",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "typescript": "5.7.3",
+    "wrangler": "4.162.0"
+  }
+}

@@ -1,0 +1,21 @@
+name = "by-rj-payment-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-18"
+compatibility_flags = ["nodejs_compat"]
+routes = [
+  { pattern = "api.by-rj.com", custom_domain = true }
+]
+
+# Cloudflare Hyperdrive configuration for the private Supabase connection.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "154202a24b4b4e8f813a3cb25f029bed"
+
+[vars]
+SUMOPOD_API_URL = "https://api-pay.sumopod.com"
+PAYMENT_ENVIRONMENT = "live"
+
+# Secrets are deliberately absent from this file. Set all of these with
+# `wrangler secret put` before deployment:
+#   SUMOPOD_API_KEY
+#   SUMOPOD_WEBHOOK_SECRET

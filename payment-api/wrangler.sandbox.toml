@@ -1,0 +1,19 @@
+name = "by-rj-payment-api-sandbox"
+main = "src/index.ts"
+compatibility_date = "2026-11-18"
+compatibility_flags = ["nodejs_compat"]
+routes = [
+  { pattern = "api-sandbox.by-rj.com", custom_domain = true }
+]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "154202a24b4b4e8f813a3cb25f029bed"
+
+[vars]
+SUMOPOD_API_URL = "https://api-pay-sandbox.sumopod.com"
+PAYMENT_ENVIRONMENT = "sandbox"
+
+# Sandbox credentials are separate Cloudflare Worker secrets:
+#   SUMOPOD_API_KEY
+#   SUMOPOD_WEBHOOK_SECRET
