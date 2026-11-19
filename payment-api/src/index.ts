@@ -214,7 +214,12 @@ async function createPayment(env: Bindings, applicationId: string, input: Create
       [applicationId, input.order_id, input.customer_email ?? null, input.customer_name ?? null, input.currency ?? "IDR", input.amount, status, sumo.payment_id, providerOrderId, idempotencyKey, sumo.payment_link_url, sumo.fee, sumo.net_amount, JSON.stringify(input.metadata ?? {}), sumo.expires_at, env.PAYMENT_ENVIRONMENT],
     );
     await db.query("commit");
-    return inserted.rows[0];
+    const order = inserted.rows[0];
+    await sendTelegram(
+      env,
+      `💳 Order baru (${env.PAYMENT_ENVIRONMENT})\nAplikasi: ${applicationId}\nOrder: ${order.external_reference}\nTotal: ${order.currency} ${Number(order.amount).toLocaleString("id-ID")}\nStatus: ${order.status}`,
+    );
+    return order;
   } catch (error) {
     await db.query("rollback");
     throw error;
