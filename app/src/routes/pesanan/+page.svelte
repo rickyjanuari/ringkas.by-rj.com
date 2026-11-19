@@ -34,6 +34,8 @@
 	let checkingId = $state<string | null>(null);
 	let downloadingId = $state<string | null>(null);
 	let notice = $state("");
+	let paidCount = $derived(orders.filter((order) => order.status === "PAID").length);
+	let pendingCount = $derived(orders.filter((order) => order.status === "PENDING").length);
 
 	let statusBadge = $derived((s: string) =>
 		s === "PAID" ? "badge-leaf" : s === "EXPIRED" ? "badge-red" : "badge-sun"
@@ -124,7 +126,31 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="receipt" size={18} /> Pesanan saya</h1>
+<header class="border-b border-[#d8d2bd] pb-5">
+	<div class="flex items-start justify-between gap-4">
+		<div>
+			<p class="text-sm font-semibold text-[#177245]">Akun saya</p>
+			<h1 class="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+				<Icon name="receipt" size={21} /> Pesanan saya
+			</h1>
+			<p class="mt-1 max-w-xl text-sm leading-relaxed text-[#5f6b62]">
+				Riwayat pembayaran, akses materi, dan struk pembelianmu.
+			</p>
+		</div>
+		{#if !loading && orders.length > 0}
+			<p class="shrink-0 pt-1 text-right text-sm text-[#5f6b62]">
+				<strong class="block text-lg font-semibold tabular-nums text-[#22302a]">{orders.length}</strong>
+				pesanan
+			</p>
+		{/if}
+	</div>
+	{#if !loading && orders.length > 0}
+		<div class="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs font-medium text-[#5f6b62]">
+			<span><b class="tabular-nums text-[#177245]">{paidCount}</b> sudah lunas</span>
+			{#if pendingCount > 0}<span><b class="tabular-nums text-[#a15c00]">{pendingCount}</b> menunggu pembayaran</span>{/if}
+		</div>
+	{/if}
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
@@ -132,7 +158,7 @@
 	<p class="err mt-6">{error}</p>
 	<button type="button" class="btn btn-primary mt-3" onclick={loadOrders}>Coba lagi</button>
 {:else if orders.length === 0}
-	<div class="card mt-4 p-6 text-center lg:mx-auto lg:max-w-xl">
+	<div class="mx-auto mt-10 max-w-xl border-y border-[#d8d2bd] px-6 py-10 text-center">
 		<p class="flex justify-center"><Mascot expression="semangat" /></p>
 		<p class="flex justify-center"><Icon name="receipt" size={40} class="text-[#177245]" /></p>
 		<p class="mt-2 font-semibold">Belum ada pesanan</p>
@@ -143,24 +169,30 @@
 	{#if notice}
 		<p class="ok-msg mt-4">{notice}</p>
 	{/if}
-	<div class="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+	<section class="mt-5 overflow-hidden border-y border-[#d8d2bd]" aria-label="Daftar pesanan">
+		<div class="hidden grid-cols-[minmax(15rem,1.25fr)_minmax(12rem,1fr)_auto] gap-6 border-b border-[#e7e2d2] px-1 py-3 text-xs font-semibold text-[#5f6b62] lg:grid">
+			<span>Pesanan</span>
+			<span>Produk & total</span>
+			<span class="text-right">Aksi</span>
+		</div>
 		{#each orders as o (o.id)}
-			<article class="card p-4">
-				<div class="flex items-start justify-between gap-2">
+			<article class="border-b border-[#e7e2d2] py-5 first:pt-4 last:border-b-0 last:pb-5 lg:grid lg:grid-cols-[minmax(15rem,1.25fr)_minmax(12rem,1fr)_auto] lg:gap-6">
+				<div class="flex items-start justify-between gap-2 lg:block">
 					<div class="min-w-0">
-						<p class="truncate text-sm font-semibold">{o.id}</p>
+						<p class="truncate font-mono text-xs font-semibold tracking-tight text-[#22302a]">{o.id}</p>
 						<p class="text-xs text-[#5f6b62]">{formatTanggal(o.created_at)}</p>
 					</div>
 					<span class="badge {statusBadge(o.status)}">{statusLabel(o.status)}</span>
 				</div>
-				<div class="mt-2 space-y-1">
+				<div class="mt-3 border-t border-[#e7e2d2] pt-3 lg:mt-0 lg:border-0 lg:pt-0">
+					<div class="space-y-1">
 					{#each o.items as it (it.product_id)}
 						<p class="flex items-center gap-1.5 text-sm"><Icon name="book-open" size={16} class="shrink-0" /> <span class="min-w-0">{it.title} — <b class="font-semibold tabular-nums">{formatRupiah(it.price)}</b></span></p>
 					{/each}
-				</div>
-				<p class="mt-2 text-sm">
-					Total: <b class="font-semibold tabular-nums text-[#177245]">{formatRupiah(o.total_amount ?? o.total)}</b>
-				</p>
+					</div>
+					<p class="mt-2 text-sm">
+						Total <b class="font-semibold tabular-nums text-[#177245]">{formatRupiah(o.total_amount ?? o.total)}</b>
+					</p>
 				{#if o.is_gift}
 					<p class="mt-2 flex items-start gap-1.5 rounded-xl bg-[#fff8e6] px-3 py-2 text-sm font-semibold text-[#22302a]">
 						<Icon name="package" size={16} class="mt-0.5 shrink-0" />
@@ -182,10 +214,13 @@
 					</p>
 				{/if}
 
+				</div>
+
+				<div class="mt-4 lg:mt-0 lg:min-w-48">
 				{#if o.status === "PENDING"}
 					<button
 						type="button"
-						class="btn btn-primary btn-block mt-3"
+						class="btn btn-primary btn-block"
 						disabled={checkingId === o.id}
 						onclick={() => cekStatus(o.id)}
 					>
@@ -196,7 +231,7 @@
 				{#if o.status === "PAID"}
 					{#if o.is_gift}
 						<!-- Order hadiah (pembeli): akses milik penerima — hanya struk yang tampil. -->
-						<div class="mt-3">
+						<div>
 							<button
 								type="button"
 								class="btn btn-outline w-full text-xs"
@@ -210,7 +245,7 @@
 							Tombol belajar dan unduh ada di akun penerima setelah hadiah diklaim.
 						</p>
 					{:else}
-					<div class="mt-3 grid grid-cols-2 gap-2">
+					<div class="grid grid-cols-2 gap-2">
 						{#if !o.is_gift_received}
 						<button
 							type="button"
@@ -261,7 +296,8 @@
 					</a>
 					{/if}
 				{/if}
+				</div>
 			</article>
 		{/each}
-	</div>
+	</section>
 {/if}
