@@ -75,7 +75,7 @@
 		// SumoPod mengirim `order_id` milik provider, sedangkan API Ringkas
 		// membutuhkan nomor order internal (`order`). Prioritaskan nilai
 		// internal supaya redirect sukses dapat langsung memuat pesanan.
-		orderId = page.url.searchParams.get("order") ?? page.url.searchParams.get("order_id");
+		orderId = $page.url.searchParams.get("order") ?? $page.url.searchParams.get("order_id");
 		if (!orderId) {
 			loading = false;
 			return;
