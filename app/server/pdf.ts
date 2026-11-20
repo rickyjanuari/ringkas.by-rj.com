@@ -37,6 +37,9 @@ const EMERALD = rgb(0.09, 0.45, 0.27); // #177245
 const MARIGOLD = rgb(0.95, 0.7, 0.24); // #f2b33d
 const LIGHT_LINE = rgb(0.906, 0.886, 0.824); // #e7e2d2
 const BAR_BG = rgb(0.906, 0.886, 0.824); // #e7e2d2
+const PAPER = rgb(0.975, 0.976, 0.965);
+const PALE_GREEN = rgb(0.906, 0.969, 0.929);
+const DEEP_GREEN = rgb(0.025, 0.31, 0.18);
 
 const CHAR_MAP: Record<string, string> = {
   "→": "->",
@@ -195,6 +198,107 @@ class Doc {
     this.moveDown(1);
   }
 
+  /** Header khusus invoice: identitas, status, dan nomor order dalam satu blok. */
+  invoiceHeader(orderId: string): void {
+    const h = 118;
+    this.page.drawRectangle({ x: 0, y: PAGE_H - h, width: PAGE_W, height: h, color: EMERALD });
+    this.page.drawRectangle({ x: 0, y: PAGE_H - h, width: PAGE_W, height: 7, color: MARIGOLD });
+    this.page.drawText("Ringkas", { x: MARGIN, y: PAGE_H - 47, size: 25, font: this.bold, color: rgb(1, 1, 1) });
+    this.page.drawText("Rangkuman Materi SD, SMP, SMA", {
+      x: MARGIN, y: PAGE_H - 64, size: 9, font: this.regular, color: PALE_GREEN
+    });
+    this.page.drawText("INVOICE / STRUK PEMBAYARAN", {
+      x: MARGIN, y: PAGE_H - 94, size: 10, font: this.bold, color: rgb(1, 1, 1)
+    });
+    const badge = "LUNAS";
+    const badgeW = this.bold.widthOfTextAtSize(badge, 9) + 22;
+    const badgeX = PAGE_W - MARGIN - badgeW;
+    this.page.drawRectangle({ x: badgeX, y: PAGE_H - 53, width: badgeW, height: 23, color: PALE_GREEN });
+    this.page.drawText(badge, { x: badgeX + 11, y: PAGE_H - 45, size: 9, font: this.bold, color: DEEP_GREEN });
+    const id = sanitize(orderId);
+    const idW = this.regular.widthOfTextAtSize(id, 8);
+    this.page.drawText(id, { x: PAGE_W - MARGIN - idW, y: PAGE_H - 79, size: 8, font: this.regular, color: PALE_GREEN });
+    this.y = h + 28;
+  }
+
+  invoiceMeta(left: Array<[string, string]>, right: Array<[string, string]>): void {
+    const h = 92;
+    this.ensureSpace(h + 16);
+    const top = PAGE_H - this.y;
+    this.page.drawRectangle({ x: MARGIN, y: top - h, width: CONTENT_W, height: h, color: PAPER, borderColor: LIGHT_LINE, borderWidth: 0.6 });
+    const columnW = (CONTENT_W - 34) / 2;
+    const drawColumn = (rows: Array<[string, string]>, x: number) => {
+      rows.forEach(([label, value], index) => {
+        const rowTop = top - 20 - index * 37;
+        this.page.drawText(sanitize(label.toUpperCase()), { x, y: rowTop, size: 7.5, font: this.bold, color: GRAY });
+        this.page.drawText(sanitize(value), { x, y: rowTop - 15, size: 10, font: this.regular, color: BLACK, maxWidth: columnW });
+      });
+    };
+    drawColumn(left, MARGIN + 17);
+    drawColumn(right, MARGIN + 17 + columnW + 17);
+    this.y += h + 22;
+  }
+
+  invoiceItems(items: ReceiptItem[]): void {
+    this.ensureSpace(64);
+    const drawTableHeader = () => {
+      const top = PAGE_H - this.y;
+      this.page.drawRectangle({ x: MARGIN, y: top - 27, width: CONTENT_W, height: 27, color: DEEP_GREEN });
+      this.page.drawText("RINCIAN PRODUK", { x: MARGIN + 13, y: top - 18, size: 8, font: this.bold, color: rgb(1, 1, 1) });
+      const price = "HARGA";
+      const pw = this.bold.widthOfTextAtSize(price, 8);
+      this.page.drawText(price, { x: PAGE_W - MARGIN - 13 - pw, y: top - 18, size: 8, font: this.bold, color: rgb(1, 1, 1) });
+      this.y += 27;
+    };
+    drawTableHeader();
+    for (const item of items) {
+      const titleLines = this.wrap(item.title, this.regular, 10).slice(0, 2);
+      const rowH = Math.max(44, 21 + titleLines.length * 13);
+      const isNewPage = this.y + rowH > PAGE_H - MARGIN;
+      this.ensureSpace(rowH);
+      if (isNewPage) drawTableHeader();
+      const top = PAGE_H - this.y;
+      this.page.drawRectangle({ x: MARGIN, y: top - rowH, width: CONTENT_W, height: rowH, color: rgb(1, 1, 1), borderColor: LIGHT_LINE, borderWidth: 0.5 });
+      titleLines.forEach((line, index) => this.page.drawText(line, { x: MARGIN + 13, y: top - 18 - index * 13, size: 10, font: this.regular, color: BLACK }));
+      if (item.included_in_bundle) {
+        this.page.drawText("Termasuk bundel", { x: MARGIN + 13, y: top - rowH + 11, size: 8, font: this.regular, color: GRAY });
+      } else {
+        const price = rupiah(item.price);
+        const pw = this.bold.widthOfTextAtSize(price, 10);
+        this.page.drawText(price, { x: PAGE_W - MARGIN - 13 - pw, y: top - 21, size: 10, font: this.bold, color: BLACK });
+      }
+      this.y += rowH;
+    }
+    this.y += 18;
+  }
+
+  invoiceTotals(rows: Array<[string, string]>, total: string): void {
+    const h = rows.length * 20 + 54;
+    this.ensureSpace(h + 16);
+    let top = PAGE_H - this.y;
+    rows.forEach(([label, value]) => {
+      this.page.drawText(sanitize(label), { x: MARGIN + 205, y: top - 11, size: 10, font: this.regular, color: GRAY });
+      const width = this.regular.widthOfTextAtSize(sanitize(value), 10);
+      this.page.drawText(sanitize(value), { x: PAGE_W - MARGIN - width, y: top - 11, size: 10, font: this.regular, color: BLACK });
+      top -= 20;
+    });
+    this.page.drawRectangle({ x: MARGIN + 190, y: top - 38, width: CONTENT_W - 190, height: 38, color: EMERALD });
+    this.page.drawText("TOTAL DIBAYAR", { x: MARGIN + 205, y: top - 24, size: 9, font: this.bold, color: rgb(1, 1, 1) });
+    const totalW = this.bold.widthOfTextAtSize(total, 13);
+    this.page.drawText(total, { x: PAGE_W - MARGIN - 14 - totalW, y: top - 26, size: 13, font: this.bold, color: rgb(1, 1, 1) });
+    this.y += h;
+  }
+
+  invoiceFooter(): void {
+    this.ensureSpace(54);
+    this.y += 16;
+    this.page.drawLine({ start: { x: MARGIN, y: PAGE_H - this.y }, end: { x: PAGE_W - MARGIN, y: PAGE_H - this.y }, thickness: 0.5, color: LIGHT_LINE });
+    this.y += 14;
+    this.page.drawText("Dokumen ini dibuat otomatis oleh Ringkas dan sah tanpa tanda tangan.", { x: MARGIN, y: PAGE_H - this.y - 9, size: 8.5, font: this.regular, color: GRAY });
+    this.page.drawText("Simpan invoice ini sebagai bukti pembayaran dan akses pembelajaran Anda.", { x: MARGIN, y: PAGE_H - this.y - 22, size: 8.5, font: this.regular, color: GRAY });
+    this.y += 31;
+  }
+
   /** Judul seksi rapor: tebal, emerald, dengan garis tipis di bawahnya. */
   section(title: string): void {
     this.moveDown(0.5);
@@ -257,40 +361,27 @@ function formatTanggal(iso: string | null | undefined): string {
   return d.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "short" });
 }
 
-/** Struk A4 dari data order asli. */
+/** Invoice / struk A4 dari data order asli. */
 export async function receiptPdf(order: ReceiptOrder, items: ReceiptItem[]): Promise<Uint8Array> {
   const doc = await Doc.create();
-  doc.header("Struk Pembayaran");
-  doc.keyValue("No. Order:", order.id);
-  doc.keyValue("Tanggal dibuat:", formatTanggal(order.created_at));
-  doc.keyValue("Tanggal bayar:", formatTanggal(order.paid_at));
-  doc.keyValue("Pembeli:", `${order.buyer_name ?? "-"} (${order.buyer_email ?? "-"})`);
-  doc.keyValue("Metode:", "KlikQRIS");
-  doc.keyValue("Status:", "LUNAS");
-  doc.moveDown(0.5);
-  doc.boldText("Produk", 11);
-  doc.moveDown(0.25);
-  for (const it of items) {
-    if (it.included_in_bundle) {
-      doc.text(`${it.title} (termasuk bundel)`, 10, GRAY);
-    } else {
-      doc.leftRight(it.title, rupiah(it.price));
-    }
-    doc.moveDown(0.25);
-  }
-  doc.moveDown(0.5);
+  doc.invoiceHeader(order.id);
+  doc.invoiceMeta(
+    [["Ditagihkan kepada", order.buyer_name ?? "-"], ["Email", order.buyer_email ?? "-"]],
+    [["Tanggal pembayaran", formatTanggal(order.paid_at)], ["Metode pembayaran", "QRIS - SumoPod"]]
+  );
+  doc.invoiceItems(items);
   const totalAmount = order.total_amount ?? order.total;
   const kodeUnik = totalAmount - order.total;
   const discount = order.discount_amount ?? 0;
+  const totals: Array<[string, string]> = [];
   if (discount > 0) {
-    doc.keyValue("Subtotal:", rupiah(order.total + discount));
-    doc.keyValue(`Diskon (${order.voucher_code ?? "VOUCHER"}):`, `-${rupiah(discount)}`);
+    totals.push(["Subtotal", rupiah(order.total + discount)]);
+    totals.push([`Diskon (${order.voucher_code ?? "VOUCHER"})`, `-${rupiah(discount)}`]);
   }
-  doc.keyValue("Total produk:", rupiah(order.total));
-  doc.keyValue("Kode unik:", rupiah(kodeUnik));
-  doc.boldText(`Total bayar:  ${rupiah(totalAmount)}`, 12);
-  doc.moveDown(1);
-  doc.text("Terima kasih sudah belajar bersama Ringkas.", 10, GRAY);
+  totals.push(["Total produk", rupiah(order.total)]);
+  if (kodeUnik > 0) totals.push(["Kode unik", rupiah(kodeUnik)]);
+  doc.invoiceTotals(totals, rupiah(totalAmount));
+  doc.invoiceFooter();
   return doc.bytes();
 }
 
