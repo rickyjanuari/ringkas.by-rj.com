@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import bcrypt from "bcryptjs";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   type Chapter,
   type Database,
@@ -764,6 +764,16 @@ async function authUser(c: Context, db: Database): Promise<User | null> {
   );
   if (!session) return null;
   return await db.get<User>("SELECT * FROM users WHERE id = ?", session.user_id) ?? null;
+}
+
+function validInternalPaymentSignature(secret: string, timestamp: string | undefined, signature: string | undefined, rawBody: string): boolean {
+  if (!secret || !timestamp || !signature) return false;
+  const sentAt = Number(timestamp);
+  if (!Number.isInteger(sentAt) || Math.abs(Date.now() - sentAt * 1000) > 5 * 60 * 1000) return false;
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+  if (signature.length !== expected.length) return false;
+  const encoder = new TextEncoder();
+  return timingSafeEqual(encoder.encode(signature), encoder.encode(expected));
 }
 
 async function orderOut(db: Database, o: OrderRow): Promise<Record<string, unknown>> {
@@ -2729,6 +2739,13 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     // Donasi "beli 1, donasi 1" (migrasi 0014): default false — alur
     // checkout normal tidak berubah bila flag ini tidak dikirim.
     const donate = body.donate === true;
+    // Hadiah dibayar oleh pembeli tetapi kepemilikannya diberikan ke
+    // penerima. Karena itu pembeli yang sudah memiliki produk tetap boleh
+    // membeli item yang sama bila checkout ini benar-benar sebuah hadiah.
+    const giftEmailRaw = asString(body.gift_recipient_email).trim().toLowerCase();
+    const giftNameRaw = asString(body.gift_recipient_name).trim();
+    const giftMessageRaw = asString(body.gift_message);
+    const isGiftCheckout = giftEmailRaw !== "" || giftNameRaw !== "" || giftMessageRaw !== "";
 
     const products: Product[] = [];
     for (const pid of items) {
@@ -2744,7 +2761,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       products.map(async (product) => (await userHasPaidProduct(db, user.id, product.id)) ? product.title : null)
     );
     const ownedTitles = alreadyOwned.filter((title): title is string => title !== null);
-    if (ownedTitles.length) {
+    if (!isGiftCheckout && ownedTitles.length) {
       return c.json(
         { error: `Produk sudah dimiliki: ${ownedTitles.join(", ")}. Buka dari Ruang Belajar.` },
         409
@@ -2790,11 +2807,6 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     // 30 hari — akses pembeli TIDAK berubah: order hadiah tetap
     // dibayar pembeli, tapi aksesnya milik penerima (lihat orderOut
     // + fulfillGiftOrder).
-    const giftEmailRaw = asString(body.gift_recipient_email).trim().toLowerCase();
-    const giftNameRaw = asString(body.gift_recipient_name).trim();
-    const giftMessageRaw = asString(body.gift_message);
-    const isGiftCheckout =
-      giftEmailRaw !== "" || giftNameRaw !== "" || giftMessageRaw !== "";
     let giftEmail: string | null = null;
     let giftName: string | null = null;
     let giftMessage: string | null = null;
@@ -2863,6 +2875,48 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
 
     const orderId = `RM-${randomAlphaNum(12)}`;
     const orderItems = await expandBundleItems(db, products);
+    const checkoutFingerprint = [itemsKey, voucherCode ?? "", giftEmail ?? "", donate ? "donate" : "standard"].join("\u001f");
+    // INSERT OR IGNORE adalah atomik di SQLite/D1. Kunci hanya ditahan
+    // selama payment link dan order lokal sedang dibuat; sesudahnya order
+    // PENDING yang sudah ada menjadi jalur idempotensi normal di atas.
+    let lock = await db.run(
+      "INSERT OR IGNORE INTO checkout_locks (user_id, fingerprint, order_id, created_at) VALUES (?, ?, ?, ?)",
+      user.id,
+      checkoutFingerprint,
+      orderId,
+      nowIso()
+    );
+    if (lock.changes === 0) {
+      const activeLock = await db.get<{ order_id: string; created_at: string }>(
+        "SELECT order_id, created_at FROM checkout_locks WHERE user_id = ? AND fingerprint = ?",
+        user.id,
+        checkoutFingerprint
+      );
+      // Worker yang berhenti di tengah request tidak boleh mengunci checkout
+      // selamanya. Dua menit lebih lama daripada timeout API payment.
+      if (activeLock && Date.now() - new Date(activeLock.created_at).getTime() > 2 * 60 * 1000) {
+        await db.run(
+          "DELETE FROM checkout_locks WHERE user_id = ? AND fingerprint = ? AND order_id = ?",
+          user.id,
+          checkoutFingerprint,
+          activeLock.order_id
+        );
+        lock = await db.run(
+          "INSERT OR IGNORE INTO checkout_locks (user_id, fingerprint, order_id, created_at) VALUES (?, ?, ?, ?)",
+          user.id,
+          checkoutFingerprint,
+          orderId,
+          nowIso()
+        );
+      }
+      if (lock.changes === 0) {
+        const existing = activeLock
+          ? await db.get<OrderRow>("SELECT * FROM orders WHERE id = ? AND user_id = ?", activeLock.order_id, user.id)
+          : undefined;
+        if (existing) return c.json({ order: await orderOut(db, existing) });
+        return c.json({ error: "Checkout sedang diproses. Coba lagi beberapa detik lagi." }, 409);
+      }
+    }
     let qris: {
       qris_url: string | null;
       direct_url: string | null;
@@ -2897,6 +2951,7 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         expired_at: central.expires_at
       };
     } catch (err) {
+      await db.run("DELETE FROM checkout_locks WHERE user_id = ? AND fingerprint = ? AND order_id = ?", user.id, checkoutFingerprint, orderId);
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("belum dikonfigurasi")) {
         return c.json({ error: "Payment gateway belum dikonfigurasi. Pembayaran belum bisa diproses." }, 503);
@@ -2904,24 +2959,30 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
       console.error("[checkout] pembuatan payment gagal:", err);
       return c.json({ error: "Pembayaran QRIS gagal dibuat, silakan coba lagi." }, 503);
     }
-    await db.run(
-      `INSERT INTO orders (id, user_id, items, total, status, klikqris_order_id, qris_url, direct_url, total_amount, expired_at, whatsapp, idempotency_key, voucher_code, discount_amount, created_at, paid_at)
-       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      orderId,
-      user.id,
-      JSON.stringify(orderItems),
-      finalTotal,
-      paymentReference,
-      qris.qris_url,
-      qris.direct_url,
-      qris.total_amount,
-      qris.expired_at,
-      orderWhatsapp,
-      idempotencyKey ?? `auto-${orderId}`,
-      voucherCode,
-      discount,
-      nowIso()
-    );
+    try {
+      await db.run(
+        `INSERT INTO orders (id, user_id, items, total, status, klikqris_order_id, qris_url, direct_url, total_amount, expired_at, whatsapp, idempotency_key, voucher_code, discount_amount, created_at, paid_at)
+         VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        orderId,
+        user.id,
+        JSON.stringify(orderItems),
+        finalTotal,
+        paymentReference,
+        qris.qris_url,
+        qris.direct_url,
+        qris.total_amount,
+        qris.expired_at,
+        orderWhatsapp,
+        idempotencyKey ?? `auto-${orderId}`,
+        voucherCode,
+        discount,
+        nowIso()
+      );
+    } catch (err) {
+      await db.run("DELETE FROM checkout_locks WHERE user_id = ? AND fingerprint = ? AND order_id = ?", user.id, checkoutFingerprint, orderId);
+      throw err;
+    }
+    await db.run("DELETE FROM checkout_locks WHERE user_id = ? AND fingerprint = ? AND order_id = ?", user.id, checkoutFingerprint, orderId);
     // Kuota voucher terpakai saat order dibuat (tidak kembali bila order
     // kedaluwarsa — lihat migrasi 0005).
     if (voucherCode) {
@@ -3039,6 +3100,68 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     const paid = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id);
     if (paid) background(c, handlePaidOrder(db, paid));
     return c.json({ received: true, applied: true }, 200);
+  });
+
+  // Webhook privat dari api.by-rj.com. Endpoint ini tidak bergantung pada
+  // browser pelanggan; payment yang telah dilunasi langsung memenuhi order,
+  // email, hadiah, referral, dan donasi lewat handlePaidOrder yang idempoten.
+  app.post("/api/webhook/payment", async (c) => {
+    const rawBody = await c.req.text();
+    const env = getEnv();
+    if (!validInternalPaymentSignature(
+      env.paymentWebhookSecret,
+      c.req.header("x-payment-timestamp"),
+      c.req.header("x-payment-signature"),
+      rawBody
+    )) {
+      return c.json({ error: "Webhook signature tidak valid." }, 401);
+    }
+
+    let payload: { event_id?: unknown; event_type?: unknown; payment_id?: unknown; order_id?: unknown; status?: unknown; paid_at?: unknown };
+    try {
+      payload = JSON.parse(rawBody) as typeof payload;
+    } catch {
+      return c.json({ error: "Payload webhook tidak valid." }, 400);
+    }
+    const eventId = typeof payload.event_id === "string" ? payload.event_id : "";
+    const paymentId = typeof payload.payment_id === "string" ? payload.payment_id : "";
+    const orderId = typeof payload.order_id === "string" ? payload.order_id : "";
+    const eventType = typeof payload.event_type === "string" ? payload.event_type : "";
+    const status = typeof payload.status === "string" ? payload.status : "";
+    if (!eventId || !paymentId || !orderId || !eventType || !["paid", "expired", "failed"].includes(status)) {
+      return c.json({ error: "Payload webhook tidak lengkap." }, 400);
+    }
+
+    const order = await db.get<OrderRow>(
+      "SELECT * FROM orders WHERE id = ? AND klikqris_order_id = ?",
+      orderId,
+      paymentId
+    );
+    if (!order) return c.json({ received: true, ignored: "unknown_order" }, 200);
+
+    const seen = await db.run(
+      "INSERT OR IGNORE INTO payment_webhook_events (event_id, payment_id, order_id, event_type, received_at) VALUES (?, ?, ?, ?, ?)",
+      eventId,
+      paymentId,
+      orderId,
+      eventType,
+      nowIso()
+    );
+    if (seen.changes === 0) return c.json({ received: true, duplicate: true }, 200);
+
+    if (status === "paid") {
+      await db.run(
+        "UPDATE orders SET status = 'PAID', paid_at = COALESCE(?, ?) WHERE id = ? AND status = 'PENDING'",
+        typeof payload.paid_at === "string" ? payload.paid_at : null,
+        nowIso(),
+        order.id
+      );
+      const paid = await db.get<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id);
+      if (paid?.status === "PAID") background(c, handlePaidOrder(db, paid));
+    } else {
+      await db.run("UPDATE orders SET status = 'EXPIRED' WHERE id = ? AND status = 'PENDING'", order.id);
+    }
+    return c.json({ received: true }, 200);
   });
 
   app.get("/api/orders", async (c) => {

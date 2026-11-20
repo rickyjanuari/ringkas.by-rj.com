@@ -7,6 +7,10 @@ type Bindings = {
   PAYMENT_ENVIRONMENT: "live" | "sandbox";
   SUMOPOD_API_KEY: string;
   SUMOPOD_WEBHOOK_SECRET: string;
+  /** Endpoint internal aplikasi pada environment Worker ini. */
+  APPLICATION_WEBHOOK_URL?: string;
+  /** Secret HMAC khusus endpoint internal aplikasi. */
+  APPLICATION_WEBHOOK_SECRET?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
 };
@@ -51,6 +55,15 @@ type SumoPodPayment = {
   payment_link_url: string;
   status: string;
   expires_at: string;
+};
+
+type ApplicationWebhookEvent = {
+  event_id: string;
+  event_type: string;
+  payment_id: string;
+  order_id: string;
+  status: string;
+  paid_at: string | null;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -140,8 +153,8 @@ app.post("/v1/webhooks/sumopod", async (c) => {
   const db = await connect(c.env);
   try {
     await db.query("begin");
-    const orderResult = await db.query<Pick<PaymentOrder, "id" | "application_id">>(
-      "select id, application_id from core.payment_orders where provider_order_id = $1 for update",
+    const orderResult = await db.query<Pick<PaymentOrder, "id" | "application_id" | "external_reference" | "status" | "paid_at">>(
+      "select id, application_id, external_reference, status, paid_at from core.payment_orders where provider_order_id = $1 for update",
       [providerOrderId],
     );
     if (!orderResult.rowCount) {
@@ -149,32 +162,54 @@ app.post("/v1/webhooks/sumopod", async (c) => {
       return c.json({ received: true, ignored: "unknown_order" }, 200);
     }
     const order = orderResult.rows[0];
-    const eventResult = await db.query(
+    const eventResult = await db.query<{ id: string; processing_status: string }>(
       `insert into core.payment_events
        (payment_order_id, application_id, provider, provider_event_id, event_type, payload, signature_valid, processing_status)
        values ($1, $2, 'sumopod', $3, $4, $5::jsonb, true, 'received')
-       on conflict (provider, provider_event_id) do nothing
-       returning id`,
+       on conflict (provider, provider_event_id) do update
+         set processing_status = case when core.payment_events.processing_status = 'failed' then 'received' else core.payment_events.processing_status end,
+             processing_error = case when core.payment_events.processing_status = 'failed' then null else core.payment_events.processing_error end
+       returning id, processing_status`,
       [order.id, order.application_id, svixId, event.event_type, rawBody],
     );
-    if (eventResult.rowCount) {
+    if (eventResult.rows[0]?.processing_status !== "processed") {
       const data = event.data ?? {};
       const status = statusFromEvent(event.event_type);
-      await db.query(
+      const updated = await db.query<Pick<PaymentOrder, "id" | "application_id" | "external_reference" | "status" | "paid_at">>(
         `update core.payment_orders
          set status = $1, paid_at = coalesce($2::timestamptz, paid_at), updated_at = now()
-         where id = $3`,
+         where id = $3
+         returning id, application_id, external_reference, status, paid_at`,
         [status, typeof data.paid_at === "string" ? data.paid_at : null, order.id],
       );
-      await db.query(
-        "update core.payment_events set processing_status = 'processed', processed_at = now() where id = $1",
-        [eventResult.rows[0].id],
-      );
+      const payment = updated.rows[0] ?? { ...order, status, paid_at: typeof data.paid_at === "string" ? data.paid_at : order.paid_at };
+      await db.query("commit");
+      try {
+        await deliverApplicationWebhook(c.env, {
+          event_id: svixId,
+          event_type: event.event_type,
+          payment_id: payment.id,
+          order_id: payment.external_reference,
+          status: payment.status,
+          paid_at: payment.paid_at
+        });
+        await db.query(
+          "update core.payment_events set processing_status = 'processed', processed_at = now(), processing_error = null where id = $1",
+          [eventResult.rows[0].id],
+        );
+      } catch (error) {
+        await db.query(
+          "update core.payment_events set processing_status = 'failed', processing_error = $2 where id = $1",
+          [eventResult.rows[0].id, error instanceof Error ? error.message.slice(0, 500) : "Delivery failed"],
+        );
+        throw error;
+      }
+      return c.json({ received: true }, 200);
     }
     await db.query("commit");
     return c.json({ received: true }, 200);
   } catch (error) {
-    await db.query("rollback");
+    await db.query("rollback").catch(() => undefined);
     console.error("sumopod webhook processing failed", error);
     await sendTelegram(c.env, `⚠️ Payment webhook gagal diproses (${c.env.PAYMENT_ENVIRONMENT}). Periksa log API payment.`);
     return c.json({ error: "Webhook processing failed" }, 500);
@@ -226,6 +261,33 @@ async function createPayment(env: Bindings, applicationId: string, input: Create
   } finally {
     await db.end();
   }
+}
+
+async function deliverApplicationWebhook(env: Bindings, event: ApplicationWebhookEvent): Promise<void> {
+  if (!env.APPLICATION_WEBHOOK_URL || !env.APPLICATION_WEBHOOK_SECRET) {
+    throw new Error("Application webhook is not configured");
+  }
+  const rawBody = JSON.stringify(event);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.APPLICATION_WEBHOOK_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${timestamp}.${rawBody}`)));
+  const signature = Array.from(mac, byte => byte.toString(16).padStart(2, "0")).join("");
+  const response = await fetch(env.APPLICATION_WEBHOOK_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-payment-timestamp": timestamp,
+      "x-payment-signature": signature
+    },
+    body: rawBody
+  });
+  if (!response.ok) throw new Error(`Application webhook returned ${response.status}`);
 }
 
 async function requestSumoPod(env: Bindings, orderId: string, input: CreatePaymentInput): Promise<SumoPodPayment> {

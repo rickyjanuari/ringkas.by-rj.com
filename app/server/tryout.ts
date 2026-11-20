@@ -101,7 +101,13 @@ async function userHasPaidProduct(
     "SELECT items FROM orders WHERE user_id = ? AND status = 'PAID'",
     userId
   );
-  return orders.some((o) => parseItems(o.items).some((it) => it.product_id === productId));
+  if (orders.some((o) => parseItems(o.items).some((it) => it.product_id === productId))) return true;
+  const grant = await db.get<{ x: number }>(
+    "SELECT 1 AS x FROM gift_grants WHERE user_id = ? AND product_id = ? LIMIT 1",
+    userId,
+    productId
+  );
+  return !!grant;
 }
 
 /** Nama tampil di papan peringkat: nama depan + inisial (tanpa email). */

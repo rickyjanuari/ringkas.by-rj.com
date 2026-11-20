@@ -20,6 +20,8 @@ export interface AppEnv {
   paymentApiUrl: string;
   /** API key khusus aplikasi untuk api.by-rj.com (secret Worker). */
   paymentApiKey: string;
+  /** Secret HMAC untuk webhook internal dari API payment pusat. */
+  paymentWebhookSecret: string;
   resendApiKey: string;
   resendFrom: string;
   /** URL dasar situs, dipakai untuk tautan di email (bukan secret). */
@@ -53,6 +55,7 @@ function fromProcessEnv(): AppEnv {
     klikqrisWebhookSecret: p.KLIKQRIS_WEBHOOK_SECRET ?? "",
     paymentApiUrl: p.PAYMENT_API_URL ?? "",
     paymentApiKey: p.PAYMENT_API_KEY ?? "",
+    paymentWebhookSecret: p.PAYMENT_WEBHOOK_SECRET ?? "",
     resendApiKey: p.RESEND_API_KEY ?? "",
     resendFrom: p.RESEND_FROM ?? "halo@ringkas.by-rj.com",
     appUrl: p.APP_URL ?? "https://ringkas.by-rj.com",
