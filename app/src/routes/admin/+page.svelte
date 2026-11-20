@@ -156,6 +156,9 @@
 	let uploadFile = $state<File | null>(null);
 	let uploadKind = $state<"feature" | "gallery">("feature");
 	let uploading = $state(false);
+	let productToDelete = $state<Product | null>(null);
+	let productDeleting = $state(false);
+	let productDeleteError = $state("");
 
 	// ---- Pengguna ----
 	let users = $state<
@@ -1281,14 +1284,33 @@
 		}
 	}
 
-	async function hapusProduk(id: string, title: string) {
-		if (!confirm(`Hapus produk "${title}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+	function mintaHapusProduk(product: Product) {
+		productToDelete = product;
+		productDeleteError = "";
+	}
+
+	function batalHapusProduk() {
+		if (productDeleting) return;
+		productToDelete = null;
+		productDeleteError = "";
+	}
+
+	async function konfirmasiHapusProduk() {
+		const product = productToDelete;
+		if (!product || productDeleting) return;
+		productDeleting = true;
+		productDeleteError = "";
 		try {
-			await api(`/api/admin/products/${id}`, { method: "DELETE" });
-			products = products.filter((p) => p.id !== id);
+			await api(`/api/admin/products/${product.id}`, { method: "DELETE" });
+			products = products.filter((p) => p.id !== product.id);
+			if (expandedProductId === product.id) expandedProductId = null;
+			if (editId === product.id) editId = null;
+			productToDelete = null;
 			notice = "Produk dihapus";
 		} catch (e) {
-			notice = e instanceof Error ? e.message : "Gagal menghapus produk";
+			productDeleteError = e instanceof Error ? e.message : "Gagal menghapus produk";
+		} finally {
+			productDeleting = false;
 		}
 	}
 
@@ -2096,7 +2118,7 @@
 												<button
 													type="button"
 													class="btn btn-danger !px-3 !py-2 text-xs"
-													onclick={() => hapusProduk(p.id, p.title)}
+											onclick={() => mintaHapusProduk(p)}
 												>
 													<Icon name="trash" size={16} /> Hapus
 												</button>
@@ -2206,7 +2228,7 @@
 									<button
 										type="button"
 										class="btn btn-danger !px-3 !py-2 text-xs"
-										onclick={() => hapusProduk(p.id, p.title)}
+										onclick={() => mintaHapusProduk(p)}
 									>
 										<Icon name="trash" size={16} /> Hapus
 									</button>
@@ -3240,6 +3262,41 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- Modal konfirmasi hapus produk: tidak memakai dialog browser agar aman pada Browser Locker. -->
+	{#if productToDelete}
+		<div class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4" role="alertdialog" aria-modal="true" aria-labelledby="delete-product-title" aria-describedby="delete-product-description">
+			<button
+				type="button"
+				aria-label="Batal hapus produk"
+				class="absolute inset-0 bg-black/50"
+				disabled={productDeleting}
+				onclick={batalHapusProduk}
+			></button>
+			<div class="relative w-full max-w-md space-y-4 rounded-t-2xl bg-[#fffdf7] p-5 shadow-[0_12px_36px_rgb(0_0_0/0.18)] sm:rounded-2xl">
+				<div class="flex items-start gap-3">
+					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
+						<Icon name="trash" size={19} />
+					</div>
+					<div class="min-w-0">
+						<h2 id="delete-product-title" class="font-semibold text-[#1e2821]">Hapus produk?</h2>
+						<p id="delete-product-description" class="mt-1 text-sm leading-6 text-[#5f6b62]">
+							Anda akan menghapus <span class="font-semibold text-[#1e2821]">{productToDelete.title}</span>. Produk, gambar, bab, dan relasi bundelnya akan dihapus. Riwayat order lama tetap tersimpan.
+						</p>
+					</div>
+				</div>
+				{#if productDeleteError}
+					<p class="err">{productDeleteError}</p>
+				{/if}
+				<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+					<button type="button" class="btn btn-ghost" disabled={productDeleting} onclick={batalHapusProduk}>Batal</button>
+					<button type="button" class="btn btn-danger" disabled={productDeleting} onclick={konfirmasiHapusProduk}>
+						{#if productDeleting}Menghapus...{:else}<Icon name="trash" size={16} /> Ya, hapus produk{/if}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Modal form tambah/edit produk -->
 	{#if editId}

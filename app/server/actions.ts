@@ -1811,6 +1811,9 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
     if (admin.role !== "admin") return c.json({ error: "Hanya admin yang dapat mengakses." }, 403);
     const product = await db.get<Product>("SELECT * FROM products WHERE id = ?", c.req.param("id"));
     if (!product) return c.json({ error: "Produk tidak ditemukan." }, 404);
+    // bundle_members tidak memiliki foreign key agar seed database baru bisa berjalan,
+    // sehingga referensi bundel harus dibersihkan eksplisit saat produk dihapus.
+    await db.run("DELETE FROM bundle_members WHERE bundle_product_id = ? OR product_id = ?", product.id, product.id);
     await db.run("DELETE FROM products WHERE id = ?", product.id);
     await logAdminAction(db, admin, "product_delete", product.id, product.title);
     return c.json({ ok: true });
