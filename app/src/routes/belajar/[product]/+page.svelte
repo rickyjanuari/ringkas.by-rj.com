@@ -639,6 +639,17 @@
 						></div>
 					</div>
 					<p class="mt-3 text-base font-semibold leading-snug">{simCurrent.question}</p>
+					{#if simCurrent.images?.length}
+						<div class="mt-3 grid gap-2 sm:grid-cols-2">
+							{#each simCurrent.images as image (image)}
+								<img
+									src={image}
+									alt={`Ilustrasi untuk soal ${simIdx + 1}`}
+									class="max-h-72 w-full rounded-xl border border-[#e7e2d2] bg-white object-contain p-2"
+								/>
+							{/each}
+						</div>
+					{/if}
 
 					{#if simCurrent.type === "pg" && Array.isArray(simCurrent.options)}
 						<div class="mt-3 space-y-2">

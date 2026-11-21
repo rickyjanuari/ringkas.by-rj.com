@@ -212,6 +212,7 @@ interface PublicQuestion {
   type: string;
   question: string;
   options: unknown;
+  images?: string[];
 }
 
 interface GradeInput {
@@ -933,6 +934,18 @@ function parseOptions(raw: string | null): unknown {
     return JSON.parse(raw) as unknown;
   } catch {
     return null;
+  }
+}
+
+function parseImageUrls(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string" && item.startsWith("/"))
+      : [];
+  } catch {
+    return [];
   }
 }
 
@@ -3717,7 +3730,8 @@ export function registerRoutes(app: Hono, db: Database, storage: ImageStorage): 
         id: String(q.id),
         type: q.type,
         question: q.question,
-        options: parseOptions(q.options)
+        options: parseOptions(q.options),
+        images: parseImageUrls(q.image_urls)
       }));
     return c.json({
       simulation: {

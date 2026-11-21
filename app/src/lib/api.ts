@@ -91,6 +91,7 @@ export interface PublicQuestion {
 	type: string;
 	question: string;
 	options: string[] | { left: string[]; right: string[] } | null;
+	images?: string[];
 }
 
 export interface FullChapter extends ChapterMeta {

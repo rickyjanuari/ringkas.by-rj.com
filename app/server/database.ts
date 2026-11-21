@@ -111,6 +111,7 @@ export interface QuestionRow {
   type: string; // pg | pg_kompleks | bs | menjodohkan | isian | uraian
   question: string;
   options: string | null; // JSON
+  image_urls: string | null; // JSON string[]
   answer: string; // lihat API_CONTRACT.md untuk arti per tipe
   discussion: string;
   subject: string;

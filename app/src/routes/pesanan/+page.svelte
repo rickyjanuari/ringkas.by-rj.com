@@ -121,7 +121,6 @@
 	}
 
 	function linkProduk(productId: string, externalUrl?: string | null): string {
-		if (externalUrl) return externalUrl;
 		return `${location.origin}/belajar/${productId}`;
 	}
 </script>
@@ -257,14 +256,6 @@
 						</button>
 						{/if}
 						{#each o.items as it (it.product_id)}
-							<button
-								type="button"
-								class="btn btn-ghost text-xs"
-								disabled={downloadingId === `pdf-${o.id}-${it.product_id}`}
-								onclick={() => unduhPdf(o.id, it.product_id, it.title)}
-							>
-								<Icon name="file-text" size={16} /> Unduh PDF
-							</button>
 							{#if it.externalUrl}
 								<a
 									href={it.externalUrl}
@@ -272,9 +263,21 @@
 									rel="noopener noreferrer"
 									class="btn btn-sun text-xs"
 								>
-									<Icon name="link" size={16} /> Buka produk
+									<Icon name="file-text" size={16} /> PDF & Word
 								</a>
+							{:else}
+								<button
+									type="button"
+									class="btn btn-ghost text-xs"
+									disabled={downloadingId === `pdf-${o.id}-${it.product_id}`}
+									onclick={() => unduhPdf(o.id, it.product_id, it.title)}
+								>
+									<Icon name="file-text" size={16} /> Unduh PDF
+								</button>
 							{/if}
+							<a href={`/belajar/${it.product_id}`} class="btn btn-primary text-xs">
+								<Icon name="book-open" size={16} /> Latihan web
+							</a>
 							<a
 								href={waLink(
 									o.whatsapp ?? $auth.user?.whatsapp,
@@ -291,9 +294,6 @@
 					<p class="mt-2 text-[11px] leading-relaxed text-[#5f6b62]">
 						Membuka WhatsApp dengan pesan siap kirim — bukan pengiriman otomatis dari server.
 					</p>
-					<a href={`/belajar/${o.items[0]?.product_id}`} class="btn btn-primary btn-block mt-2">
-						<Icon name="book-open" size={16} /> Buka ruang belajar
-					</a>
 					{/if}
 				{/if}
 				</div>

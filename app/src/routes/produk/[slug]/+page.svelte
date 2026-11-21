@@ -30,6 +30,7 @@
 	let simCount = $state(0);
 	let hasQuiz = $state(false);
 	let hasFlashcards = $state(false);
+	let materialUrl = $state<string | null>(null);
 
 	// Gambar fitur SAS per kelas (dipakai bila produk tidak punya gambar fitur admin).
 	const sasFeature: Record<string, string> = {
@@ -89,6 +90,7 @@
 			try {
 				const pack = await api<StudyPack>(`/api/study/${slug}`);
 				simCount = pack.simulations?.length ?? 0;
+				materialUrl = pack.externalUrl ?? null;
 				hasQuiz = (pack.chapters ?? []).some((c) => (c.quiz?.length ?? 0) > 0);
 				hasFlashcards = (pack.chapters ?? []).some((c) => (c.flashcards?.length ?? 0) > 0);
 			} catch {
@@ -248,10 +250,10 @@
 			<details class="card overflow-hidden">
 				<summary class="flex cursor-pointer items-center gap-2 p-4 text-sm font-semibold">
 					<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#177245] text-xs font-semibold text-white">2</span>
-					Bayar lewat KlikQRIS
+					Bayar lewat QRIS
 				</summary>
 				<p class="px-4 pb-4 text-sm leading-relaxed text-[#5f6b62]">
-					Scan kode QR yang muncul dengan aplikasi pembayaran apa saja.
+					Scan kode QR SumoPod yang muncul dengan aplikasi pembayaran apa saja.
 				</p>
 			</details>
 			<details class="card overflow-hidden">
@@ -311,11 +313,18 @@
 					<Icon name="party-popper" size={16} /> Produk ini sudah milikmu.
 				</p>
 				<p class="mt-0.5 text-sm text-[#3f4a42]">
-					Lanjutkan belajar, kerjakan kuis, dan coba simulasi SAS-nya.
+					Materi unduhan dan latihan web sudah terbuka di akunmu.
 				</p>
-				<a href={`/belajar/${product.id}`} class="btn btn-leaf mt-3 w-full">
-					<Icon name="book-open" size={16} /> Buka ruang belajar
-				</a>
+				<div class="mt-3 grid gap-2 sm:grid-cols-2">
+					{#if materialUrl}
+						<a href={materialUrl} target="_blank" rel="noopener noreferrer" class="btn btn-sun w-full">
+							<Icon name="file-text" size={16} /> PDF & Word
+						</a>
+					{/if}
+					<a href={`/belajar/${product.id}`} class="btn btn-leaf w-full">
+						<Icon name="book-open" size={16} /> Latihan web
+					</a>
+				</div>
 			</div>
 		{/if}
 
