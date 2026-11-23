@@ -9,7 +9,7 @@
 //         offline kembalikan JSON 503, bukan data basi).
 //       * navigasi ........ network-first; bila gagal, pakai cache;
 //         bila tidak ada di cache, tampilkan /offline.html.
-//       * aset statis ...... cache-first (/_app/, /logo/, /shorts/,
+//       * aset statis ...... cache-first (/_app/, /fonts/, /logo/, /shorts/,
 //         /manifest.webmanifest): sekali dibuka, bisa dibuka lagi
 //         tanpa internet.
 //       * sisanya .......... teruskan ke jaringan apa adanya.
@@ -26,7 +26,7 @@
 // ini harus tetap di app/static/ dan terdaftar dari /sw.js (scope "/").
 "use strict";
 
-const CACHE_VERSION = "ringkas-v3";
+const CACHE_VERSION = "ringkas-v4";
 const CACHE_NAME = CACHE_VERSION;
 
 const CORE_SHELL = [
@@ -66,6 +66,7 @@ self.addEventListener("activate", (event) => {
 function isStaticAsset(pathname) {
   return (
     pathname.startsWith("/_app/") ||
+    pathname.startsWith("/fonts/") ||
     pathname.startsWith("/logo/") ||
     pathname.startsWith("/shorts/") ||
     pathname === "/hero-scene.webp" ||
@@ -79,7 +80,7 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  // Hanya tangani origin yang sama — font Google dkk. diteruskan apa adanya.
+  // Hanya tangani permintaan ke origin aplikasi.
   if (url.origin !== self.location.origin) return;
 
   // 1) API: selalu jaringan, jangan pernah sajikan data basi.

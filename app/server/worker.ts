@@ -127,8 +127,8 @@ async function runScheduled(env: Env, cron: string): Promise<void> {
 const CSP_MAIN =
   "default-src 'self'; " +
   "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com; " +
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "font-src 'self' https://fonts.gstatic.com; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "font-src 'self'; " +
   "img-src 'self' data: blob:; " +
   "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com; " +
   "frame-src https://challenges.cloudflare.com; " +
@@ -137,8 +137,8 @@ const CSP_MAIN =
 const CSP_SHORTS =
   "default-src 'self'; " +
   "script-src 'self' 'unsafe-inline'; " +
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "font-src 'self' https://fonts.gstatic.com; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "font-src 'self'; " +
   "img-src 'self' data: blob:; " +
   "connect-src 'self'; " +
   "frame-ancestors 'self'; base-uri 'self'; form-action 'self'";

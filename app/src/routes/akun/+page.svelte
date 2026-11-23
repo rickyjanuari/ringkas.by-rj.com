@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import Avatar from "$lib/Avatar.svelte";
-	import ThemeToggle from "$lib/ThemeToggle.svelte";
 	import SoundToggle from "$lib/SoundToggle.svelte";
 	import { getOnboardingDone } from "$lib/onboarding";
 	import BottomSheet from "$lib/BottomSheet.svelte";
@@ -1279,19 +1278,16 @@
 		{/if}
 	</div>
 
-	<!-- Tampilan & suara -->
+	<!-- Pengaturan suara -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center gap-3">
 			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="sparkles" size={22} /></span>
 			<div class="min-w-0 flex-1">
-				<p class="font-semibold">Tampilan &amp; suara</p>
-				<p class="text-xs text-[#5f6b62]">Pilih tema dan atur bunyi umpan balik saat menjawab soal.</p>
+				<p class="font-semibold">Suara jawaban</p>
+				<p class="text-xs text-[#5f6b62]">Atur bunyi umpan balik saat menjawab soal.</p>
 			</div>
 		</div>
 		<div class="mt-3">
-			<ThemeToggle />
-		</div>
-		<div class="mt-3 border-t border-[#e7e2d2] pt-3">
 			<SoundToggle />
 		</div>
 	</div>
