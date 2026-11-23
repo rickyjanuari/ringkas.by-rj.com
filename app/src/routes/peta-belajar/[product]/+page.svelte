@@ -2,11 +2,11 @@
 	import Icon from "$lib/Icon.svelte";
 	import { gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { api, getToken, type StudyPack, type FullChapter } from "$lib/api";
 
-	let productId = $derived($page.params.product);
+	let productId = $derived(page.params.product);
 	/** Warna kelas produk ini — dipakai cincin node "saat ini" + legenda. */
 	let gtPeta = $derived(gradeTheme(gradeOfProduct(productId)));
 	let pack = $state<StudyPack | null>(null);
@@ -147,21 +147,23 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto(`/belajar/${productId}`)}>
+<a href={`/belajar/${productId}`} class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke ruang belajar
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat peta...</p>
 {:else if error || !pack}
 	<p class="err mt-6">{error || "Peta belajar tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-		<Icon name="map" size={18} class="shrink-0" /> Peta <span class="u-pencil">belajar</span>
-	</h1>
-	<p class="text-sm text-[#5f6b62]">
-		{pack.product.title} • {pack.chapters.length} bab
-	</p>
+	<header class="page-heading page-heading-study">
+		<h1>
+			<Icon name="map" size={18} class="shrink-0" /> Peta belajar
+		</h1>
+		<p class="text-sm text-[#5f6b62]">
+			{pack.product.title} • {pack.chapters.length} bab
+		</p>
+	</header>
 
 	<!-- Ringkasan progres -->
 	<div class="card mt-3 p-4">

@@ -7,29 +7,29 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
-  href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Nunito+Sans:wght@400;700;800&display=swap"
+  href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
   rel="stylesheet"
 />
 <style>
   :root {
-    --emerald: #177245;
-    --emerald-dark: #115c39;
-    --marigold: #f2b33d;
-    --ink: #22302a;
-    --paper: #f7f5ef;
-    --card: #fffdf7;
-    --line: #e7e2d2;
-    --muted: #5f6b62;
+    --emerald: #143c31;
+    --emerald-dark: #205343;
+    --marigold: #e9f492;
+    --ink: #203129;
+    --paper: #f6f4eb;
+    --card: #fdfbf4;
+    --line: #d8d9ca;
+    --muted: #515e52;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--paper);
     color: var(--ink);
-    font-family: "Nunito Sans", system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
   .phone {
-    max-width: 420px;
+    max-width: 30rem;
     min-height: 100dvh;
     margin: 0 auto;
     background: var(--card);
@@ -48,7 +48,7 @@
     width: 34px; height: 34px; border-radius: 10px;
     background: var(--emerald); color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-family: Lora, serif; font-weight: 700; font-size: 18px;
+    font-family: "DM Serif Display", Georgia, serif; font-weight: 700; font-size: 18px;
   }
   header p { margin: 0; line-height: 1.25; }
   header .t { font-weight: 800; font-size: 15px; }
@@ -67,11 +67,11 @@
     align-items: center; justify-content: center;
     gap: 14px; padding: 18px 16px 8px; text-align: center;
   }
-  .stage h1 {
-    font-family: Lora, serif; font-size: 26px; line-height: 1.25; margin: 0;
+  .stage h2 {
+    font-family: "DM Serif Display", Georgia, serif; font-size: 26px; line-height: 1.25; margin: 0;
   }
   .stage .big {
-    font-family: Lora, serif; font-size: 44px; font-weight: 700; color: var(--emerald);
+    font-family: "DM Serif Display", Georgia, serif; font-size: 44px; font-weight: 700; color: var(--emerald);
     margin: 0;
   }
   .objects {
@@ -144,7 +144,7 @@
   .numline .frog::after {
     content: ""; position: absolute; top: 7px; width: 8px; height: 8px;
     border-radius: 50%; background: #fff;
-    box-shadow: inset 0 0 0 2px #22302a;
+    box-shadow: inset 0 0 0 2px #203129;
   }
   .numline .frog::before { left: 6px; }
   .numline .frog::after { right: 6px; }
@@ -191,13 +191,20 @@
     display: none; text-align: center; padding: 6px 16px 16px;
   }
   .endcard.show { display: block; }
+
+  header .t { display: block; margin: 0; font: 400 clamp(1.15rem, 3.5vw, 1.55rem)/1.12 "DM Serif Display", Georgia, serif; }
+  header .s { display: block; margin-top: 0.25rem; }
+  @media (min-width: 36rem) {
+    .phone { min-height: auto; margin-block: 1rem; border-radius: 1.15rem; overflow: hidden; }
+  }
+  :focus-visible { outline: 2px solid #24724e; outline-offset: 3px; }
 </style>
 </head>
 <body>
 <div class="phone">
   <header>
     <span class="dot">R</span>
-    <p><span class="t">Membilang sampai 10</span><br /><span class="s">Matematika Kelas 1 • Bab 1 • Video pendek</span></p>
+    <div><h1 class="t">Membilang sampai 10</h1><span class="s">Matematika Kelas 1 • Bab 1 • Video pendek</span></div>
   </header>
   <div class="progress" id="progress"></div>
   <div class="stage" id="stage"></div>
@@ -234,7 +241,7 @@
     Array.from({ length: n }, (_, i) =>
       `<span class="star" style="--d:${0.4 + i * 0.35}s"></span>`).join("");
   const balloons = (n) => {
-    const colors = ["#d64541", "#f2b33d", "#3b82c4", "#4caf50", "#e8833a", "#8e6fc8", "#d64541"];
+    const colors = ["#d64541", "#e9f492", "#3b82c4", "#4caf50", "#e8833a", "#8e6fc8", "#d64541"];
     return Array.from({ length: n }, (_, i) =>
       `<span class="balloon" style="--d:${0.4 + i * 0.45}s;background:${colors[i % colors.length]}"></span>`).join("");
   };
@@ -246,25 +253,25 @@
     {
       title: "Pembuka",
       text: "Halo, teman-teman! Ayo membilang sampai sepuluh!",
-      html: `<h1>Ayo Membilang<br />sampai 10!</h1><p class="big">1 2 3 4 5<br />6 7 8 9 10</p>`,
+      html: `<h2>Ayo Membilang<br />sampai 10!</h2><p class="big">1 2 3 4 5<br />6 7 8 9 10</p>`,
       fallbackMs: 7000
     },
     {
       title: "Menghitung apel 1–5",
       text: "Ada lima apel. Satu, dua, tiga, empat, lima! Ada lima apel. Hebat!",
-      html: `<h1>Berapa apelnya?</h1><div class="objects">${apples(5)}</div>`,
+      html: `<h2>Berapa apelnya?</h2><div class="objects">${apples(5)}</div>`,
       fallbackMs: 11000
     },
     {
       title: "Menghitung bintang 1–10",
       text: "Sekarang ada sepuluh bintang. Hitung bersama, yuk! Satu sampai sepuluh!",
-      html: `<h1>Berapa bintangnya?</h1><div class="objects">${stars(10)}</div>`,
+      html: `<h2>Berapa bintangnya?</h2><div class="objects">${stars(10)}</div>`,
       fallbackMs: 11000
     },
     {
       title: "Garis bilangan",
       text: "Katak melompat di garis bilangan. Satu, dua, tiga, empat, lima! Katak berhenti di angka lima.",
-      html: `<h1>Katak melompat!</h1><div class="numline"><div class="track"></div>
+      html: `<h2>Katak melompat!</h2><div class="numline"><div class="track"></div>
         ${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="tick" style="left:${4 + n * 9.2}%"></span><span class="lbl" style="left:${4 + n * 9.2}%">${n}</span>`).join("")}
         <span class="frog"></span></div>`,
       fallbackMs: 11000
@@ -272,13 +279,13 @@
     {
       title: "Tebak balon",
       text: "Ada berapa balon? Satu, dua, tiga, empat, lima, enam, tujuh! Ada tujuh balon!",
-      html: `<h1>Tebak, ada berapa balon?</h1><div class="objects">${balloons(7)}</div>`,
+      html: `<h2>Tebak, ada berapa balon?</h2><div class="objects">${balloons(7)}</div>`,
       fallbackMs: 11000
     },
     {
       title: "Penutup",
       text: "Hebat! Kamu bisa membilang sampai sepuluh. Lihat kotak sepuluh ini: delapan sudah terisi, dua masih kosong. Sampai jumpa di video berikutnya!",
-      html: `<h1>Kotak Sepuluh</h1>${tenFrame(8)}<p style="font-weight:800">8 sudah terisi, 2 masih kosong.</p>`,
+      html: `<h2>Kotak Sepuluh</h2>${tenFrame(8)}<p style="font-weight:800">8 sudah terisi, 2 masih kosong.</p>`,
       fallbackMs: 11000
     }
   ];

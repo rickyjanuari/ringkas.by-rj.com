@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { api, getToken, type PublicQuestion, type QuizResult } from "$lib/api";
 
@@ -45,7 +45,7 @@
 		subject: string;
 	}
 
-	let quizId = $derived($page.params.id);
+	let quizId = $derived(page.params.id);
 	let detail = $state<QuizDetail | null>(null);
 	let loading = $state(true);
 	let error = $state("");
@@ -158,19 +158,21 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/kuis-guru")}>
+<a href="/kuis-guru" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke kuis buatan guru
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error || !detail}
 	<p class="err mt-6">{error || "Kuis tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 text-xl font-semibold leading-snug">{detail.title}</h1>
-	<p class="text-sm text-[#5f6b62]">
-		{detail.class_name} • {detail.subject} • Kelas {detail.grade} • {detail.question_count} soal
-	</p>
+	<header class="page-heading page-heading-practice">
+		<h1>{detail.title}</h1>
+		<p class="text-sm text-[#5f6b62]">
+			{detail.class_name} • {detail.subject} • Kelas {detail.grade} • {detail.question_count} soal
+		</p>
+	</header>
 
 	<!-- ======================= MODE GURU: REKAP ======================= -->
 	{#if detail.is_teacher}

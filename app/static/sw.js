@@ -26,7 +26,7 @@
 // ini harus tetap di app/static/ dan terdaftar dari /sw.js (scope "/").
 "use strict";
 
-const CACHE_VERSION = "ringkas-v2";
+const CACHE_VERSION = "ringkas-v3";
 const CACHE_NAME = CACHE_VERSION;
 
 const CORE_SHELL = [
@@ -68,6 +68,7 @@ function isStaticAsset(pathname) {
     pathname.startsWith("/_app/") ||
     pathname.startsWith("/logo/") ||
     pathname.startsWith("/shorts/") ||
+    pathname === "/hero-scene.webp" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/offline.html" ||
     pathname === "/sw.js"

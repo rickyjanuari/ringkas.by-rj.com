@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { api, getToken } from "$lib/api";
 
@@ -30,7 +30,7 @@
 		xpEarned: number;
 	};
 
-	let id = $derived($page.params.id ?? "");
+	let id = $derived(page.params.id ?? "");
 	let story = $state<StoryDetail | null>(null);
 	let loading = $state(true);
 	let error = $state("");
@@ -91,21 +91,23 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/cerita")}>
+<a href="/cerita" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke daftar cerita
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat cerita...</p>
 {:else if error || !story}
 	<p class="err mt-6">{error || "Cerita tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-		<Icon name="book-open" size={18} class="shrink-0" /> {story.title}
-	</h1>
-	<p class="text-sm text-[#5f6b62]">
-		Kelas {story.grade} • {total} soal pemahaman
-	</p>
+	<header class="page-heading page-heading-reading">
+		<h1>
+			<Icon name="book-open" size={18} class="shrink-0" /> {story.title}
+		</h1>
+		<p class="text-sm text-[#5f6b62]">
+			Kelas {story.grade} • {total} soal pemahaman
+		</p>
+	</header>
 
 	{#if !started}
 		<div class="card mt-4 space-y-3 p-4 lg:p-5">

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
-	import { goto } from "$app/navigation";
 	import { api, formatTanggal, getToken } from "$lib/api";
 
 	interface TryoutListItem {
@@ -106,17 +105,19 @@
 	);
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
+<a href="/" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke beranda
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold">
-	<Icon name="trophy" size={18} /> Tryout terjadwal
-</h1>
-<p class="mt-1 text-sm text-[#5f6b62]">
-	Ujian bersama per kelas — soal acak lintas mapel dari bank simulasi. Daftar dulu, kerjakan saat
-	waktunya tiba, dan lihat peringkatmu setelah selesai.
-</p>
+<header class="page-heading page-heading-practice">
+	<h1>
+		<Icon name="trophy" size={18} /> Tryout terjadwal
+	</h1>
+	<p class="mt-1 text-sm text-[#5f6b62]">
+		Ujian bersama per kelas — soal acak lintas mapel dari bank simulasi. Daftar dulu, kerjakan saat
+		waktunya tiba, dan lihat peringkatmu setelah selesai.
+	</p>
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat tryout...</p>

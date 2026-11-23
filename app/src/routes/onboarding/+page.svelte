@@ -77,14 +77,14 @@
 {#if memeriksa}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else}
-	<div class="lg:mx-auto lg:max-w-xl">
-		<div class="flex flex-col items-center text-center">
+	<div class="onboarding-flow">
+		<header class="page-heading page-heading-study onboarding-heading">
 			<Mascot expression="semangat" size={88} />
-			<h1 class="mt-2 text-xl font-semibold">Kenalan dulu, yuk</h1>
+			<h1>Kenalan dulu, yuk</h1>
 			<p class="mt-1 text-sm text-[#5f6b62]">
 				Tiga langkah cepat sebelum mulai belajar di Ringkas.
 			</p>
-		</div>
+		</header>
 
 		<!-- Penanda langkah -->
 		<div class="tabular-nums mt-5 flex items-center justify-center gap-2" aria-label="Langkah {langkah} dari 3">

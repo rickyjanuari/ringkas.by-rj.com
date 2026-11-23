@@ -79,7 +79,9 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="package" size={18} /> Hadiah untukmu</h1>
+<header class="page-heading page-heading-account">
+	<h1><Icon name="package" size={18} /> Hadiah untukmu</h1>
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat hadiahmu...</p>

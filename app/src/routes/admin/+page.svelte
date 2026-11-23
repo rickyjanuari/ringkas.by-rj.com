@@ -22,22 +22,28 @@
 	let error = $state("");
 	let notice = $state("");
 	let adminName = $state("");
-	let drawerOpen = $state(false);
+	let drawer = $state<HTMLDialogElement>();
 
-	const MENU: { id: Tab; label: string; icon: string }[] = [
-		{ id: "ringkasan", label: "Ringkasan", icon: "chart" },
-		{ id: "pesanan", label: "Pesanan", icon: "shopping-cart" },
-		{ id: "donasi", label: "Donasi", icon: "thumbs-up" },
-		{ id: "produk", label: "Produk", icon: "package" },
-		{ id: "voucher", label: "Voucher", icon: "receipt" },
-		{ id: "pengguna", label: "Pengguna", icon: "users" },
-		{ id: "video", label: "Video per bab", icon: "video" },
-		{ id: "tryout", label: "Tryout", icon: "trophy" },
-		{ id: "tanggal-sas", label: "Tanggal SAS", icon: "calendar" },
-		{ id: "tanya-jawab", label: "Tanya jawab", icon: "message" },
-		{ id: "cron", label: "Email & cron", icon: "clock" },
-		{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" },
-		{ id: "audit", label: "Log aktivitas", icon: "history" }
+	const MENU: { label: string; items: { id: Tab; label: string; icon: string }[] }[] = [
+		{ label: "Toko", items: [
+			{ id: "ringkasan", label: "Ringkasan", icon: "chart" },
+			{ id: "pesanan", label: "Pesanan", icon: "shopping-cart" },
+			{ id: "produk", label: "Produk", icon: "package" },
+			{ id: "voucher", label: "Voucher", icon: "receipt" },
+			{ id: "donasi", label: "Donasi", icon: "thumbs-up" }
+		] },
+		{ label: "Pembelajaran", items: [
+			{ id: "video", label: "Video per bab", icon: "video" },
+			{ id: "tryout", label: "Tryout", icon: "trophy" },
+			{ id: "tanggal-sas", label: "Tanggal SAS", icon: "calendar" },
+			{ id: "tanya-jawab", label: "Tanya jawab", icon: "message" }
+		] },
+		{ label: "Sistem", items: [
+			{ id: "pengguna", label: "Pengguna", icon: "users" },
+			{ id: "pengumuman", label: "Pengumuman", icon: "sparkles" },
+			{ id: "cron", label: "Email & cron", icon: "clock" },
+			{ id: "audit", label: "Log aktivitas", icon: "history" }
+		] }
 	];
 
 	const TAB_TITLE: Record<Tab, string> = {
@@ -55,14 +61,6 @@
 		pengumuman: "Pengumuman",
 		audit: "Log aktivitas"
 	};
-
-	function navClass(t: Tab): string {
-		const base =
-			"flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold";
-		return tab === t
-			? `${base} bg-[#177245] text-white`
-			: `${base} text-[#3f4a42] hover:bg-[#ece9dc]`;
-	}
 
 	// ---- Ringkasan ----
 	type AdminStats = {
@@ -1035,9 +1033,10 @@
 	}
 
 	function switchTab(t: Tab) {
+		if (tab !== t) window.scrollTo(0, 0);
 		tab = t;
 		notice = "";
-		drawerOpen = false;
+		drawer?.close();
 		if (t === "pengguna" && users.length === 0) loadUsers();
 		if (t === "voucher" && vouchers.length === 0) loadVouchers();
 		if (t === "ringkasan" && !stats && !statsLoading) loadStats();
@@ -1443,107 +1442,69 @@
 	}
 </script>
 
+{#snippet adminLinks()}
+	<nav class="admin-menu" aria-label="Bagian admin">
+		{#each MENU as group (group.label)}
+			<div class="admin-menu-group">
+				<p>{group.label}</p>
+				{#each group.items as item (item.id)}
+					<button type="button" aria-current={tab === item.id ? "true" : undefined} onclick={() => switchTab(item.id)}>
+						<Icon name={item.icon} size={18} /> {item.label}
+						{#if item.id === "produk" && products.length}
+							<span>{products.length}</span>
+						{/if}
+					</button>
+				{/each}
+			</div>
+		{/each}
+	</nav>
+{/snippet}
+
 {#if checking}
-	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
+	<p class="store-state" role="status">Memuat panel admin…</p>
 {:else if !isAdmin}
-	<p class="err mt-6">{error || "Halaman ini hanya untuk admin"}</p>
+	<header class="page-heading page-heading-account"><h1>Panel admin</h1></header>
+	<p class="err mt-4" role="alert">{error || "Halaman ini hanya untuk admin"}</p>
 	<a href="/" class="btn btn-primary mt-4">Kembali ke beranda</a>
 {:else}
-	<div class="lg:flex lg:items-start lg:gap-4">
-		<!-- Sidebar desktop -->
-		<aside class="card sticky top-4 hidden w-60 shrink-0 flex-col gap-1 p-3 lg:flex">
-			<p class="flex items-center gap-2 px-2 pb-2 pt-1 text-base font-semibold">
-				<Icon name="crown" size={18} /> Admin Ringkas
-			</p>
-			{#each MENU as m (m.id)}
-				<button type="button" class={navClass(m.id)} onclick={() => switchTab(m.id)}>
-					<Icon name={m.icon} size={18} /> {m.label}
-					{#if m.id === "produk"}
-						<span class="ml-auto text-xs font-semibold tabular-nums">{products.length}</span>
-					{:else if m.id === "voucher"}
-						<span class="ml-auto text-xs font-semibold tabular-nums">{vouchers.length}</span>
-					{/if}
-				</button>
-			{/each}
-			<div class="mt-3 border-t border-[#e7e2d2] pt-3">
-				<button type="button" class="btn btn-ghost w-full" onclick={() => goto("/akun")}>
-					<Icon name="chevron-left" size={18} /> Kembali ke akun
-				</button>
-			</div>
+	<div class="admin-layout">
+		<aside class="admin-sidebar">
+			{@render adminLinks()}
+			<a href="/akun" class="admin-back"><Icon name="arrow-left" size={18} /> Kembali ke akun</a>
 		</aside>
 
-		<!-- Drawer mobile -->
-		{#if drawerOpen}
-			<div class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Menu admin">
-				<button
-					type="button"
-					aria-label="Tutup menu"
-					class="absolute inset-0 bg-black/40"
-					onclick={() => (drawerOpen = false)}
-				></button>
-				<aside class="absolute left-0 top-0 flex h-full w-72 flex-col gap-1 overflow-y-auto bg-[#fffdf7] p-3 shadow-[0_8px_24px_rgb(0_0_0/0.06)]">
-					<div class="flex items-center justify-between px-2 pb-2 pt-1">
-						<p class="flex items-center gap-2 text-base font-semibold">
-							<Icon name="crown" size={18} /> Admin Ringkas
-						</p>
-						<button
-							type="button"
-							aria-label="Tutup menu"
-							class="btn btn-ghost !px-2 !py-2"
-							onclick={() => (drawerOpen = false)}
-						>
-							<Icon name="x" size={18} />
-						</button>
-					</div>
-					{#each MENU as m (m.id)}
-						<button type="button" class={navClass(m.id)} onclick={() => switchTab(m.id)}>
-							<Icon name={m.icon} size={18} /> {m.label}
-							{#if m.id === "produk"}
-								<span class="ml-auto text-xs font-semibold tabular-nums">{products.length}</span>
-							{:else if m.id === "voucher"}
-								<span class="ml-auto text-xs font-semibold tabular-nums">{vouchers.length}</span>
-							{/if}
-						</button>
-					{/each}
-					<div class="mt-3 border-t border-[#e7e2d2] pt-3">
-						<button type="button" class="btn btn-ghost w-full" onclick={() => goto("/akun")}>
-							<Icon name="chevron-left" size={18} /> Kembali ke akun
-						</button>
-					</div>
-				</aside>
+		<dialog class="admin-drawer" bind:this={drawer} aria-label="Menu admin">
+			<div class="admin-drawer-header">
+				<strong>Menu admin</strong>
+				<button type="button" class="btn btn-ghost" aria-label="Tutup menu admin" onclick={() => drawer?.close()}><Icon name="x" size={20} /></button>
 			</div>
-		{/if}
+			{@render adminLinks()}
+			<a href="/akun" class="admin-back"><Icon name="arrow-left" size={18} /> Kembali ke akun</a>
+		</dialog>
 
-		<!-- Konten dashboard -->
-		<div class="min-w-0 flex-1">
-			<div class="flex items-center gap-2">
-				<button
-					type="button"
-					aria-label="Buka menu"
-					class="btn btn-ghost !px-3 !py-2 lg:hidden"
-					onclick={() => (drawerOpen = true)}
-				>
-					<Icon name="layers" size={18} />
-				</button>
-				<h1 class="flex items-center gap-2 text-xl font-semibold">
-					<Icon name="crown" size={18} /> {TAB_TITLE[tab]}
-				</h1>
-				<span class="ml-auto flex min-w-0 items-center gap-2 text-xs font-semibold text-[#3f4a42]">
-					<Icon name="user" size={16} />
-					<span class="max-w-28 truncate sm:max-w-none">{adminName}</span>
-				</span>
-			</div>
-
+		<div class="admin-content">
+			<header class="admin-heading">
+				<div>
+					<p class="eyebrow">Panel admin</p>
+					<h1>{TAB_TITLE[tab]}</h1>
+				</div>
+				<div class="admin-heading-actions">
+					<span><Icon name="user" size={17} /> {adminName}</span>
+					<button type="button" class="btn btn-outline admin-menu-trigger" onclick={() => drawer?.showModal()}>
+						<Icon name="layers" size={19} /> Menu
+					</button>
+				</div>
+			</header>
 			{#if error}
-				<p class="err mt-3">{error}</p>
+				<p class="err mt-3" role="alert">{error}</p>
 			{/if}
 			{#if notice}
-				<p class="ok-msg mt-3">{notice}</p>
+				<p class="ok-msg mt-3" role="status">{notice}</p>
 			{/if}
 
 			{#if tab === "ringkasan"}
 				<div class="mt-4 flex items-center justify-between gap-2">
-					<p class="text-sm font-semibold text-[#3f4a42]">Angka-angka dari database toko</p>
+					<p class="text-sm font-semibold text-[#3f4a42]">Kinerja toko</p>
 					<button type="button" class="btn btn-ghost !px-3 !py-2 text-xs" disabled={statsLoading} onclick={loadStats}>
 						<Icon name="refresh" size={16} /> {statsLoading ? "Memuat..." : "Muat ulang"}
 					</button>
@@ -1557,50 +1518,28 @@
 					{#if statsError}
 						<p class="err mt-4">{statsError}</p>
 					{/if}
-					<div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="package" size={16} /> Total produk</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.products_total}</p>
-							<p class="text-xs text-[#5f6b62]">{stats.products_visible} tampil • {stats.products_hidden} tersembunyi</p>
+					<div class="admin-metrics">
+						<div class="admin-metric admin-metric-featured">
+							<span><Icon name="credit-card" size={19} /> Pendapatan</span>
+							<strong>{formatRupiah(stats.revenue_paid)}</strong>
+							<small>Dari {stats.orders_paid} pesanan lunas</small>
 						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="eye" size={16} /> Produk tampil</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.products_visible}</p>
-							<p class="text-xs text-[#5f6b62]">dari {stats.products_total} produk</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="users" size={16} /> Pengguna</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.users_total}</p>
-							<p class="text-xs text-[#5f6b62]">akun terdaftar</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="receipt" size={16} /> Total order</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.orders_total}</p>
-							<p class="text-xs text-[#5f6b62]">{stats.orders_paid} sudah lunas (PAID)</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="check" size={16} /> Order lunas</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.orders_paid}</p>
-							<p class="text-xs text-[#5f6b62]">status PAID</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="credit-card" size={16} /> Pendapatan</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{formatRupiah(stats.revenue_paid)}</p>
-							<p class="text-xs text-[#5f6b62]">total order PAID</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="bookmark" size={16} /> Voucher aktif</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.vouchers_active}</p>
-							<p class="text-xs text-[#5f6b62]">kode bisa dipakai</p>
-						</div>
-						<div class="card p-3">
-							<p class="flex items-center gap-2 text-xs font-semibold text-[#5f6b62]"><Icon name="sparkles" size={16} /> Email terkirim</p>
-							<p class="mt-1 text-2xl font-semibold tabular-nums">{stats.emails_sent}</p>
-							<p class="text-xs text-[#5f6b62]">jejak pengiriman email</p>
-						</div>
+						{#each [
+							{ label: "Pesanan", icon: "receipt", value: stats.orders_total, detail: `${stats.orders_paid} sudah lunas`, target: "pesanan" as const },
+							{ label: "Produk", icon: "package", value: stats.products_total, detail: `${stats.products_visible} tampil · ${stats.products_hidden} tersembunyi`, target: "produk" as const },
+							{ label: "Pengguna", icon: "users", value: stats.users_total, detail: "Akun terdaftar", target: "pengguna" as const },
+							{ label: "Voucher aktif", icon: "bookmark", value: stats.vouchers_active, detail: "Kode dapat digunakan", target: "voucher" as const },
+							{ label: "Email terkirim", icon: "message", value: stats.emails_sent, detail: "Riwayat pengiriman", target: "cron" as const }
+						] as metric (metric.target)}
+							<button class="admin-metric" type="button" onclick={() => switchTab(metric.target)}>
+								<span><Icon name={metric.icon} size={19} /> {metric.label} <Icon name="arrow-right" size={16} class="metric-arrow" /></span>
+								<strong>{metric.value}</strong>
+								<small>{metric.detail}</small>
+							</button>
+						{/each}
 					</div>
 
-					<h2 class="mt-8 text-base font-semibold">Order terbaru</h2>
+					<h2 class="mt-8 text-base font-semibold">Pesanan terbaru</h2>
 					{#if recentOrders.length === 0}
 						<p class="mt-2 text-sm text-[#5f6b62]">Belum ada order</p>
 					{:else}
@@ -3300,7 +3239,7 @@
 
 	<!-- Modal form tambah/edit produk -->
 	{#if editId}
-		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label={editId === "baru" ? "Produk baru" : "Edit produk"}>
+		<div class="admin-modal fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label={editId === "baru" ? "Produk baru" : "Edit produk"}>
 			<button
 				type="button"
 				aria-label="Tutup form produk"
@@ -3392,7 +3331,7 @@
 
 	<!-- Modal detail order -->
 	{#if orderDetailLoading || orderDetail || orderDetailError}
-		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Detail order">
+		<div class="admin-modal fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Detail order">
 			<button
 				type="button"
 				aria-label="Tutup detail order"
@@ -3524,7 +3463,7 @@
 
 	<!-- Modal reset kata sandi -->
 	{#if resetUser}
-		<div class="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Reset kata sandi">
+		<div class="admin-modal fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-label="Reset kata sandi">
 			<button
 				type="button"
 				aria-label="Tutup reset kata sandi"

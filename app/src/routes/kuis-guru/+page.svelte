@@ -153,10 +153,12 @@
 	<Icon name="chevron-left" size={18} /> Kembali ke akun
 </button>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="school" size={18} class="shrink-0" /> Kuis buatan guru
-</h1>
-<p class="text-sm text-[#5f6b62]">Rakit kuis dari bank soal untuk kelasmu, lalu lihat siapa saja yang sudah mengerjakan.</p>
+<header class="page-heading page-heading-practice">
+	<h1>
+		<Icon name="school" size={18} class="shrink-0" /> Kuis buatan guru
+	</h1>
+	<p class="text-sm text-[#5f6b62]">Rakit kuis dari bank soal untuk kelasmu, lalu lihat siapa saja yang sudah mengerjakan.</p>
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>

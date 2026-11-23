@@ -44,17 +44,17 @@
 	});
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
-	<Icon name="chevron-left" size={18} /> Kembali ke beranda
-</button>
+<a href="/alat" class="store-text-link product-back"><Icon name="arrow-left" size={18} /> Alat belajar</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="school" size={18} class="shrink-0" /> Simulasi ANBK kelas 5
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Latihan seperti Asesmen Nasional: Literasi membaca dan Numerasi. Ada waktu, ada skor, ada
-	pembahasan tiap soal. Soal-soalnya orisinal, dibuat untuk latihan.
-</p>
+<header class="page-heading page-heading-practice">
+	<h1>
+		<Icon name="school" size={18} class="shrink-0" /> Simulasi ANBK kelas 5
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Latihan seperti Asesmen Nasional: Literasi membaca dan Numerasi. Ada waktu, ada skor, ada
+		pembahasan tiap soal. Soal-soalnya orisinal, dibuat untuk latihan.
+	</p>
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
@@ -80,12 +80,12 @@
 		</div>
 	{/if}
 
-	<div class="mt-4 space-y-3">
+	<div class="assessment-grid">
 		{#each data.packages as p (p.id)}
 			<div class="card p-4">
 				<div class="flex items-start justify-between gap-2">
 					<div>
-						<p class="text-sm font-semibold leading-snug">{p.title}</p>
+						<h2>{p.title}</h2>
 						<p class="mt-0.5 text-xs text-[#5f6b62]">
 							{p.subject} • Kelas {p.grade} • Paket {p.paket}
 						</p>

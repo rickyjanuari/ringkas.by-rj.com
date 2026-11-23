@@ -2,7 +2,7 @@
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { api, getToken } from "$lib/api";
 
 	const MAX_SECONDS = 60;
@@ -77,8 +77,8 @@
 			micError =
 				"Browser ini tidak mendukung perekaman suara. Coba lewat Chrome atau Edge di Android/komputer ya.";
 		}
-		const qProduct = $page.url.searchParams.get("product") ?? "";
-		const qChapter = $page.url.searchParams.get("chapter") ?? "";
+		const qProduct = page.url.searchParams.get("product") ?? "";
+		const qChapter = page.url.searchParams.get("chapter") ?? "";
 		if (qProduct) productId = qProduct;
 		if (qChapter) chapterId = qChapter;
 		muatProduk().then(() => {
@@ -343,17 +343,19 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
+<a href="/akun" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke akun
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="book-open" size={18} class="shrink-0" /> Rekam suara baca nyaring
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Baca nyaring satu bagian bab, rekam suaramu (maksimal 60 detik), lalu kirim. Orang tua atau
-	gurumu bisa mendengarkan dan memberi bintang.
-</p>
+<header class="page-heading page-heading-reading">
+	<h1>
+		<Icon name="book-open" size={18} class="shrink-0" /> Rekam suara baca nyaring
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Baca nyaring satu bagian bab, rekam suaramu (maksimal 60 detik), lalu kirim. Orang tua atau
+		gurumu bisa mendengarkan dan memberi bintang.
+	</p>
+</header>
 
 {#if loadError}
 	<p class="err mt-3">{loadError}</p>

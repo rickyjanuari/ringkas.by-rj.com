@@ -4,80 +4,57 @@
 	import MultiplicationTable from "$lib/tools/MultiplicationTable.svelte";
 	import FractionCalculator from "$lib/tools/FractionCalculator.svelte";
 
-	type AlatId = "garis" | "perkalian" | "pecahan";
-	let terbuka = $state<AlatId | null>(null);
+	const tools = [
+		{ id: "garis", title: "Garis bilangan", level: "Kelas 1–2", symbol: "+ −", description: "Lompat maju dan mundur di garis 0–20.", component: NumberLine },
+		{ id: "perkalian", title: "Tabel perkalian", level: "Kelas 3–4", symbol: "×", description: "Jelajahi hasil perkalian 1–10, lalu coba latihan acak.", component: MultiplicationTable },
+		{ id: "pecahan", title: "Kalkulator pecahan", level: "Kelas 5–6", symbol: "½", description: "Hitung pecahan dan lihat hasilnya sebagai potongan lingkaran.", component: FractionCalculator }
+	] as const;
+	const practice = [
+		{ href: "/soal-cerita", title: "Soal cerita", icon: "message", description: "Matematika dan Bahasa Indonesia dari kejadian sehari-hari." },
+		{ href: "/latihan-adaptif", title: "Latihan adaptif", icon: "zap", description: "Latihan yang menyesuaikan tingkat kesulitan dengan jawabanmu." },
+		{ href: "/latihan-tanpa-habis", title: "Latihan tanpa habis", icon: "refresh", description: "Lima soal hitung baru setiap kali kamu mulai." },
+		{ href: "/anbk", title: "Simulasi ANBK", icon: "graduation-cap", description: "Kenali bentuk soal literasi dan numerasi untuk kelas 5." },
+		{ href: "/tryout", title: "Tryout terjadwal", icon: "trophy", description: "Temukan ujian bersama untuk kelasmu." },
+		{ href: "/kuis-guru", title: "Kuis buatan guru", icon: "school", description: "Buat kuis kelas atau masuk dengan kode dari gurumu." },
+		{ href: "/cerita", title: "Cerita edukasi", icon: "book-open", description: "Baca cerita dan jawab pertanyaan tentang bacaanmu." }
+	];
 
-	function alih(id: AlatId) {
-		terbuka = terbuka === id ? null : id;
-	}
+	let selectedId = $state<(typeof tools)[number]["id"]>("garis");
+	let selected = $derived(tools.find((tool) => tool.id === selectedId) ?? tools[0]);
 </script>
 
-<h1 class="mt-3 text-xl font-semibold leading-snug">Alat interaktif</h1>
-<p class="mt-1 text-sm text-[#5f6b62]">
-	Tiga alat main sambil belajar Matematika. Semuanya berjalan langsung di perangkatmu — tanpa perlu masuk atau menunggu.
-</p>
+<header class="page-heading page-heading-study">
+	<h1>Alat belajar</h1>
+	<p>Jelajahi konsep Matematika, berlatih soal, atau baca satu cerita pendek.</p>
+</header>
 
-<div class="mt-4 space-y-4">
-	<!-- Garis bilangan -->
-	<div class="card p-4">
-		<div class="flex flex-wrap items-start justify-between gap-2">
-			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
-					<Icon name="target" size={18} /> Garis bilangan
-				</h2>
-				<p class="mt-1 text-sm leading-relaxed">
-					Lompat maju dan mundur di garis 0–20, lalu lihat kalimat penjumlahannya.
-				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 1–2</span></p>
-			</div>
-			<button type="button" class="btn {terbuka === 'garis' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("garis")}>
-				{#if terbuka === "garis"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}
+<section class="tool-section" aria-labelledby="tool-title">
+	<h2 id="tool-title">Matematika interaktif</h2>
+	<p>Ketiga alat ini bisa langsung dipakai tanpa akun.</p>
+	<div class="tool-picker" role="group" aria-label="Pilih alat Matematika">
+		{#each tools as tool (tool.id)}
+			<button class="tool-choice" type="button" aria-pressed={selectedId === tool.id} onclick={() => (selectedId = tool.id)}>
+				<span class="tool-symbol" aria-hidden="true">{tool.symbol}</span>
+				<small>{tool.level}</small>
+				<strong>{tool.title}</strong>
+				<span>{tool.description}</span>
 			</button>
-		</div>
-		{#if terbuka === "garis"}
-			<div class="mt-4"><NumberLine /></div>
-		{/if}
+		{/each}
 	</div>
+	<div class="tool-workbench" aria-label={selected.title}>
+		{#key selectedId}<selected.component />{/key}
+	</div>
+</section>
 
-	<!-- Tabel perkalian -->
-	<div class="card p-4">
-		<div class="flex flex-wrap items-start justify-between gap-2">
-			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
-					<Icon name="target" size={18} /> Tabel perkalian
-				</h2>
-				<p class="mt-1 text-sm leading-relaxed">
-					Lihat hasil 1–10 × 1–10 dengan sekali ketuk, lalu uji diri dengan Latihan Acak.
-				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 3–4</span></p>
-			</div>
-			<button type="button" class="btn {terbuka === 'perkalian' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("perkalian")}>
-				{#if terbuka === "perkalian"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}
-			</button>
-		</div>
-		{#if terbuka === "perkalian"}
-			<div class="mt-4"><MultiplicationTable /></div>
-		{/if}
+<section class="tool-section" aria-labelledby="exercise-title">
+	<h2 id="exercise-title">Latihan dan bacaan</h2>
+	<div class="tool-directory">
+		{#each practice as item (item.href)}
+			<a href={item.href}>
+				<Icon name={item.icon} size={24} />
+				<span><strong>{item.title}</strong><small>{item.description}</small></span>
+				<Icon name="arrow-right" size={18} />
+			</a>
+		{/each}
 	</div>
-
-	<!-- Kalkulator pecahan -->
-	<div class="card p-4">
-		<div class="flex flex-wrap items-start justify-between gap-2">
-			<div>
-				<h2 class="flex items-center gap-1.5 text-base font-semibold text-[#177245]">
-					<Icon name="target" size={18} /> Kalkulator pecahan
-				</h2>
-				<p class="mt-1 text-sm leading-relaxed">
-					Jumlah, kurang, kali, dan bagi pecahan — hasilnya disederhanakan dan digambar sebagai potongan lingkaran.
-				</p>
-				<p class="mt-2"><span class="badge badge-leaf">Matematika • kelas 5–6</span></p>
-			</div>
-			<button type="button" class="btn {terbuka === 'pecahan' ? 'btn-ghost' : 'btn-primary'}" onclick={() => alih("pecahan")}>
-				{#if terbuka === "pecahan"}<Icon name="x" size={16} /> Tutup{:else}<Icon name="chevron-down" size={16} /> Buka{/if}
-			</button>
-		</div>
-		{#if terbuka === "pecahan"}
-			<div class="mt-4"><FractionCalculator /></div>
-		{/if}
-	</div>
-</div>
+</section>

@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-	--color-brand: #177245;
-	--color-brand-dark: #115c39;
-	--color-sun: #f2b33d;
-	--color-leaf: #177245;
-	--color-mist: #f7f5ef;
-	--color-ink: #22302a;
-	--font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
-	--font-serif: "Lora", Georgia, serif;
+	--color-brand: #16774f;
+	--color-brand-dark: #0d5236;
+	--color-sun: #f5b942;
+	--color-leaf: #16774f;
+	--color-mist: #f7f9fc;
+	--color-ink: #172035;
+	--font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+	--font-serif: "DM Serif Display", Georgia, serif;
 	--ease-signature: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -18,33 +18,25 @@ html {
 
 body {
 	font-family: var(--font-sans);
-	background-color: #f7f5ef;
-	color: #22302a;
+	background: var(--paper);
+	color: var(--ink);
 	min-height: 100vh;
+	letter-spacing: -0.012em;
 }
 
-/* Latar titik-titik hanya di bawah lg (mobile/tablet);
-   di desktop latar kertas pucat polos. */
-@media (max-width: 1023.98px) {
-	body {
-		background-image: radial-gradient(#dce8d8 1.2px, transparent 1.2px);
-		background-size: 22px 22px;
-	}
-}
-
-/* Judul memakai serif Lora, isi memakai Nunito Sans. */
 h1,
 h2,
 h3 {
 	font-family: var(--font-serif);
+	letter-spacing: -0.035em;
+	text-wrap: balance;
 }
 
 /* --- Komponen dasar --- */
 .card {
-	background: #fffdf7;
-	border: 1px solid #e7e2d2;
-	border-radius: 1rem;
-	box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+	background: var(--sheet);
+	border: 1px solid var(--rule);
+	border-radius: 0.85rem;
 }
 
 .btn {
@@ -53,15 +45,16 @@ h3 {
 	justify-content: center;
 	gap: 0.4rem;
 	font-weight: 600;
-	border-radius: 0.625rem;
-	padding: 0.65rem 1rem;
+	border-radius: 0.6rem;
+	padding: 0.72rem 1.05rem;
 	font-size: 0.9rem;
 	line-height: 1.2;
 	cursor: pointer;
-	border: none;
+	border: 1px solid transparent;
 	transition:
-		transform 0.12s cubic-bezier(0.22, 1, 0.36, 1),
-		background-color 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+		transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
 		opacity 0.15s cubic-bezier(0.22, 1, 0.36, 1);
 	text-decoration: none;
 }
@@ -73,28 +66,28 @@ h3 {
 	cursor: not-allowed;
 }
 .btn-primary {
-	background: #177245;
-	color: #fff;
+	background: var(--forest);
+	color: var(--on-forest);
 }
 .btn-primary:hover {
-	background: #115c39;
+	background: var(--forest-hover);
 }
 .btn-sun {
-	background: #f2b33d;
-	color: #22302a;
+	background: var(--lime);
+	color: #203129;
 }
 .btn-leaf {
 	background: #177245;
 	color: #fff;
 }
 .btn-outline {
-	background: #fffdf7;
-	color: #177245;
-	border: 1.5px solid #177245;
+	background: var(--sheet);
+	color: var(--forest-text);
+	border-color: var(--rule);
 }
 .btn-ghost {
-	background: #ece9dc;
-	color: #177245;
+	background: var(--sage);
+	color: var(--forest-text);
 }
 .btn-danger {
 	background: #fee2e2;
@@ -108,9 +101,9 @@ h3 {
 select.input,
 textarea.input {
 	width: 100%;
-	background: #fffdf7;
-	border: 1.5px solid #e7e2d2;
-	border-radius: 0.625rem;
+	background: var(--sheet);
+	border: 1px solid var(--rule);
+	border-radius: 0.6rem;
 	padding: 0.65rem 0.85rem;
 	font-size: 1rem;
 	font-family: inherit;
@@ -118,8 +111,8 @@ textarea.input {
 	outline: none;
 }
 .input:focus {
-	border-color: #177245;
-	box-shadow: 0 0 0 3px rgb(23 114 69 / 0.15);
+	border-color: #16774f;
+	box-shadow: 0 0 0 4px rgb(22 119 79 / 0.12);
 }
 .input::placeholder {
 	color: #6e675c;
@@ -137,12 +130,12 @@ label.lbl {
 	align-items: center;
 	gap: 0.3rem;
 	padding: 0.4rem 0.85rem;
-	border-radius: 0.5rem;
+	border-radius: 999px;
 	font-size: 0.85rem;
 	font-weight: 600;
-	background: #fffdf7;
-	border: 1.5px solid #e7e2d2;
-	color: #3f4a42;
+	background: var(--sheet);
+	border: 1px solid var(--rule);
+	color: var(--quiet);
 	cursor: pointer;
 	white-space: nowrap;
 }
@@ -202,41 +195,6 @@ label.lbl {
 .muted {
 	color: #5f6b62;
 }
-.tablink {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 2px;
-	font-size: 0.68rem;
-	font-weight: 600;
-	color: #6e675c;
-	text-decoration: none;
-	padding: 0.35rem 0;
-	flex: 1;
-}
-.tablink.active {
-	color: #177245;
-}
-.tablink svg {
-	display: block;
-}
-
-/* Tautan menu header desktop (hanya tampil di lg ke atas). */
-.navlink {
-	padding: 0.4rem 0.75rem;
-	border-radius: 0.5rem;
-	color: #3f4a42;
-	text-decoration: none;
-	white-space: nowrap;
-}
-.navlink:hover {
-	background: #ece9dc;
-}
-.navlink.active {
-	background: #dcefe2;
-	color: #115c39;
-}
-
 /* --- Aksesibilitas & hemat data (diaktifkan lewat atribut di <html>) --- */
 
 /* Font mudah dibaca (Atkinson Hyperlegible): hanya bila diaktifkan. */
@@ -331,21 +289,9 @@ label.lbl {
 /* Cincin fokus keyboard yang terlihat (tombol, chip, tautan). */
 .btn:focus-visible,
 .chip:focus-visible,
-.tablink:focus-visible,
-.navlink:focus-visible,
 a:focus-visible {
 	outline: 2px solid #177245;
 	outline-offset: 2px;
-}
-
-/* Garis bawah coretan pensil — signature Ringkas: dipakai pada SATU
-   kata kunci judul halaman utama saja, bukan di mana-mana. */
-.u-pencil {
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='8' viewBox='0 0 120 8' preserveAspectRatio='none'%3E%3Cpath d='M2 5 Q 18 2 32 5 T 62 5 T 92 5 T 118 4' fill='none' stroke='%23177245' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
-	background-repeat: no-repeat;
-	background-position: 0 100%;
-	background-size: 100% 0.28em;
-	padding-bottom: 0.12em;
 }
 
 /* Hormati preferensi sistem: kurangi gerakan. */
@@ -360,20 +306,13 @@ a:focus-visible {
 	.animate-pulse {
 		animation: none !important;
 	}
-	.btn,
-	.tablink {
-		transition: none !important;
-	}
 }
 
 /* --- Mode gelap anak (diaktifkan lewat data-theme="dark" di <html>) --- */
 /* Lembut, BUKAN hitam pekat: latar hijau gelap #1b2b22, kartu #24382d,
    teks krem #f3efe4. Aksen emerald/marigold dipertahankan; hijau teks
    diterangkan supaya tetap kontras di atas latar gelap. Aturan ini
-   hanya MENAMBAH — tidak mengubah aturan terang di atas.
-   Catatan: header + tab bar bawah memakai kelas Tailwind arbitrary
-   (mis. bg-[#fffdf7]) karena +layout.svelte tidak diubah; kelas-kelas
-   itu di-override di bawah lewat nama kelas hasil Tailwind. */
+   hanya MENAMBAH — tidak mengubah aturan terang di atas. */
 
 [data-theme="dark"] {
 	color-scheme: dark;
@@ -393,10 +332,6 @@ a:focus-visible {
 	background: #24382d;
 	border-color: #3a5245;
 	box-shadow: none;
-}
-/* Hero slide 1: foto terang/hangat sedikit diredupkan di mode gelap. */
-[data-theme="dark"] .hero-scene {
-	filter: brightness(0.85);
 }
 [data-theme="dark"] .btn-primary {
 	background: #1e8a57;
@@ -468,22 +403,6 @@ a:focus-visible {
 }
 [data-theme="dark"] .muted {
 	color: #b9c4b4;
-}
-[data-theme="dark"] .tablink {
-	color: #93a89a;
-}
-[data-theme="dark"] .tablink.active {
-	color: #4ade80;
-}
-[data-theme="dark"] .navlink {
-	color: #d3d8cc;
-}
-[data-theme="dark"] .navlink:hover {
-	background: #2f463a;
-}
-[data-theme="dark"] .navlink.active {
-	background: #2c4a38;
-	color: #6ee7b7;
 }
 [data-theme="dark"] .glossary-term {
 	color: #4ade80;
@@ -635,12 +554,6 @@ a:focus-visible {
 [data-theme="dark"][data-a11y-contrast="1"] .chip.active {
 	background: #0a7a3f;
 	border-color: #0a7a3f;
-}
-[data-theme="dark"][data-a11y-contrast="1"] .tablink {
-	color: #d3d8cc;
-}
-[data-theme="dark"][data-a11y-contrast="1"] .tablink.active {
-	color: #4ade80;
 }
 [data-theme="dark"][data-a11y-contrast="1"] .err {
 	background: #2c1a1a;

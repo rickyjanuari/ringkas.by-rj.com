@@ -7,7 +7,7 @@
 	import MultiplicationTable from "$lib/tools/MultiplicationTable.svelte";
 	import FractionCalculator from "$lib/tools/FractionCalculator.svelte";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import {
 		api,
@@ -18,8 +18,8 @@
 		type FullChapter
 	} from "$lib/api";
 
-	let productId = $derived($page.params.product);
-	let chapterId = $derived($page.params.chapter);
+	let productId = $derived(page.params.product);
+	let chapterId = $derived(page.params.chapter);
 	let chapter = $state<FullChapter | null>(null);
 	let loading = $state(true);
 	let error = $state("");
@@ -506,9 +506,9 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto(`/belajar/${productId}`)}>
+<a href={`/belajar/${productId}`} class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke ruang belajar
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
@@ -516,16 +516,18 @@
 	<p class="err mt-6">{error || "Bab tidak ditemukan."}</p>
 {:else}
 	<Confetti fire={confettiFire} />
-	<h1 class="mt-3 text-xl font-semibold leading-snug">{chapter.title}</h1>
-	<p class="text-sm text-[#5f6b62]">
-		{chapter.subject} • Kelas {chapter.grade} • Semester {chapter.semester}
-	</p>
+	<header class="page-heading page-heading-reading">
+		<h1>{chapter.title}</h1>
+		<p class="text-sm text-[#5f6b62]">
+			{chapter.subject} • Kelas {chapter.grade} • Semester {chapter.semester}
+		</p>
+	</header>
 
 	{#if notice}
 		<p class="tabular-nums ok-msg mt-3">{notice}</p>
 	{/if}
 
-	<div class="mt-3 flex flex-wrap gap-2">
+	<div class="study-links">
 		<button type="button" class="btn {bookmarked ? 'btn-sun' : 'btn-ghost'} text-xs" onclick={toggleBookmark}>
 			{#if bookmarked}<Icon name="bookmark" size={16} /> Dibookmark{:else}<Icon name="bookmark" size={16} /> Bookmark{/if}
 		</button>
@@ -557,8 +559,8 @@
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
 		<div class="min-w-0">
 	<!-- Poin inti -->
-	<div class="card mt-4 p-4">
-		<h2 class="flex items-center gap-1.5 text-sm font-semibold text-[#177245]"><Icon name="target" size={16} /> Poin inti</h2>
+	<div class="card study-keypoints mt-4 p-4">
+		<h2><Icon name="target" size={20} /> Poin inti</h2>
 		<ul class="mt-2 space-y-1.5">
 			{#each chapter.points as p, i (i)}
 				<li class="flex gap-2 text-sm leading-relaxed">

@@ -220,22 +220,12 @@
 	}
 </script>
 
-<!-- Bar atas layar dorong: kembali + judul di tengah -->
-<div
-	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur lg:top-14 lg:-mx-8 lg:px-4"
->
-	<button
-		type="button"
-		class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#177245]"
-		aria-label="Kembali"
-		onclick={() => goto("/keranjang")}
-	>
-		<Icon name="chevron-left" size={18} />
-	</button>
-	<h1 class="min-w-0 flex-1 truncate text-center text-base font-semibold">Checkout</h1>
-	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
-</div>
+<header class="commerce-heading">
+	<a href="/keranjang" class="store-text-link product-back"><Icon name="arrow-left" size={18} /> Kembali ke keranjang</a>
+	<h1 class="store-title">Checkout.</h1>
+</header>
 
+<div class="checkout-flow">
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
 {:else if error}
@@ -534,3 +524,4 @@
 		</div>
 	</div>
 {/if}
+</div>

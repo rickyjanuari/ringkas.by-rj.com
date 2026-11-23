@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import {
 		api,
@@ -11,10 +11,12 @@
 		type BundleItem,
 		type StudyPack
 	} from "$lib/api";
-	import { cart, auth } from "$lib/store";
+	import { cart } from "$lib/store";
+	import { gradeLabel, gradeOfProduct, gradeStyle } from "$lib/gradeTheme";
+	import { settingsStore } from "$lib/settings";
 	import Icon from "$lib/Icon.svelte";
 
-	let slug = $derived($page.params.slug);
+	let slug = $derived(page.params.slug);
 	let product = $state<ProductPublic | null>(null);
 	let chapters = $state<ChapterMeta[]>([]);
 	let bundleItems = $state<BundleItem[]>([]);
@@ -22,7 +24,7 @@
 	let loading = $state(true);
 	let error = $state("");
 	let owned = $state(false);
-	let addedMsg = $state("");
+	let imageFailed = $state(false);
 
 	// Jumlah simulasi + ketersediaan kuis/flashcard, diambil best-effort dari
 	// GET /api/study/:slug. Bila gagal (401/locked/tanpa login), gagal diam-diam
@@ -106,8 +108,6 @@
 	function tambahKeranjang() {
 		if (!product || owned) return;
 		cart.add(product.id);
-		addedMsg = "Ditambahkan ke keranjang";
-		setTimeout(() => (addedMsg = ""), 2000);
 	}
 
 	function beliSekarang() {
@@ -117,263 +117,141 @@
 	}
 </script>
 
-<!-- Bar atas layar dorong: kembali + judul di tengah -->
-<div
-	class="sticky top-0 z-30 -mx-4 flex items-center gap-2 border-b border-[#e7e2d2] bg-[#fffdf7]/95 px-2 py-2.5 backdrop-blur lg:top-14 lg:-mx-8 lg:px-4"
->
-	<button
-		type="button"
-		class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#177245]"
-		aria-label="Kembali"
-		onclick={() => history.back()}
-	>
-		<Icon name="chevron-left" size={18} />
-	</button>
-	<h1 class="min-w-0 flex-1 truncate text-center text-base font-semibold">
-		{#if loading}Detail produk{:else}<span class="u-pencil">{(product?.title ?? "Detail produk").split(" ")[0]}</span> {(product?.title ?? "Detail produk").split(" ").slice(1).join(" ")}{/if}
-	</h1>
-	<span class="h-9 w-9 shrink-0" aria-hidden="true"></span>
-</div>
+<div class="product-detail">
+	<a href="/katalog" class="store-text-link product-back"><Icon name="arrow-left" size={18} /> Kembali ke katalog</a>
 
-{#if loading}
-	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat...</p>
-{:else if error || !product}
-	<p class="err mt-6">{error || "Produk tidak ditemukan."}</p>
-	<a href="/katalog" class="btn btn-primary mt-4">Lihat katalog</a>
-{:else}
-	<!-- Kolom tunggal sempit terpusat -->
-	<div class="mx-auto w-full max-w-[560px]">
-		<!-- Cover besar -->
-		<div class="card mt-3 overflow-hidden">
-			{#if coverImage}
-				<img src={coverImage} alt={product.title} class="datasaver-hide h-56 w-full object-cover" />
-			{:else}
-				<div
-					class="flex h-56 items-center justify-center px-6 text-center text-lg font-semibold text-white"
-					style="background: {product.cover_color}"
-				>
-					{product.cover_label}
-				</div>
-			{/if}
-		</div>
-
-		<!-- Judul + badge -->
-		<div class="mt-4">
-			<h2 class="font-serif text-xl leading-snug font-semibold">{product.title}</h2>
-			<div class="mt-2 flex flex-wrap gap-1.5">
-				<span class="badge badge-brand">{product.jenjang}</span>
-				<span class="badge badge-leaf">{product.mapel}</span>
-				{#if product.badge}
-					<span class="badge badge-sun">{product.badge}</span>
+	{#if loading}
+		<h1 class="store-title">Detail produk.</h1>
+		<p class="store-state mt-4" role="status">Memuat produk…</p>
+	{:else if error || !product}
+		<h1 class="store-title">Detail produk.</h1>
+		<p class="store-state mt-4" role="alert">{error || "Produk tidak ditemukan."}</p>
+	{:else}
+		{@const grade = gradeLabel(product.id)}
+		{@const added = $cart.includes(product.id)}
+		<div class="detail-intro">
+			<div class="detail-media" style={gradeStyle(grade ? gradeOfProduct(product.id) : 0)}>
+				{#if coverImage && !imageFailed && !$settingsStore.data_saver}
+					<img src={coverImage} alt="Sampul {product.title}" fetchpriority="high" onerror={() => (imageFailed = true)} />
+				{:else}
+					<div class="detail-book" aria-hidden="true">
+						<span><Icon name="book-open" size={24} /> Ringkas</span>
+						<strong>{product.cover_label || product.mapel}</strong>
+						<small>{product.jenjang}{grade ? ' · ' + grade : ''}</small>
+					</div>
 				{/if}
+			</div>
+			<div class="detail-summary">
+				<p class="product-meta">
+					<span>{product.jenjang}{grade ? ' · ' + grade : ''} · {product.mapel}</span>
+					{#if product.badge}<span class="badge badge-brand">{product.badge}</span>{/if}
+				</p>
+				<h1 class="store-title">{product.title}</h1>
+				{#if product.description}<p class="detail-description">{product.description}</p>{/if}
+
+				<div class="detail-purchase">
+					<div class="detail-price">
+						<strong>{formatRupiah(product.price)}</strong>
+						{#if product.strikethrough_price}<s>{formatRupiah(product.strikethrough_price)}</s>{/if}
+						{#if discountPct > 0}<span class="badge badge-brand">Hemat {discountPct}%</span>{/if}
+					</div>
+					{#if owned}
+						<p class="detail-purchase-note"><Icon name="check-circle" size={17} /> Produk ini sudah milikmu.</p>
+					{:else}
+						<p class="detail-purchase-note">Sekali bayar, tanpa langganan.</p>
+					{/if}
+					<div class="detail-actions">
+						{#if owned}
+							{#if materialUrl}
+								<a href={materialUrl} target="_blank" rel="noopener noreferrer" class="store-button store-button-outline"><Icon name="file-text" size={18} /> PDF & Word</a>
+							{/if}
+							<a href="/belajar/{encodeURIComponent(product.id)}" class="store-button store-button-dark"><Icon name="book-open" size={18} /> {materialUrl ? "Latihan web" : "Buka ruang belajar"}</a>
+						{:else}
+							<button type="button" class="store-button store-button-outline" onclick={() => added ? goto("/keranjang") : tambahKeranjang()}>
+								<Icon name={added ? "check" : "shopping-cart"} size={18} /> {added ? "Lihat keranjang" : "Tambah ke keranjang"}
+							</button>
+							<button type="button" class="store-button store-button-dark" onclick={beliSekarang}>
+								Beli sekarang <Icon name="arrow-right" size={18} />
+							</button>
+						{/if}
+					</div>
+					<p class="sr-only" role="status">{added ? "Produk ada di keranjang." : ""}</p>
+				</div>
 			</div>
 		</div>
 
-		<!-- Harga -->
-		<div class="mt-3 flex flex-wrap items-baseline gap-2">
-			<p class="text-3xl font-semibold tabular-nums text-[#177245]">{formatRupiah(product.price)}</p>
-			{#if product.strikethrough_price}
-				<p class="text-base font-semibold text-[#6e675c] line-through">
-					{formatRupiah(product.strikethrough_price)}
-				</p>
-				{#if discountPct > 0}
-					<span class="badge badge-sun">Hemat {discountPct}%</span>
+		<div class="detail-information">
+			<div>
+				{#if chapters.length || product.pages > 0 || hasQuiz || hasFlashcards || simCount > 0}
+					<section class="detail-section">
+						<h2>Yang kamu dapatkan.</h2>
+						<ul class="detail-included">
+							{#each [
+								chapters.length ? `${chapters.length} bab rangkuman` : "",
+								product.pages > 0 ? `${product.pages} halaman materi` : "",
+								hasQuiz ? "Kuis per bab" : "",
+								hasFlashcards ? "Flashcard per bab" : "",
+								simCount > 0 ? `${simCount} simulasi SAS` : ""
+							].filter(Boolean) as item (item)}
+								<li><Icon name="check-circle" size={18} /> {item}</li>
+							{/each}
+						</ul>
+					</section>
 				{/if}
-			{/if}
-		</div>
-		{#if addedMsg}
-			<p class="ok-msg mt-3 flex items-center gap-1.5">
-				<Icon name="check-circle" size={16} /> {addedMsg}
-			</p>
-		{/if}
 
-		<!-- Deskripsi pendek -->
-		{#if product.description}
-			<p class="mt-3 text-sm leading-relaxed">{product.description}</p>
-		{/if}
+				{#if chapters.length > 0}
+					<section class="detail-section">
+						<h2>Daftar isi.</h2>
+						{#each bySubject as [subject, list] (subject)}
+							<details>
+								<summary><span>{subject}</span><small>{list.length} bab</small><Icon name="chevron-down" size={18} /></summary>
+								<ul class="detail-chapters">
+									{#each list as chapter (chapter.id)}
+										<li>
+											<Icon name="file-text" size={19} />
+											<div>
+												<strong>{chapter.title}</strong>
+												<small>Kelas {chapter.grade} · Semester {chapter.semester}{chapter.video_url ? ' · Ada video' : ''}</small>
+											</div>
+										</li>
+									{/each}
+								</ul>
+							</details>
+						{/each}
+					</section>
+				{/if}
 
-		<!-- Yang kamu dapatkan -->
-		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
-			<Icon name="check-circle" size={18} /> Yang kamu dapatkan
-		</h2>
-		<ul class="card mt-2 space-y-2 p-4 text-sm">
-			{#if chapters.length > 0}
-				<li class="flex items-start gap-2">
-					<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-					<span>{chapters.length} bab rangkuman</span>
-				</li>
-			{/if}
-			{#if product.pages > 0}
-				<li class="flex items-start gap-2">
-					<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-					<span>{product.pages} halaman materi</span>
-				</li>
-			{/if}
-			{#if hasQuiz}
-				<li class="flex items-start gap-2">
-					<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-					<span>Kuis per bab</span>
-				</li>
-			{/if}
-			{#if hasFlashcards}
-				<li class="flex items-start gap-2">
-					<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-					<span>Flashcard per bab</span>
-				</li>
-			{/if}
-			{#if simCount > 0}
-				<li class="flex items-start gap-2">
-					<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-					<span>{simCount} simulasi SAS</span>
-				</li>
-			{/if}
-			<li class="flex items-start gap-2">
-				<Icon name="check-circle" size={16} class="mt-0.5 shrink-0 text-[#177245]" />
-				<span>Sekali bayar, tanpa langganan</span>
-			</li>
-		</ul>
+				{#if bundleItems.length > 0}
+					<section class="detail-section">
+						<h2>Isi bundel.</h2>
+						<ul class="detail-bundle">
+							{#each bundleItems as item (item.product_id)}
+								<li><span>{item.title}</span><strong>{formatRupiah(item.price)}</strong></li>
+							{/each}
+						</ul>
+					</section>
+				{/if}
 
-		<!-- Cara membeli -->
-		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
-			<Icon name="shopping-cart" size={18} /> Cara membeli
-		</h2>
-		<div class="mt-2 space-y-2">
-			<details class="card overflow-hidden">
-				<summary class="flex cursor-pointer items-center gap-2 p-4 text-sm font-semibold">
-					<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#177245] text-xs font-semibold text-white">1</span>
-					Pilih produk dan checkout
-				</summary>
-				<p class="px-4 pb-4 text-sm leading-relaxed text-[#5f6b62]">
-					Tambahkan produk ke keranjang, lalu lanjut ke checkout dan isi data pemesan.
-				</p>
-			</details>
-			<details class="card overflow-hidden">
-				<summary class="flex cursor-pointer items-center gap-2 p-4 text-sm font-semibold">
-					<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#177245] text-xs font-semibold text-white">2</span>
-					Bayar lewat QRIS
-				</summary>
-				<p class="px-4 pb-4 text-sm leading-relaxed text-[#5f6b62]">
-					Scan kode QR SumoPod yang muncul dengan aplikasi pembayaran apa saja.
-				</p>
-			</details>
-			<details class="card overflow-hidden">
-				<summary class="flex cursor-pointer items-center gap-2 p-4 text-sm font-semibold">
-					<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#177245] text-xs font-semibold text-white">3</span>
-					Pesanan lunas, akses di Ruang Belajar
-				</summary>
-				<p class="px-4 pb-4 text-sm leading-relaxed text-[#5f6b62]">
-					Setelah pembayaran terkonfirmasi, pesanan berubah menjadi lunas dan materi bisa dibuka di Ruang Belajar.
-				</p>
-			</details>
-		</div>
-
-		<!-- Daftar isi -->
-		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
-			<Icon name="book-open" size={18} /> Daftar isi
-		</h2>
-		{#if chapters.length === 0}
-			<p class="mt-2 text-sm text-[#5f6b62]">Daftar bab akan segera hadir.</p>
-		{:else}
-			<div class="mt-2 space-y-2">
-				{#each bySubject as [subject, list] (subject)}
-					<details class="card overflow-hidden">
-						<summary class="flex cursor-pointer items-center justify-between gap-2 p-4 text-sm font-semibold">
-							<span>{subject}</span>
-							<span class="shrink-0 text-xs font-semibold text-[#5f6b62]">{list.length} bab</span>
-						</summary>
-						<div class="space-y-2 px-4 pb-4">
-							{#each list as c (c.id)}
-								<div class="flex items-center gap-3">
-									<span
-										class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ece9dc] text-[#3f4a42]"
-									>
-										<Icon name="file-text" size={16} />
-									</span>
-									<div class="min-w-0 flex-1">
-										<p class="truncate text-sm font-semibold">{c.title}</p>
-										<p class="text-xs text-[#5f6b62]">
-											Kelas {c.grade} • Semester {c.semester}
-											{#if c.video_url}
-												• <Icon name="video" size={16} class="inline-block align-[-2px]" /> Ada video
-											{/if}
-										</p>
-									</div>
-								</div>
+				{#if images.length > 1 && !$settingsStore.data_saver}
+					<section class="detail-section">
+						<h2>Galeri paket.</h2>
+						<div class="detail-gallery">
+							{#each images as image, i (image.id)}
+								<img src={image.url} alt="Gambar {i + 1} paket {product.title}" loading="lazy" />
 							{/each}
 						</div>
-					</details>
-				{/each}
+					</section>
+				{/if}
 			</div>
-		{/if}
 
-		<!-- Kartu Ruang Belajar bila sudah LUNAS -->
-		{#if owned}
-			<div class="card mt-4 border-2 !border-[#177245] p-4">
-				<p class="flex items-center gap-1.5 text-sm font-semibold text-[#065f46]">
-					<Icon name="party-popper" size={16} /> Produk ini sudah milikmu.
-				</p>
-				<p class="mt-0.5 text-sm text-[#3f4a42]">
-					Materi unduhan dan latihan web sudah terbuka di akunmu.
-				</p>
-				<div class="mt-3 grid gap-2 sm:grid-cols-2">
-					{#if materialUrl}
-						<a href={materialUrl} target="_blank" rel="noopener noreferrer" class="btn btn-sun w-full">
-							<Icon name="file-text" size={16} /> PDF & Word
-						</a>
-					{/if}
-					<a href={`/belajar/${product.id}`} class="btn btn-leaf w-full">
-						<Icon name="book-open" size={16} /> Latihan web
-					</a>
-				</div>
-			</div>
-		{/if}
-
-		<!-- Isi bundel -->
-		{#if bundleItems.length > 0}
-			<h2 class="mt-6 flex items-center gap-2 text-base font-semibold">
-				<Icon name="package" size={18} /> Isi bundel
-			</h2>
-			<p class="text-xs text-[#5f6b62]">Bundel ini berisi {bundleItems.length} produk:</p>
-			<div class="mt-2 space-y-2">
-				{#each bundleItems as item (item.product_id)}
-					<div class="card flex items-center justify-between gap-2 p-3">
-						<span class="min-w-0 flex-1 text-sm font-semibold leading-snug">{item.title}</span>
-						<span class="shrink-0 text-sm font-semibold text-[#177245]">{formatRupiah(item.price)}</span>
-					</div>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Galeri -->
-		{#if images.length > 1}
-			<div class="mt-4 flex gap-2 overflow-x-auto pb-1">
-				{#each images as img (img.id)}
-					<img
-						src={img.url}
-						alt=""
-						class="datasaver-hide h-20 w-28 shrink-0 rounded-xl border border-[#e7e2d2] object-cover"
-					/>
-				{/each}
-			</div>
-		{/if}
-	</div>
-
-	<!-- Bar beli bawah (sticky, selebar kolom) -->
-	<div
-		class="fixed bottom-0 left-1/2 z-40 flex w-full max-w-[560px] -translate-x-1/2 gap-2 border-t border-[#e7e2d2] bg-[#fffdf7] px-4 py-3 pb-[env(safe-area-inset-bottom)]"
-	>
-		{#if owned}
-			<a href={`/belajar/${product.id}`} class="btn btn-leaf w-full">
-				<Icon name="book-open" size={16} /> Buka ruang belajar
-			</a>
-		{:else}
-			<button type="button" class="btn btn-outline flex-1" onclick={tambahKeranjang}>
-				<Icon name="shopping-cart" size={16} /> Tambah ke keranjang
-			</button>
-			<button type="button" class="btn btn-primary flex-1" onclick={beliSekarang}>
-				<Icon name="zap" size={16} /> Beli sekarang
-			</button>
-		{/if}
-	</div>
-	<div class="h-16"></div>
-{/if}
+			<section class="detail-section detail-guide">
+				<h2>Cara membeli.</h2>
+				<ol>
+					<li>Pilih produk dan isi data pemesan saat checkout.</li>
+					<li>Ikuti petunjuk pembayaran QRIS.</li>
+					<li>Buka materi dari halaman <a href="/pesanan">Pesanan</a> setelah pembayaran terkonfirmasi.</li>
+				</ol>
+			</section>
+		</div>
+	{/if}
+</div>

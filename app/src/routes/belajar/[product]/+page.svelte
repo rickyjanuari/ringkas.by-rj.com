@@ -3,7 +3,7 @@
 	import Confetti from "$lib/Confetti.svelte";
 	import { gradeLabel, gradeOfProduct, gradeTheme } from "$lib/gradeTheme";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import {
 		api,
@@ -19,7 +19,7 @@
 		type FullChapter
 	} from "$lib/api";
 
-	let productId = $derived($page.params.product);
+	let productId = $derived(page.params.product);
 	let pack = $state<StudyPack | null>(null);
 	let doneSet = $state<Set<string>>(new Set());
 	let loading = $state(true);
@@ -342,7 +342,7 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto(`/produk/${productId}`)}>
+<button type="button" class="btn btn-ghost product-back" onclick={() => goto(`/produk/${productId}`)}>
 	<Icon name="chevron-left" size={18} /> Kembali ke produk
 </button>
 
@@ -351,27 +351,25 @@
 {:else if error || !pack}
 	<p class="err mt-6">{error || "Ruang belajar tidak ditemukan."}</p>
 {:else}
-	{@const kataKunci = pack.product.title.split(" ")[0]}
-	<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug"><Icon name="book-open" size={18} class="shrink-0" />
-		<span class="u-pencil">{kataKunci}</span>{pack.product.title.slice(kataKunci.length)}
-	</h1>
-	<p class="text-sm text-[#5f6b62]">
-		{pack.product.jenjang} • {pack.product.mapel} • {pack.chapters.length} bab
-	</p>
 	{@const gtBelajar = gradeTheme(gradeOfProduct(productId))}
-	{#if gradeLabel(productId)}
-		<p class="mt-2">
-			<span class="badge" style="background: {gtBelajar.soft}; color: {gtBelajar.text}">
-				{gradeLabel(productId)}
-			</span>
-		</p>
-	{/if}
-	<div class="mt-3 h-1.5 rounded-full" style="background: {gtBelajar.accent}" aria-hidden="true"></div>
-
-	<a href="/peta-belajar/{productId}" class="btn btn-outline mt-3">
-		<Icon name="map" size={16} /> Lihat peta belajar
-	</a>
-	<div class="mt-2 flex flex-wrap gap-2">
+	<header class="page-heading page-heading-study study-intro">
+		<div>
+			<p class="eyebrow">Ruang belajar</p>
+			<h1>{pack.product.title}</h1>
+			<p>{pack.product.jenjang} · {pack.product.mapel} · {pack.chapters.length} bab</p>
+			{#if gradeLabel(productId)}
+				<span class="badge" style="background: {gtBelajar.soft}; color: {gtBelajar.text}">{gradeLabel(productId)}</span>
+			{/if}
+		</div>
+		<nav aria-label="Bagian ruang belajar">
+			<a href="#daftar-bab"><Icon name="book-open" size={19} /> Daftar bab</a>
+			{#if pack.simulations.length > 0}
+				<a href="#simulasi-sas"><Icon name="trophy" size={19} /> Simulasi SAS</a>
+			{/if}
+			<a href="/peta-belajar/{productId}"><Icon name="map" size={19} /> Peta belajar</a>
+		</nav>
+	</header>
+	<div class="study-links">
 		<a href="/soal-cerita" class="btn btn-outline">
 			<Icon name="message" size={16} /> Latihan soal cerita
 		</a>
@@ -424,7 +422,7 @@
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
 		<div class="min-w-0">
 	<!-- Daftar bab -->
-	<h2 class="mt-6 flex items-center gap-2 text-base font-semibold"><Icon name="library" size={18} /> Daftar bab</h2>
+	<h2 id="daftar-bab" class="study-section-title">Daftar bab</h2>
 	{#if pack.chapters.length === 0}
 		<p class="mt-2 text-sm text-[#5f6b62]">Bab untuk produk ini akan segera hadir.</p>
 	{:else}
@@ -590,7 +588,7 @@
 		<div class="min-w-0">
 	<!-- Simulasi SAS -->
 	{#if pack.simulations.length > 0}
-		<h2 class="mt-6 flex items-center gap-2 text-base font-semibold"><Icon name="trophy" size={18} /> Simulasi SAS</h2>
+		<h2 id="simulasi-sas" class="study-section-title">Simulasi SAS</h2>
 		<p class="text-xs text-[#5f6b62]">Latihan seperti ujian sebenarnya — ada waktu dan skor.</p>
 		{#if simNotice}
 			<p class="err mt-3">{simNotice}</p>

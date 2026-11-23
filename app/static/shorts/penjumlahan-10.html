@@ -7,28 +7,28 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
-  href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Nunito+Sans:wght@400;700;800&display=swap"
+  href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
   rel="stylesheet"
 />
 <style>
   :root {
-    --emerald: #177245;
-    --marigold: #f2b33d;
-    --ink: #22302a;
-    --paper: #f7f5ef;
-    --card: #fffdf7;
-    --line: #e7e2d2;
-    --muted: #5f6b62;
+    --emerald: #143c31;
+    --marigold: #e9f492;
+    --ink: #203129;
+    --paper: #f6f4eb;
+    --card: #fdfbf4;
+    --line: #d8d9ca;
+    --muted: #515e52;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--paper);
     color: var(--ink);
-    font-family: "Nunito Sans", system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
   .phone {
-    max-width: 420px;
+    max-width: 30rem;
     min-height: 100dvh;
     margin: 0 auto;
     background: var(--card);
@@ -47,7 +47,7 @@
     width: 34px; height: 34px; border-radius: 10px;
     background: var(--emerald); color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-family: Lora, serif; font-weight: 700; font-size: 18px;
+    font-family: "DM Serif Display", Georgia, serif; font-weight: 700; font-size: 18px;
   }
   header p { margin: 0; line-height: 1.25; }
   header .t { font-weight: 800; font-size: 15px; }
@@ -62,11 +62,11 @@
     align-items: center; justify-content: center;
     gap: 14px; padding: 18px 16px 8px; text-align: center;
   }
-  .stage h1 {
-    font-family: Lora, serif; font-size: 26px; line-height: 1.25; margin: 0;
+  .stage h2 {
+    font-family: "DM Serif Display", Georgia, serif; font-size: 26px; line-height: 1.25; margin: 0;
   }
   .stage .big {
-    font-family: Lora, serif; font-size: 40px; font-weight: 700; color: var(--emerald);
+    font-family: "DM Serif Display", Georgia, serif; font-size: 40px; font-weight: 700; color: var(--emerald);
     margin: 0;
   }
   .objects {
@@ -145,7 +145,7 @@
   .numline .frog::after {
     content: ""; position: absolute; top: 7px; width: 8px; height: 8px;
     border-radius: 50%; background: #fff;
-    box-shadow: inset 0 0 0 2px #22302a;
+    box-shadow: inset 0 0 0 2px #203129;
   }
   .numline .frog::before { left: 6px; }
   .numline .frog::after { right: 6px; }
@@ -187,13 +187,20 @@
   }
   .endcard { display: none; text-align: center; padding: 6px 16px 16px; }
   .endcard.show { display: block; }
+
+  header .t { display: block; margin: 0; font: 400 clamp(1.15rem, 3.5vw, 1.55rem)/1.12 "DM Serif Display", Georgia, serif; }
+  header .s { display: block; margin-top: 0.25rem; }
+  @media (min-width: 36rem) {
+    .phone { min-height: auto; margin-block: 1rem; border-radius: 1.15rem; overflow: hidden; }
+  }
+  :focus-visible { outline: 2px solid #24724e; outline-offset: 3px; }
 </style>
 </head>
 <body>
 <div class="phone">
   <header>
     <span class="dot">R</span>
-    <p><span class="t">Penjumlahan sampai 10</span><br /><span class="s">Matematika Kelas 1 • Bab 2 • Video pendek</span></p>
+    <div><h1 class="t">Penjumlahan sampai 10</h1><span class="s">Matematika Kelas 1 • Bab 2 • Video pendek</span></div>
   </header>
   <div class="progress" id="progress"></div>
   <div class="stage" id="stage"></div>
@@ -230,7 +237,7 @@
     Array.from({ length: n }, (_, i) =>
       `<span class="star ${cls || ""}" style="--d:${base + i * 0.4}s"></span>`).join("");
   const balloons = (n) => {
-    const colors = ["#d64541", "#f2b33d", "#3b82c4", "#4caf50", "#e8833a", "#8e6fc8"];
+    const colors = ["#d64541", "#e9f492", "#3b82c4", "#4caf50", "#e8833a", "#8e6fc8"];
     return Array.from({ length: n }, (_, i) =>
       `<span class="balloon" style="--d:${0.4 + i * 0.45}s;background:${colors[i % colors.length]}"></span>`).join("");
   };
@@ -244,25 +251,25 @@
     {
       title: "Pembuka",
       text: "Halo, teman-teman! Penjumlahan artinya menggabungkan. Ayo kita coba!",
-      html: `<h1>Penjumlahan itu<br />menggabungkan!</h1><p class="big">2 + 3 = 5</p>`,
+      html: `<h2>Penjumlahan itu<br />menggabungkan!</h2><p class="big">2 + 3 = 5</p>`,
       fallbackMs: 7000
     },
     {
       title: "Menggabungkan apel 2+3",
       text: "Dua apel ditambah tiga apel. Gabungkan semuanya! Satu, dua, tiga, empat, lima! Ada lima apel. Hebat!",
-      html: `<h1>2 apel + 3 apel = ?</h1><div class="objects"><span class="group a">${apples(2, "red", 0.4)}</span><span class="plus">+</span><span class="group b">${apples(3, "orange", 1.4)}</span></div><p class="big">2 + 3 = 5</p>`,
+      html: `<h2>2 apel + 3 apel = ?</h2><div class="objects"><span class="group a">${apples(2, "red", 0.4)}</span><span class="plus">+</span><span class="group b">${apples(3, "orange", 1.4)}</span></div><p class="big">2 + 3 = 5</p>`,
       fallbackMs: 12000
     },
     {
       title: "Menggabungkan bintang 4+2",
       text: "Empat bintang ditambah dua bintang. Gabungkan! Ada enam bintang!",
-      html: `<h1>4 bintang + 2 bintang = ?</h1><div class="objects">${stars(4, "", 0.4)}<span class="plus">+</span>${stars(2, "blue", 2.2)}</div><p class="big">4 + 2 = 6</p>`,
+      html: `<h2>4 bintang + 2 bintang = ?</h2><div class="objects">${stars(4, "", 0.4)}<span class="plus">+</span>${stars(2, "blue", 2.2)}</div><p class="big">4 + 2 = 6</p>`,
       fallbackMs: 11000
     },
     {
       title: "Garis bilangan 3+4",
       text: "Tiga ditambah empat. Katak melompat tiga kali, lalu empat kali lagi. Katak tiba di angka tujuh!",
-      html: `<h1>3 + 4 = ?</h1><div class="numline"><div class="track"></div>
+      html: `<h2>3 + 4 = ?</h2><div class="numline"><div class="track"></div>
         ${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<span class="tick" style="left:${4 + n * 9.2}%"></span><span class="lbl" style="left:${4 + n * 9.2}%">${n}</span>`).join("")}
         <span class="frog"></span></div><p class="big">3 + 4 = 7</p>`,
       fallbackMs: 11000
@@ -270,13 +277,13 @@
     {
       title: "Tebak balon 3+3",
       text: "Tiga balon ditambah tiga balon. Ada berapa balon? Satu, dua, tiga, empat, lima, enam! Ada enam balon!",
-      html: `<h1>3 balon + 3 balon = ?</h1><div class="objects">${balloons(6)}</div><p class="big">3 + 3 = 6</p>`,
+      html: `<h2>3 balon + 3 balon = ?</h2><div class="objects">${balloons(6)}</div><p class="big">3 + 3 = 6</p>`,
       fallbackMs: 11000
     },
     {
       title: "Penutup",
       text: "Hebat! Penjumlahan itu menggabungkan. Lihat kotak sepuluh: enam biru ditambah dua oranye sama dengan delapan. Coba kuisnya, ya!",
-      html: `<h1>Kotak Sepuluh</h1>${tenFrame62()}<p style="font-weight:800">6 biru + 2 oranye = 8</p>`,
+      html: `<h2>Kotak Sepuluh</h2>${tenFrame62()}<p style="font-weight:800">6 biru + 2 oranye = 8</p>`,
       fallbackMs: 11000
     }
   ];

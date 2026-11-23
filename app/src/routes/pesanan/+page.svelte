@@ -125,11 +125,10 @@
 	}
 </script>
 
-<header class="border-b border-[#d8d2bd] pb-5">
+<header class="page-heading page-heading-account order-heading">
 	<div class="flex items-start justify-between gap-4">
 		<div>
-			<p class="text-sm font-semibold text-[#177245]">Akun saya</p>
-			<h1 class="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+			<h1>
 				<Icon name="receipt" size={21} /> Pesanan saya
 			</h1>
 			<p class="mt-1 max-w-xl text-sm leading-relaxed text-[#5f6b62]">

@@ -263,16 +263,18 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
+<a href="/akun" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke akun
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="alarm-clock" size={18} class="shrink-0" /> Jadwal belajar & pengingat
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Atur jam belajar tiap anak, lalu Ringkas mengingatkan lewat notifikasi saat waktunya tiba.
-</p>
+<header class="page-heading page-heading-account">
+	<h1>
+		<Icon name="alarm-clock" size={18} class="shrink-0" /> Jadwal belajar & pengingat
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Atur jam belajar tiap anak, lalu Ringkas mengingatkan lewat notifikasi saat waktunya tiba.
+	</p>
+</header>
 
 <!-- Kartu langganan push -->
 <div class="card mt-4 p-4">

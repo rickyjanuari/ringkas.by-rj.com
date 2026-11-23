@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { api, formatTanggal, getToken, type PublicQuestion } from "$lib/api";
 
@@ -41,7 +41,7 @@
 		review: { questionId: string; correct: boolean; discussion: string }[];
 	}
 
-	let id = $derived($page.params.id);
+	let id = $derived(page.params.id);
 	let detail = $state<TryoutDetail | null>(null);
 	let leaderboard = $state<BoardRow[] | null>(null);
 	let loading = $state(true);
@@ -228,24 +228,26 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/tryout")}>
+<a href="/tryout" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Semua tryout
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat tryout...</p>
 {:else if error || !detail}
 	<p class="err mt-6">{error || "Tryout tidak ditemukan."}</p>
 {:else}
-	<h1 class="mt-3 text-xl font-semibold leading-snug">{detail.title}</h1>
-	<p class="mt-1 flex flex-wrap items-center gap-1.5 text-sm">
-		<span class={faseBadge(detail)}>
-			{detail.phase === "live" ? "Berlangsung" : detail.phase === "upcoming" ? "Mendatang" : "Selesai"}
-		</span>
-		<span class="badge {detail.is_free ? 'badge-leaf' : 'badge-gray'}">
-			{detail.is_free ? "Gratis — semua akun bisa ikut" : `Khusus pemilik produk Kelas ${detail.grade}`}
-		</span>
-	</p>
+	<header class="page-heading page-heading-practice">
+		<h1>{detail.title}</h1>
+		<p class="mt-1 flex flex-wrap items-center gap-1.5 text-sm">
+			<span class={faseBadge(detail)}>
+				{detail.phase === "live" ? "Berlangsung" : detail.phase === "upcoming" ? "Mendatang" : "Selesai"}
+			</span>
+			<span class="badge {detail.is_free ? 'badge-leaf' : 'badge-gray'}">
+				{detail.is_free ? "Gratis — semua akun bisa ikut" : `Khusus pemilik produk Kelas ${detail.grade}`}
+			</span>
+		</p>
+	</header>
 	<p class="mt-2 text-sm text-[#5f6b62]">
 		Kelas {detail.grade} • {detail.question_count} soal • {detail.duration_minutes} menit
 	</p>

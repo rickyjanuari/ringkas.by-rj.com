@@ -109,16 +109,18 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
+<a href="/akun" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke akun
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="graduation-cap" size={18} class="shrink-0" /> Rapor semester
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Ringkasan belajarmu satu semester dalam satu berkas PDF — siap diunduh dan dibagikan ke orang tua.
-</p>
+<header class="page-heading page-heading-account">
+	<h1>
+		<Icon name="graduation-cap" size={18} class="shrink-0" /> Rapor semester
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Ringkasan belajarmu satu semester dalam satu berkas PDF — siap diunduh dan dibagikan ke orang tua.
+	</p>
+</header>
 
 <!-- Rapor saya -->
 <div class="card mt-4 p-4">

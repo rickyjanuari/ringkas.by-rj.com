@@ -96,17 +96,19 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/")}>
+<a href="/" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke beranda
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="refresh" size={18} class="shrink-0" /> Latihan tanpa habis
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Soal hitung baru setiap kali kamu minta — tidak ada habisnya. Jawab semua soal, periksa
-	jawabanmu, lalu minta soal baru lagi sesukamu.
-</p>
+<header class="page-heading page-heading-practice">
+	<h1>
+		<Icon name="refresh" size={18} class="shrink-0" /> Latihan tanpa habis
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Soal hitung baru setiap kali kamu minta — tidak ada habisnya. Jawab semua soal, periksa
+		jawabanmu, lalu minta soal baru lagi sesukamu.
+	</p>
+</header>
 
 {#if !pack}
 	<div class="card mt-4 space-y-4 p-4">

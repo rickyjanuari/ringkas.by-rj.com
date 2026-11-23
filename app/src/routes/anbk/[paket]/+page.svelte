@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from "$lib/Icon.svelte";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import {
 		api,
@@ -13,7 +13,7 @@
 		type SimulationPack
 	} from "$lib/api";
 
-	let simId = $derived($page.params.paket);
+	let simId = $derived(page.params.paket);
 	let pack = $state<SimulationPack | null>(null);
 	let loading = $state(true);
 	let error = $state("");
@@ -128,9 +128,9 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/anbk")}>
+<a href="/anbk" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke simulasi ANBK
-</button>
+</a>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat soal simulasi...</p>
@@ -142,12 +142,15 @@
 		</a>
 	{/if}
 {:else}
-	<div class="card mt-3 border-[#177245] p-4">
+	<header class="page-heading page-heading-practice">
+		<h1>{pack.simulation.title}</h1>
+		<p>{pack.simulation.total_minutes} menit · {total} soal</p>
+	</header>
+	<div class="card exercise-panel mt-4 p-4">
 		<div class="flex items-start justify-between gap-2">
 			<div>
-				<p class="text-sm font-semibold leading-snug">{pack.simulation.title}</p>
 				<p class="mt-0.5 text-xs font-medium text-[#177245]">
-					<Icon name="timer" size={16} class="tabular-nums inline-block align-[-2px]" /> Sisa waktu: {clock(timeLeft)} • {pack.simulation.total_minutes} menit • {total} soal
+					<Icon name="timer" size={16} class="tabular-nums inline-block align-[-2px]" /> Sisa waktu: {clock(timeLeft)}
 				</p>
 			</div>
 			<span class="badge badge-brand shrink-0">ANBK</span>

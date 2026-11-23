@@ -981,17 +981,18 @@
 	}
 </script>
 
-<!-- Desktop: dua kolom — akun kiri, Bantuan & info sticky kanan -->
-<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
+<div class="account-layout" class:account-guest={!loggedIn}>
 	<div class="min-w-0">
 {#if !loggedIn}
-	<h1 class="flex items-center gap-2 text-xl font-semibold"><Icon name="user" size={18} /> <span class="u-pencil">Akun</span></h1>
-	<p class="text-sm text-[#5f6b62]">Masuk untuk menyimpan progres belajarmu.</p>
+	<header class="account-entry">
+		<h1 class="store-title">{mode === "register" ? "Buat akun" : "Masuk ke Ringkas"}</h1>
+		<p>Simpan progres belajar dan buka materi dari pesananmu.</p>
+	</header>
 
 	{#if twofaStep}
 		<!-- Langkah kedua: verifikasi dua langkah -->
 		<form
-			class="card mt-3 space-y-3 p-4 lg:max-w-xl"
+			class="card account-form space-y-4"
 			onsubmit={(e) => {
 				e.preventDefault();
 				submit2fa();
@@ -1043,17 +1044,17 @@
 			</div>
 		</form>
 	{:else}
-	<div class="mt-4 flex gap-2">
-		<button type="button" class="chip flex-1 justify-center" class:active={mode === "login"} onclick={() => (mode = "login")}>
+	<div class="account-switch" role="group" aria-label="Akses akun">
+		<button type="button" class="store-filter" aria-pressed={mode === "login"} onclick={() => (mode = "login")}>
 			Masuk
 		</button>
-		<button type="button" class="chip flex-1 justify-center" class:active={mode === "register"} onclick={() => (mode = "register")}>
+		<button type="button" class="store-filter" aria-pressed={mode === "register"} onclick={() => (mode = "register")}>
 			Daftar
 		</button>
 	</div>
 
 	<form
-		class="card mt-3 space-y-3 p-4 lg:max-w-xl"
+		class="card account-form space-y-4"
 		onsubmit={(e) => {
 			e.preventDefault();
 			submitAuth();
@@ -1062,13 +1063,14 @@
 		{#if mode === "register"}
 			<div>
 				<label class="lbl" for="reg-nama">Nama</label>
-				<input id="reg-nama" class="input" bind:value={name} placeholder="Nama kamu" required />
+				<input id="reg-nama" autocomplete="name" class="input" bind:value={name} placeholder="Nama kamu" required />
 			</div>
 		{/if}
 		<div>
 			<label class="lbl" for="auth-email">Email</label>
 			<input
 				id="auth-email"
+				autocomplete="email"
 				class="input"
 				type="email"
 				bind:value={email}
@@ -1080,6 +1082,7 @@
 			<label class="lbl" for="auth-pass">Password</label>
 			<input
 				id="auth-pass"
+				autocomplete={mode === "register" ? "new-password" : "current-password"}
 				class="input"
 				type="password"
 				bind:value={password}
@@ -1131,25 +1134,30 @@
 	</form>
 	{/if}
 {:else}
-	<!-- Profil -->
-	<div class="card flex items-center gap-3 p-4">
-		<span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#177245] text-white"><Icon name="user" size={24} /></span>
-		<div class="min-w-0 flex-1">
-			<p class="truncate font-semibold">{$auth.user?.name}</p>
-			<p class="truncate text-sm text-[#5f6b62]">{$auth.user?.email}</p>
-			<p class="text-xs font-medium text-[#177245]">
-				{#if isAdmin}<span class="inline-flex items-center gap-1"><Icon name="crown" size={16} /> Admin</span>{:else}<span class="inline-flex items-center gap-1"><Icon name="backpack" size={16} /> Pelanggan</span>{/if}
-				{#if tracker}• <Icon name="flame" size={16} class="inline-block align-[-2px]" /> Streak {tracker.streak} hari{/if}
-			</p>
+	<header class="page-heading page-heading-study account-profile">
+		<div>
+			<p class="eyebrow">Akun Ringkas</p>
+			<h1>{$auth.user?.name || "Akun saya"}</h1>
+			<p class="account-email">{$auth.user?.email}</p>
 		</div>
-	</div>
+		<div class="account-profile-meta">
+			{#if isAdmin}<a href="/admin" class="store-button store-button-accent"><Icon name="crown" size={17} /> Panel admin</a>{/if}
+			{#if tracker}<span><Icon name="flame" size={18} /> Streak {tracker.streak} hari</span>{/if}
+		</div>
+	</header>
+	<nav class="account-jump" aria-label="Bagian akun">
+		<a href="#progres-akun">Progres belajar</a>
+		<a href="#pengaturan-akun">Pengaturan</a>
+		<a href="#latihan-akun">Latihan</a>
+		<a href="#keluarga-akun">Orang tua & kelas</a>
+	</nav>
 
 	{#if trackerError}
 		<p class="err mt-3">{trackerError}</p>
 	{/if}
 
 	<!-- Level & XP -->
-	<div class="card mt-3 p-4">
+	<div id="progres-akun" class="card mt-3 p-4">
 		<div class="flex items-center gap-3">
 			<Avatar stage={xp ? xp.stage : 1} size={56} />
 			<div class="min-w-0 flex-1">
@@ -1237,7 +1245,7 @@
 	</div>
 
 	<!-- Aksesibilitas & hemat data -->
-	<div class="card mt-3 p-4">
+	<div id="pengaturan-akun" class="card mt-3 p-4">
 		<div class="flex items-center gap-3">
 			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="eye" size={22} /></span>
 			<div class="min-w-0 flex-1">
@@ -1271,13 +1279,13 @@
 		{/if}
 	</div>
 
-	<!-- Mode tampilan & suara -->
+	<!-- Tampilan & suara -->
 	<div class="card mt-3 p-4">
 		<div class="flex items-center gap-3">
-			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="moon" size={22} /></span>
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="sparkles" size={22} /></span>
 			<div class="min-w-0 flex-1">
-				<p class="font-semibold">Mode Tampilan &amp; Suara</p>
-				<p class="text-xs text-[#5f6b62]">Mode gelap dan bunyi jawaban benar. Tersimpan di akunmu.</p>
+				<p class="font-semibold">Tampilan &amp; suara</p>
+				<p class="text-xs text-[#5f6b62]">Pilih tema dan atur bunyi umpan balik saat menjawab soal.</p>
 			</div>
 		</div>
 		<div class="mt-3">
@@ -1437,7 +1445,7 @@
 	</div>
 
 	<!-- Menu -->
-	<div class="mt-4 space-y-3">
+	<div id="latihan-akun" class="mt-4 space-y-3">
 		<!-- Latihan Harian -->
 		<div class="card overflow-hidden">
 			<button type="button" class="flex w-full items-center gap-3 p-4 text-left" onclick={toggleDaily}>
@@ -1833,7 +1841,7 @@
 		</div>
 
 		<!-- Mode orang tua -->
-		<div class="card overflow-hidden">
+		<div id="keluarga-akun" class="card overflow-hidden">
 			<button type="button" class="flex w-full items-center gap-3 p-4 text-left" onclick={toggleOrtu}>
 				<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ece9dc] text-[#3f4a42]"><Icon name="users" size={22} /></span>
 				<span class="flex-1 text-left">
@@ -2037,7 +2045,24 @@
 {/if}
 	</div>
 
-	<div class="lg:sticky lg:top-[72px] lg:self-start">
+	<aside class="account-rail">
+{#if loggedIn}
+	<nav class="account-links" aria-label="Tautan akun">
+		<h2>Akses cepat</h2>
+		<a href="/pesanan"><Icon name="receipt" size={19} /> Pesanan saya <Icon name="arrow-right" size={17} /></a>
+		<a href="/alat"><Icon name="layers" size={19} /> Alat belajar <Icon name="arrow-right" size={17} /></a>
+		<a href="/rapor"><Icon name="graduation-cap" size={19} /> Rapor semester <Icon name="arrow-right" size={17} /></a>
+	</nav>
+{:else}
+	<section class="account-visual">
+		<Icon name="book-open" size={34} />
+		<h2>Lanjut belajar, bab demi bab.</h2>
+		<ul>
+			<li><Icon name="check" size={18} /> Buka materi yang sudah kamu beli.</li>
+			<li><Icon name="check" size={18} /> Simpan nilai kuis dan catatanmu.</li>
+		</ul>
+	</section>
+{/if}
 <!-- Bantuan & info -->
 <div class="card mt-4 p-4 lg:mt-0">
 	<p class="text-sm font-semibold">Bantuan &amp; Info</p>
@@ -2062,7 +2087,7 @@
 		Ketuk untuk membaca di sini, atau buka halaman penuh dari menu bawah situs.
 	</p>
 </div>
-	</div>
+	</aside>
 </div>
 
 <BottomSheet open={sheet !== null} title={sheetTitle} onClose={() => (sheet = null)}>

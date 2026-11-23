@@ -373,12 +373,14 @@
 	}
 </script>
 
-<h1 class="flex items-center gap-2 text-xl font-semibold">
-	<Icon name="pen" size={18} /> {viewTitle}
-</h1>
-<p class="mt-1 text-sm text-[#5f6b62]">
-	{viewDesc}
-</p>
+<header class="page-heading page-heading-account">
+	<h1>
+		<Icon name="pen" size={18} /> {viewTitle}
+	</h1>
+	<p class="mt-1 text-sm text-[#5f6b62]">
+		{viewDesc}
+	</p>
+</header>
 
 {#if loading}
 	<p class="mt-6 text-center text-sm font-semibold text-[#5f6b62]">Memuat karya...</p>

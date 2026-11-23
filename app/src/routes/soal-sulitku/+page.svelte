@@ -132,17 +132,19 @@
 	}
 </script>
 
-<button type="button" class="btn btn-ghost" onclick={() => goto("/akun")}>
+<a href="/akun" class="store-text-link product-back">
 	<Icon name="chevron-left" size={18} /> Kembali ke akun
-</button>
+</a>
 
-<h1 class="mt-3 flex items-center gap-2 text-xl font-semibold leading-snug">
-	<Icon name="target" size={18} class="shrink-0" /> Soal sulitku
-</h1>
-<p class="text-sm text-[#5f6b62]">
-	Soal yang pernah kamu jawab salah — di kuis bab dan simulasi — terkumpul di sini. Jawab benar,
-	maka soal itu keluar dari bank.
-</p>
+<header class="page-heading page-heading-practice">
+	<h1>
+		<Icon name="target" size={18} class="shrink-0" /> Soal sulitku
+	</h1>
+	<p class="text-sm text-[#5f6b62]">
+		Soal yang pernah kamu jawab salah — di kuis bab dan simulasi — terkumpul di sini. Jawab benar,
+		maka soal itu keluar dari bank.
+	</p>
+</header>
 
 {#if notice}
 	<p class="tabular-nums ok-msg mt-3">{notice}</p>
